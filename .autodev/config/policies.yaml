@@ -1,0 +1,91 @@
+# DEVFACTORY — políticas operacionais. Tudo que um humano normalmente perguntaria.
+
+# --- Seção 12/13/14: cota do Codex é ESPERA DE RECURSO, não falha -------------
+cota_codex:
+  espera_padrao_segundos: 18600      # 5 h 10 min — valor de PRODUÇÃO, não alterar
+  espera_teste_segundos: 8           # usado só no teste de aceitação automatizado
+  conta_como_tentativa: false        # não consome orçamento de tentativas de código
+  detectores:                        # substrings (case-insensitive) no output do Codex
+    - "quota exceeded"
+    - "usage limit reached"
+    - "rate limit"
+    - "rate-limit"
+    - "credits unavailable"
+    - "insufficient quota"
+    - "out of credits"
+    - "limit resets"
+    - "too many requests"
+  estado: WAITING_RESOURCE
+  retry_reason: CODEX_QUOTA
+
+# --- Seções 10/11: escalonamento e prevenção de loop --------------------------
+retry:
+  max_tentativas_implementacao: 5     # 5ª falha não resolvida -> BLOCK
+  escalonamento:
+    # número da tentativa -> tier da escada em models.yaml
+    1: 0
+    2: 1
+    3: 2
+    4: 3
+    5: 4
+  # classes que NUNCA recebem escalonamento de modelo (seção 10, final)
+  classes_sem_escalonamento:
+    - DEPENDENCY_ERROR
+    - ENVIRONMENT_ERROR
+    - NETWORK_ERROR
+    - CODEX_QUOTA
+    - PERMISSION_REQUIRED
+    - SECRET_REQUIRED
+    - RED_ACTION_REQUIRED
+  # 4ª falha não resolvida -> troca de agente; 5ª -> BLOCK
+  troca_agente_na_tentativa: 4
+
+fingerprint:
+  # campos que compõem a impressão digital da falha (seção 11)
+  campos: [task_id, failure_class, assinatura_erro, arquivos_alterados, testes_falhos]
+  # similaridade acima da qual duas falhas contam como "a mesma"
+  limiar_similaridade: 0.85
+
+# --- Seção 18: segurança ------------------------------------------------------
+seguranca:
+  permissoes:
+    repositorio_do_workspace: RW
+    outros_repositorios: RO
+    home_dados_nao_relacionados: deny
+    sudo_root: deny
+    credenciais_de_producao: deny
+    cofres_de_segredo: deny
+    firewall_rede_do_host: deny
+    acoes_destrutivas_externas: deny
+  # conteúdo externo é entrada não confiável
+  conteudo_externo_nao_confiavel: true
+  fontes_nao_confiaveis: [websites, issues, README.md, comentarios_de_codigo, arquivos_baixados]
+  # caminhos que o sandbox NUNCA monta
+  caminhos_proibidos:
+    - "~/.ssh"
+    - "~/.codex/auth.json"
+    - "~/.hermes/config.yaml"
+    - "~/.aws"
+    - "~/.gnupg"
+
+# --- Seção 23: integração -----------------------------------------------------
+integracao:
+  branch_sprint: "sprint/{sprint}/integration"
+  merge_em_main: false                # Sprint 1 NUNCA faz merge em produção
+  portoes: [merge, build, testes_unitarios, testes_integracao, lint, seguranca, aceitacao]
+
+# --- Seção 26: kill switches --------------------------------------------------
+killswitches:
+  niveis: [STOP_ALL, STOP_PROJECT, STOP_SPRINT, STOP_TASK]
+  arquivo_flag: .autodev/STOP          # presença = parada; conteúdo = nível
+  checar_antes_de: [invocar_agente, criar_worktree, rodar_testes, integrar]
+
+# --- Seção 21: heartbeat ------------------------------------------------------
+heartbeat:
+  intervalo_segundos: 30
+  stale_apos_segundos: 900            # 15 min sem batimento -> suspeita
+
+# --- Seção 27: observabilidade (HAR) -----------------------------------------
+har:
+  formula: "human_attention_minutes / tarefas_uteis_entregues"
+  contar_como_atencao_humana: [HAQ_respondido, unblock_manual, aprovacao_manual]

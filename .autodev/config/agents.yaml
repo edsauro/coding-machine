@@ -1,0 +1,47 @@
+# DEVFACTORY — definição dos agentes e como invocá-los.
+# T01 (detecção) lê este arquivo e confirma o que existe de fato na máquina.
+
+agentes:
+  codex:
+    tipo: coding_agent
+    primario: true
+    binario: codex
+    wrapper: ask-codex          # headless, em ~/.local/bin
+    detectar: ["codex --version"]
+    capabilities: [editar_arquivos, rodar_comandos, testes]
+    sandbox_padrao: workspace-write
+    # como passar modelo/effort no wrapper
+    flags: {modelo: "-m", effort: "-e", dir: "-d", sandbox: "-s", timeout: "--timeout", arquivo: "-f"}
+    disponivel_se_exit0: "codex --version"
+
+  agy:
+    tipo: coding_agent
+    primario: false
+    binario: agy
+    wrapper: ask-agy
+    detectar: ["agy --version"]
+    capabilities: [editar_arquivos, testes]
+    sandbox_padrao: accept-edits
+    flags: {modelo: "-m", effort: "-e", modo: "-t", dir: "-d", timeout: "--timeout", arquivo: "-f"}
+    disponivel_se_exit0: "agy --version"
+
+  hermes:
+    tipo: orchestrator
+    binario: hermes
+    wrapper: null
+    detectar: ["hermes --version"]
+    capabilities: [planejar, revisar, classificar, sumarizar, relatorio]
+    sempre_disponivel: true
+
+# Regras de propriedade e revisão (seções 15 e 16)
+politica_agentes:
+  # quem implementa não revisa a própria entrega
+  revisao_cruzada:
+    codex: agy
+    agy: codex
+  # fallback quando o revisor cruzado não está disponível
+  fallback_revisor: hermes
+  # um único escritor ativo por worktree
+  escritor_unico: true
+  # papéis que não consomem cota do Codex
+  livres_de_cota_codex: [hermes, agy]

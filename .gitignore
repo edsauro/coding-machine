@@ -1,0 +1,56 @@
+# =========================================================================== #
+# CREDENCIAIS — nunca versionar
+# =========================================================================== #
+# O sandbox.py cria uma CÓPIA do HOME em .autodev/sandbox-home/ para rodar os
+# agentes isolados. Essa cópia inclui .codex/auth.json, que contém um token
+# OAuth VIVO. Versionar isso entrega a conta do Codex para qualquer um.
+.autodev/sandbox-home/
+
+# =========================================================================== #
+# Estado de execução — regenerável
+# =========================================================================== #
+# Fonte autoritativa do orquestrador em runtime. Recriado por `autodev init`.
+.autodev/state.db
+.autodev/state.db-journal
+.autodev/state.db-wal
+
+# Worktrees efêmeros dos agentes (git worktree add).
+.autodev/worktrees/*/
+!.autodev/worktrees/.gitkeep
+
+# =========================================================================== #
+# Projeto-fixture — GERADO
+# =========================================================================== #
+# Criado do zero por `.autodev/fixtures/criar_fixture.py`, que roda `git init`
+# dentro dele. Versionar um repo dentro de outro quebra o git add. Regenere com:
+#   python3 .autodev/fixtures/criar_fixture.py
+.autodev/fixtures/projeto-fixture/
+
+# =========================================================================== #
+# Python
+# =========================================================================== #
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# =========================================================================== #
+# Editores e sistema
+# =========================================================================== #
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# =========================================================================== #
+# Local
+# =========================================================================== #
+.env

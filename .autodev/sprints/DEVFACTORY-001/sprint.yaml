@@ -1,0 +1,35 @@
+sprint_id: DEVFACTORY-001
+titulo: Autonomous Coding Loop Foundation
+objetivo: >
+  Construir e validar um loop de codificação autônomo mínimo, capaz de levar
+  UMA task aprovada de ponta a ponta sem intervenção humana:
+  SPEC -> PLAN -> DAG -> WORKTREE -> AGENTE -> TESTE -> REVISÃO -> FIX ->
+  RETESTE -> INTEGRAÇÃO -> VALIDAÇÃO FINAL -> RELATÓRIO.
+
+status: EM_EXECUCAO
+deadline: null            # sem deadline de política imposto (spec §13)
+max_tentativas: 5         # espelha policies.yaml
+
+# Comandos de teste/aceitação por task (opcional). Sem isto, o runner detecta.
+aceitacao:
+  comando: ".venv/bin/python -m pytest .autodev/tests -q"
+  evidencia: ".autodev/sprints/DEVFACTORY-001/evidence/"
+
+# Política de custo: começar sempre no degrau mais barato (spec §9)
+modelo_inicial: gpt-5.6-luna
+effort_inicial: low
+
+repositorio:
+  raiz: .
+  branch_integracao: sprint/DEVFACTORY-001/integration
+  merge_em_main: false
+
+ambiente:
+  detectado_em: "2026-09-26"
+  os: "Arch Linux 7.2.3-arch1-3"
+  python: "3.11.16"
+  git: "2.55.0"
+  codex_cli: "0.154.0 (gpt-5.6-luna / low)"
+  agy: "1.2.2"
+  hermes: "v0.21.5"
+  sandbox: "bwrap (sem daemon, sem root)"

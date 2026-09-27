@@ -1,0 +1,51 @@
+# DEVFACTORY — catálogo de modelos e escada de escalonamento
+# Fonte da verdade para qual modelo/effort usar em cada papel e cada tentativa.
+# Inspecionado de ~/.codex/models_cache.json e ~/.codex/config.toml em 2026-09-26.
+
+codex:
+  # Ordem crescente de custo/capacidade, validada contra os modelos que a conta expõe.
+  # NÃO inventar nomes: só os slugs abaixo existem.
+  ladder:
+    - slug: gpt-5.6-luna      # default do sprint — mais barato
+      effort: low
+      tier: 0
+    - slug: gpt-5.6-luna
+      effort: medium
+      tier: 1
+    - slug: gpt-5.6-terra
+      effort: medium
+      tier: 2
+    - slug: gpt-5.6-sol
+      effort: high
+      tier: 3
+    - slug: gpt-5.5
+      effort: high
+      tier: 4
+    - slug: gpt-6-astra
+      effort: high
+      tier: 5
+  default:
+    slug: gpt-5.6-luna
+    effort: low
+  efforts_validos: [none, low, medium, high, xhigh, max]
+
+agy:
+  # Antigravity expõe effort como low|medium|high no ask-agy.
+  default:
+    modelo: null          # null = usa o que estiver salvo no agy
+    effort: low
+  esforcos_validos: [low, medium, high]
+
+hermes:
+  # Papel: orquestração barata — planejamento, roteamento, classificação de falha,
+  # sumarização de log, revisão simples e geração de relatório.
+  modelo: deepseek-v4-flash
+  papel: orquestracao
+
+# Papéis arquiteturais (seção 8 do spec)
+papeis:
+  orquestrador:      {agente: hermes,  modelo: deepseek-v4-flash}
+  codificador_1:     {agente: codex,   modelo: gpt-5.6-luna, effort: low}
+  codificador_2:     {agente: agy,     modelo: null,          effort: low}
+  revisor_de_codex:  {agente: agy,     modelo: null}
+  revisor_de_agy:    {agente: codex,   modelo: gpt-5.6-luna, effort: low, sandbox: read-only}

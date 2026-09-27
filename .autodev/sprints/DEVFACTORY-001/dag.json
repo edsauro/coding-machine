@@ -1,0 +1,225 @@
+{
+  "sprint_id": "DEVFACTORY-001",
+  "versao": 1,
+  "criterio_paralelizacao": "tasks acopladas ficam em ondas separadas; paralelizar so quando os arquivos tocados sao disjuntos",
+  "tasks": [
+    {
+      "id": "T01",
+      "titulo": "Detectar agentes de codigo instalados",
+      "criterios": [
+        "codex, agy e hermes sao detectados por binario e versao reais",
+        "wrapper headless (ask-codex/ask-agy) e verificado, nao presumido",
+        "agente ausente aparece como indisponivel sem quebrar o Sprint",
+        "a deteccao e persistida como evidencia"
+      ],
+      "deps": [],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S"
+    },
+    {
+      "id": "T02",
+      "titulo": "Definir schemas de Sprint e de task",
+      "criterios": [
+        "sprint.yaml e dag.json tem schema validado na carga",
+        "DAG invalido (id duplicado, dep inexistente, ciclo) falha alto e cedo",
+        "a maquina de estados com 12 estados e declarada e as transicoes validas sao explicitas",
+        "ordem_topologica devolve ondas executaveis em paralelo"
+      ],
+      "deps": [],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S"
+    },
+    {
+      "id": "T03",
+      "titulo": "Implementar store de estado em SQLite",
+      "criterios": [
+        "schema cobre tasks, attempts, events, haq, killswitch, resource_waits, writer_lock, sprint_state",
+        "attempt persiste sprint_id, task_id, attempt, agent, model, branch, worktree, sandbox, base_commit, start_time, last_heartbeat, status, exit_code, changed_files, test_result, review_result, final_commit, failure_class, retry_after",
+        "transicao invalida entre estados e barrada com erro",
+        "todas as operacoes sao idempotentes (reexecutar nao duplica)",
+        "haq_adicionar nao duplica por haq_id",
+        "sobrevive a reabertura do processo (persistencia real)"
+      ],
+      "deps": ["T02"],
+      "agente": "codex",
+      "paralelizavel": false,
+      "estimativa": "M"
+    },
+    {
+      "id": "T04",
+      "titulo": "Implementar gerente de worktrees Git",
+      "criterios": [
+        "cria worktree e branch por task com nome sprint/<sprint>/<task>-<agente>",
+        "criacao e idempotente: reusa worktree/branch validos",
+        "base_commit e registrado",
+        "merge --no-ff para o branch de integracao, nunca para main",
+        "conflito de merge e detectado e reportado sem deixar o repo sujo"
+      ],
+      "deps": ["T02"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M"
+    },
+    {
+      "id": "T05",
+      "titulo": "Implementar adaptador do Codex",
+      "criterios": [
+        "invoca o Codex headless via wrapper, passando modelo e effort explicitos",
+        "persiste o modelo/effort REALMENTE usados, sem inventar nomes",
+        "grava log completo em disco",
+        "detecta exaustao de cota e classifica como CODEX_QUOTA, distinta de falha de implementacao"
+      ],
+      "deps": ["T01", "T03"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M"
+    },
+    {
+      "id": "T06",
+      "titulo": "Implementar adaptador do Antigravity/AGY",
+      "criterios": [
+        "invoca o AGY headless via wrapper, em modo plano (somente leitura) para revisao",
+        "estado de indisponibilidade e tratado limpo, sem quebrar o Sprint",
+        "grava log completo em disco",
+        "usa o mesmo formato de resultado do adaptador do Codex"
+      ],
+      "deps": ["T01", "T03"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M"
+    },
+    {
+      "id": "T07",
+      "titulo": "Implementar isolamento de execucao (sandbox)",
+      "criterios": [
+        "sandbox monta o worktree como RW e o sistema como RO",
+        "o HOME real NAO e montado",
+        "caminhos proibidos (~/.ssh, ~/.codex/auth.json, ~/.hermes/config.yaml) sao inacessiveis dentro do sandbox, provado por execucao real",
+        "sem sudo/root; se o sandbox nao estiver disponivel, executa com aviso explicito"
+      ],
+      "deps": ["T04"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M"
+    },
+    {
+      "id": "T08",
+      "titulo": "Implementar runner de testes deterministico",
+      "criterios": [
+        "detecta o comando de teste do projeto (pytest/unittest/npm/make/go)",
+        "roda dentro do sandbox e devolve resultado estruturado",
+        "salva a saida integral como evidencia em disco",
+        "calcula assinatura estavel da falha (normalizada) para o anti-loop",
+        "prova o ciclo TDD vermelho->verde"
+      ],
+      "deps": ["T04"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M"
+    },
+    {
+      "id": "T09",
+      "titulo": "Implementar revisor independente entre agentes",
+      "criterios": [
+        "quem implementa nunca revisa o proprio trabalho",
+        "codex->agy e agy->codex; fallback deterministico quando o cruzado falta",
+        "a revisao recebe criterios de aceitacao, diff, testes, restricoes e politica de seguranca",
+        "veredito estruturado (APPROVE/REQUEST_CHANGES/REJECT) com findings",
+        "portoes objetivos de seguranca rodam sempre, com ou sem LLM"
+      ],
+      "deps": ["T05", "T06"],
+      "agente": "codex",
+      "paralelizavel": false,
+      "estimativa": "M"
+    },
+    {
+      "id": "T10",
+      "titulo": "Implementar logica de retry e recuperacao",
+      "criterios": [
+        "fingerprint de falha combina task, classe, assinatura, arquivos e testes falhos",
+        "escalonamento sobe um degrau apos 2 tentativas materialmente informadas",
+        "classes de ambiente/dependencia/permissao NUNCA escalonam modelo",
+        "4a falha repetida troca de agente; 5a bloqueia a task",
+        "retry sempre inclui evidencia nova; o mesmo prompt nunca e repetido",
+        "cota nao consome tentativa de implementacao"
+      ],
+      "deps": ["T03", "T08"],
+      "agente": "codex",
+      "paralelizavel": false,
+      "estimativa": "M"
+    },
+    {
+      "id": "T11",
+      "titulo": "Implementar Fila de Acao Humana (HAQ)",
+      "criterios": [
+        "HAQ.md e gerado com os 7 campos exigidos, incluindo comando exato e verificacao",
+        "criacao e idempotente: o mesmo item nao duplica",
+        "somente as tasks dependentes ficam bloqueadas; o resto segue",
+        "falhas de permissao/segredo/acao vermelha viram item de HAQ automaticamente"
+      ],
+      "deps": ["T03"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S"
+    },
+    {
+      "id": "T12",
+      "titulo": "Implementar branch de integracao do Sprint",
+      "criterios": [
+        "branch sprint/<sprint>/integration criado a partir da base",
+        "portoes na ordem merge -> build -> testes -> lint -> seguranca -> aceitacao",
+        "falha de portao devolve a task para retry e e registrada",
+        "NUNCA faz merge automatico em main/producao"
+      ],
+      "deps": ["T04", "T08"],
+      "agente": "codex",
+      "paralelizavel": false,
+      "estimativa": "M"
+    },
+    {
+      "id": "T13",
+      "titulo": "Implementar geracao do relatorio do Sprint",
+      "criterios": [
+        "relatorio derivado do state.db, nao de memoria conversacional",
+        "cobre as 16 secoes exigidas pela spec",
+        "inclui metricas calculaveis (tasks, tentativas, escalonamentos, esperas de cota, HAQ)",
+        "expoe a base para calcular HAR"
+      ],
+      "deps": ["T03", "T12"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M"
+    },
+    {
+      "id": "T14",
+      "titulo": "Criar projeto-fixture ponta a ponta",
+      "criterios": [
+        "repositorio git independente com uma feature delimitada e testes",
+        "a feature comeca quebrada (teste vermelho) para provar o ciclo TDD",
+        "artefatos do Sprint permanecem no repo do orquestrador, nao no fixture",
+        "o fixture e descartavel e recriavel do zero"
+      ],
+      "deps": ["T04", "T08"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M"
+    },
+    {
+      "id": "T15",
+      "titulo": "Executar teste de aceitacao autonomo",
+      "criterios": [
+        "fluxo completo sem intervencao humana: plan -> worktree -> implementacao -> teste -> revisao -> correcao -> reteste -> integracao -> relatorio",
+        "exaustao de cota simulada resulta em WAITING_RESOURCE, checkpoint e retomada com CONTINUACAO (nao reinicio)",
+        "a retomada respeita o delay curto de teste, mantendo 5h10m na configuracao de producao",
+        "nenhum sudo/root; nenhum merge em main",
+        "o estado sobrevive a reinicializacao do orquestrador"
+      ],
+      "deps": ["T05", "T06", "T07", "T09", "T10", "T11", "T12", "T13", "T14"],
+      "agente": "codex",
+      "paralelizavel": false,
+      "estimativa": "L"
+    }
+  ]
+}
