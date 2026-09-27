@@ -16,6 +16,7 @@ quebraria Codex/AGY. O que se restringe é o sistema de arquivos.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -130,7 +131,18 @@ def preparar_home() -> Path:
 
     O HOME real nunca é montado. Só a credencial do Codex é COPIADA para cá —
     e o arquivo fica com permissão 600.
+
+    Já DENTRO de um sandbox não se prepara outro. O HOME ali já é o efêmero
+    /tmp/home, e criar um aninhado tem um efeito colateral grave: `__file__`
+    aponta para o sandbox.py do WORKTREE em teste, então o HOME sintético —
+    com uma cópia do token — era escrito dentro do próprio worktree. O portão
+    de segurança encontrava o token lá e reprovava a integração inteira do
+    sprint. Não é hipótese: aconteceu no primeiro backlog multi-task, e a
+    mensagem ("arquivo sensivel versionado: .../auth.json") não apontava para
+    o sandbox como causa.
     """
+    if os.environ.get("AUTODEV_SANDBOX") == "1":
+        return Path(os.environ.get("HOME") or "/tmp/home")
     destino = RAIZ_HOME_SANDBOX
     (destino / ".codex").mkdir(parents=True, exist_ok=True)
     (destino / ".config").mkdir(parents=True, exist_ok=True)
