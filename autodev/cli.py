@@ -189,6 +189,7 @@ def cmd_metrics(args) -> int:
 
 def cmd_encerrar(args) -> int:
     """Fecha o sprint. Recusa se houver task fora de estado terminal."""
+    from .state import SprintNaoEncerravel
     with _store(RAIZ) as st:
         pend = st.pendentes(args.sprint)
         if pend and not args.forcar:
@@ -198,8 +199,13 @@ def cmd_encerrar(args) -> int:
             print("\nEncerrar com trabalho em aberto e o que o HAQ existe para"
                   " evitar.\nUse --forcar somente para abortar um sprint travado.")
             return 1
-        st.encerrar_sprint(args.sprint, resultado=args.resultado,
-                           resumo=" ".join(args.resumo or []), forcar=args.forcar)
+        try:
+            st.encerrar_sprint(args.sprint, resultado=args.resultado,
+                               resumo=" ".join(args.resumo or []),
+                               forcar=args.forcar)
+        except SprintNaoEncerravel as e:
+            print(f"NAO ENCERRADO: {e}")
+            return 1
         marca = " (FORCADO)" if args.forcar else ""
         print(f"sprint {args.sprint}: ENCERRADO{marca} — resultado: {args.resultado}")
         if pend:
@@ -221,7 +227,11 @@ def cmd_evidenciar(args) -> int:
                 test_result={"evidencia": args.evidencia,
                              "comando": args.comando or ""},
                 commit=args.commit or "")
-        except (KeyError, ValueError) as e:
+        except KeyError as e:
+            # str(KeyError) vem com aspas: 'task inexistente: S/T99'
+            print(f"erro: {e.args[0] if e.args else e}")
+            return 1
+        except ValueError as e:
             print(f"erro: {e}")
             return 1
         print(f"{args.task}: DONE  (tentativa {att}, origem retroativo)")
