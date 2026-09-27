@@ -175,6 +175,57 @@ resultado é o da primeira noite.
 
 ---
 
+## D-08 **[gap]** — a cota do AGY é pega, mas pelo nome errado
+
+**Contexto:** o autor avisou que a cota do AGY pode acabar antes da do Codex e
+pediu para ser avisado se acontecer.
+
+**Fato:** não existe classe `AGY_QUOTA`. `CLASSES_DE_RECURSO = {CODEX_QUOTA}`, e
+`classificar()` percorre as classes **com cota primeiro**, casando a primeira que
+tiver qualquer sinal em `SINAIS`. Os sinais de `CODEX_QUOTA` são genéricos —
+`"quota exceeded"`, `"usage limit"`, `"rate limit"`, `"429"`, `"too many
+requests"`, `"limit resets"` — e não mencionam Codex em lugar nenhum.
+
+Consequência 1 (boa): se o AGY esgotar a cota e disser qualquer uma dessas
+frases, o erro **é** classificado como recurso, vira espera de 5h10m e **não**
+escalona modelo nem consome tentativa. Não passa em branco.
+
+Consequência 2 (ruim): a espera é atribuída à cota do Codex, então o registro
+mente sobre qual recurso acabou — e o `retry_after` de 5h10m é o do Codex.
+
+Consequência 3 (a pior): qualquer `429` transitório — um proxy, um pico de rate
+limit momentâneo — também casa com `CODEX_QUOTA` e faz o motor **dormir 5h10m**.
+Um limite momentâneo custa a noite.
+
+**Decisão:** **pendente**. Registrar como achado; a correção provável é separar
+`AGY_QUOTA` de `CODEX_QUOTA` e distinguir "cota renovável" de "limite
+momentâneo" (este pede espera curta, não 5h10m).
+
+**Consequência:** enquanto isso, espera de 5h10m é o comportamento seguro por
+padrão — nunca força renovação nem queima cota, que é exatamente a regra do autor.
+O custo é poder dormir demais diante de um 429 passageiro.
+
+---
+
+## D-09 **[bug]** — "disk quota exceeded" seria lido como cota do Codex
+
+**Contexto:** `SINAIS[ENVIRONMENT_ERROR]` inclui `"disk quota"` e
+`SINAIS[CODEX_QUOTA]` inclui `"quota exceeded"`.
+
+**Fato:** como `classificar()` testa `CODEX_QUOTA` primeiro, a mensagem
+`"disk quota exceeded"` contém `"quota exceeded"` e casa com **cota** antes de
+chegar a ambiente. Disco cheio passaria a ser espera de 5h10m em vez de erro de
+ambiente — e erro de ambiente é justamente a classe que manda corrigir o ambiente
+sem escalonar modelo.
+
+**Decisão:** **pendente** — anotado. Correção provável: excluir a leitura de
+"disk quota" dos sinais de cota, ou testar ambiente antes de cota para esse caso.
+
+**Consequência:** risco baixo de frequência, alto de custo: um disco cheio pode
+parecer cota esgotada e parar a noite inteira.
+
+---
+
 ## Decisões herdadas (pré-sprint)
 
 | Decisão | Regra |
