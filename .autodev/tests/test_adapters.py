@@ -346,3 +346,30 @@ def test_escrever_relatorio_em_disco(store, tmp_path):
     txt = report.gerar(store, SPRINT)
     p = report.escrever(txt, tmp_path / "R.md")
     assert p.exists() and len(p.read_text()) == len(txt)
+
+
+def test_relatorio_expoe_origem_da_conclusao(store):
+    """Task concluida por evidencia nao pode parecer execucao do orquestrador.
+
+    Sem isso o relatorio deixaria o leitor concluir que as 15 tasks sairam do
+    laco autonomo — decisions.md D-13.
+    """
+    store.criar_task(SPRINT, "T01", "detectar agentes")
+    store.concluir_task_evidenciada(SPRINT, "T01", evidencia="modulo existe + testes")
+    txt = report.gerar(store, SPRINT)
+    assert "origem" in txt.lower()
+    assert "retroativo" in txt
+    assert "**1** retroativo" in txt        # contagem no resultado executivo
+    assert "Atenção" in txt                 # a ressalva esta presente
+
+
+def test_relatorio_nao_alerta_quando_tudo_e_do_orquestrador(store):
+    """A ressalva so aparece quando ha conclusao nao-executada."""
+    store.criar_task(SPRINT, "T01", "x")
+    store.transicionar(SPRINT, "T01", "PLANNED")
+    store.transicionar(SPRINT, "T01", "QUEUED")
+    store.transicionar(SPRINT, "T01", "RUNNING")
+    store.transicionar(SPRINT, "T01", "VERIFYING")
+    store.transicionar(SPRINT, "T01", "DONE")
+    txt = report.gerar(store, SPRINT)
+    assert "Atenção" not in txt

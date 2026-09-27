@@ -109,6 +109,28 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
                            str(h["reason"]).split("\n")[0][:80], h["risk"],
                            h["status"]] for h in haq])
 
+    # --- origem das conclusões ------------------------------------------------
+    # Nem toda task concluída foi executada pelo laço do orquestrador. Sem esta
+    # coluna, o relatório deixaria o leitor concluir que as 15 tasks saíram do
+    # laço autônomo — que é exatamente a leitura errada (decisions.md D-13).
+    origens: dict[str, str] = {}
+    for r in store.conn.execute(
+            "SELECT task_id, origem FROM attempts WHERE sprint_id=? ORDER BY attempt",
+            (sprint,)):
+        origens[r["task_id"]] = r["origem"] or "orquestrador"
+    contagem_origem: dict[str, int] = {}
+    for o in origens.values():
+        contagem_origem[o] = contagem_origem.get(o, 0) + 1
+    resumo_origem = ", ".join(f"**{n}** {o}" for o, n in sorted(contagem_origem.items()))
+    if any(o != "orquestrador" for o in origens.values()):
+        nota_origem = (
+            "\n> **Atenção:** `origem` distingue execução do orquestrador de "
+            "conclusão por evidência. `retroativo` = o trabalho foi feito fora do "
+            "laço e registrado a partir do artefato verificável; `aceitacao_real` = "
+            "execução autônoma de verdade. Ver `decisions.md` D-13.")
+    else:
+        nota_origem = ""
+
     # --- 9. cota --------------------------------------------------------------
     linhas_cota = [[_fmt_ts(e["detectado_em"]), e["task_id"], e["agent"],
                     _fmt_ts(e["retry_after"]),
@@ -128,12 +150,18 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
         [[k, "OK" if v.get("ok") else "FALHOU", str(v.get("evidencia", ""))[:110]]
          for k, v in aceitacao.items()])
 
+    # --- ciclo de vida do sprint ---------------------------------------------
+    estado_spr = store.estado_sprint(sprint) or "PLANEJADO"
+    caminho_spr = " → ".join(
+        h["estado"] for h in reversed(store.historico_checkpoints(sprint))) or "-"
+
     cab = f"""# SPRINT {sprint} — RELATÓRIO FINAL
 
 **Objetivo:** {objetivo}
 **Gerado em:** {_fmt_ts(time.time())}
 **Duração total:** {round(duracao_s / 60, 1)} min
 **Commit do repositório:** `{git_commit or '-'}`
+**Estado do sprint:** `{estado_spr}` — percurso: {caminho_spr}
 **Fonte da verdade:** `state.db` + arquivos do Sprint + Git + evidências de teste
 
 ---
@@ -144,7 +172,8 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
 
 - Tasks no Sprint: **{m['tasks_total']}** — concluídas **{m['done']}**, bloqueadas
   **{m['blocked']}**, falhadas **{m['failed']}**, aguardando recurso **{m['waiting_resource']}**
-- Tentativas de implementação: **{m['tentativas_implementacao']}**
+- Origem das conclusões: {resumo_origem or 'n/d'}
+- Tentativas registradas: **{m['tentativas_total']}** (executadas pelo orquestrador: **{m['tentativas_orquestrador']}**) — as demais são conclusões por evidência, registradas para auditoria
 - Esperas de cota do Codex: **{m['esperas_cota']}**
 - Itens de HAQ: **{m['haq']}** (abertos: **{m['haq_abertos']}**)
 - HAR (itens de HAQ / tasks úteis entregues): **{har if har is not None else 'n/d'}**
@@ -179,10 +208,12 @@ Módulos em `autodev/`:
     s3 = f"""
 ## 3. Tasks concluídas
 
-{_tabela(['task', 'estado', 'agente', 'tentativas', 'esperas_cota', 'tier'],
-         [[t['task_id'], t['estado'], t['agente'] or '-', t['tentativas'],
+{_tabela(['task', 'estado', 'agente', 'origem', 'tentativas', 'esperas_cota', 'tier'],
+         [[t['task_id'], t['estado'], t['agente'] or '-',
+           origens.get(t['task_id'], '-'), t['tentativas'],
            t['esperas_cota'], t['tier_atual']]
           for t in concluidas])}
+{nota_origem}
 _(estado de todas as tasks abaixo)_
 
 {tabela_tasks}

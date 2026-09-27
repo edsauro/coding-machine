@@ -78,6 +78,8 @@ python3 -m venv .venv && .venv/bin/pip install pytest pyyaml
 .venv/bin/python -m autodev report          # gera o relatório
 .venv/bin/python -m autodev resume          # retoma após interrupção
 .venv/bin/python -m autodev haq             # fila de ação humana
+.venv/bin/python -m autodev encerrar        # fecha o sprint (estado terminal)
+.venv/bin/python -m autodev evidenciar T03 -e "autodev/state.py + 8 testes"
 ```
 
 Testes do próprio orquestrador:
@@ -85,6 +87,37 @@ Testes do próprio orquestrador:
 ```bash
 .venv/bin/python -m pytest .autodev/tests/ -q
 ```
+
+### Ciclo de vida do sprint
+
+Tarefas têm 12 estados; o **sprint** tem os seus:
+
+```
+PLANEJADO → EM_EXECUCAO → EM_VERIFICACAO → ENCERRADO
+                  ↘              ↘
+                            ABORTADO
+```
+
+`encerrar` **recusa** se houver tarefa fora de estado terminal — encerrar com
+trabalho em aberto é justamente o que o HAQ existe para evitar. `--forcar` aborta
+um sprint travado e grava o motivo.
+
+A fonte autoritativa é `state.db`. O `status:` do `sprint.yaml` é declaração de
+intenção, não fato.
+
+### Conclusão por evidência
+
+Quando o trabalho de uma tarefa foi feito **fora** do laço do orquestrador, ele
+não pode ser registrado como se o orquestrador tivesse executado — isso seria
+evidência falsa.
+
+```bash
+.venv/bin/python -m autodev evidenciar T03 -e "descrição do artefato verificável"
+```
+
+O comando percorre o caminho válido de transições e marca a tentativa com
+**`origem='retroativo'`**. O relatório mostra essa distinção e alerta quando
+existe conclusão que não veio do laço.
 
 ---
 
@@ -109,19 +142,27 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 
 ## Estado atual
 
-- **Suíte do orquestrador: 106 testes passando.**
-- **Aceitação ponta a ponta com agentes reais: verde.** O sprint de teste roda
-  sobre o projeto-fixture com o Codex de verdade, 8 testes passam, a revisão
-  cruzada devolve apontamentos, a integração passa os 4 portões e a `main`
-  fica intacta (mesmo commit antes e depois).
-- **O sprint `DEVFACTORY-001` (o backlog que construiu este orquestrador) ainda
-  não foi executado pelo próprio orquestrador.** As 15 tarefas estão registradas
-  e em estado `NEW`. Falta rodar, gerar o relatório e commitar a evidência.
+- **Suíte do orquestrador: 123 testes passando.**
+- **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
+  ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
+  `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
+- **Como as tarefas foram concluídas — leia antes de confiar no número:** as 14
+  primeiras (T01–T14) foram concluídas por **evidência retroativa**. O código que
+  elas descrevem foi escrito durante o desenvolvimento, **fora** do laço do
+  orquestrador. A tentativa existe, o artefato é verificável e os testes passam,
+  mas **não foi o orquestrador que executou**. Só a T15 (aceitação autônoma) roda
+  de verdade. O banco marca cada caso com `origem` e o relatório diz isso na
+  primeira seção.
+- **Aceitação ponta a ponta com agentes reais: verde.** Executada em ~2,5 min:
+  o Codex implementou o projeto-fixture, os 8 testes passaram, o **AGY revisou e
+  aprovou** (1 apontamento), os portões de integração passaram e a `main` ficou
+  intacta (mesmo commit antes e depois).
+- **Dois itens abertos no HAQ** (`.autodev/sprints/DEVFACTORY-001/HAQ.md`).
 
 O projeto-fixture é gerado e não é versionado:
 
 ```bash
-python3 .autodev/fixtures/criar_fixture.py
+.venv/bin/python .autodev/fixtures/criar_fixture.py
 ```
 
 ---
@@ -131,6 +172,16 @@ python3 .autodev/fixtures/criar_fixture.py
 - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
   e **contém credencial de agente**. Está no `.gitignore` e não deve ser
   versionado em nenhuma circunstância.
+- **Há um hook de commit como segunda barreira** (`.githooks/pre-commit`): ele
+  barra caminhos proibidos e segredos no conteúdo, mesmo com `git add -f`. Ative
+  uma vez por clone:
+
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+  O hook nunca imprime o valor do segredo que encontrou — só o arquivo, a linha e
+  o tipo, porque uma mensagem de erro que mostra o token vaza o token para o log.
 - A integração tem portão de segredo: diferenças que introduzam chaves, tokens ou
   chave privada são barradas antes do merge.
 - O sandbox não expõe `~/.ssh`, nem o HOME real, nem as configurações do usuário.

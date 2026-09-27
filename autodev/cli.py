@@ -11,6 +11,8 @@ Uso:
   python3 -m autodev start                  # limpa os kill switches
   python3 -m autodev haq                    # mostra a fila humana
   python3 -m autodev quota                  # esperas de cota registradas
+  python3 -m autodev evidenciar T03 -e "..."  # conclui task por evidencia
+  python3 -m autodev encerrar               # fecha o sprint (estado terminal)
 """
 from __future__ import annotations
 
@@ -185,6 +187,50 @@ def cmd_metrics(args) -> int:
     return 0
 
 
+def cmd_encerrar(args) -> int:
+    """Fecha o sprint. Recusa se houver task fora de estado terminal."""
+    with _store(RAIZ) as st:
+        pend = st.pendentes(args.sprint)
+        if pend and not args.forcar:
+            print(f"NAO ENCERRAVEL: {len(pend)} task(s) fora de estado terminal:")
+            for t in pend:
+                print(f"  - {t}")
+            print("\nEncerrar com trabalho em aberto e o que o HAQ existe para"
+                  " evitar.\nUse --forcar somente para abortar um sprint travado.")
+            return 1
+        st.encerrar_sprint(args.sprint, resultado=args.resultado,
+                           resumo=" ".join(args.resumo or []), forcar=args.forcar)
+        marca = " (FORCADO)" if args.forcar else ""
+        print(f"sprint {args.sprint}: ENCERRADO{marca} — resultado: {args.resultado}")
+        if pend:
+            print(f"  atencao: {len(pend)} task(s) ficaram em aberto:"
+                  f" {', '.join(pend)}")
+    return 0
+
+
+def cmd_evidenciar(args) -> int:
+    """Conclui uma task a partir de evidencia JA existente (rota b).
+
+    Para trabalho feito fora do laco do orquestrador. A tentativa fica marcada
+    com origem='retroativo' para nao ser confundida com execucao real.
+    """
+    with _store(RAIZ) as st:
+        try:
+            att = st.concluir_task_evidenciada(
+                args.sprint, args.task, evidencia=args.evidencia,
+                test_result={"evidencia": args.evidencia,
+                             "comando": args.comando or ""},
+                commit=args.commit or "")
+        except (KeyError, ValueError) as e:
+            print(f"erro: {e}")
+            return 1
+        print(f"{args.task}: DONE  (tentativa {att}, origem retroativo)")
+        print(f"  evidencia: {args.evidencia}")
+        if args.comando:
+            print(f"  comando  : {args.comando}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
     p.add_argument("--sprint", default=SPRINT_PADRAO)
@@ -213,6 +259,22 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("haq").set_defaults(fn=cmd_haq)
     sub.add_parser("quota").set_defaults(fn=cmd_quota)
     sub.add_parser("metrics").set_defaults(fn=cmd_metrics)
+
+    s = sub.add_parser("encerrar", help="fecha o sprint (estado terminal)")
+    s.add_argument("--resultado", default="CONCLUIDO",
+                   choices=["CONCLUIDO", "PARCIAL", "ABORTADO"])
+    s.add_argument("--resumo", nargs="*", default=[])
+    s.add_argument("--forcar", action="store_true",
+                   help="aborta sprint travado; registra o motivo no checkpoint")
+    s.set_defaults(fn=cmd_encerrar)
+
+    s = sub.add_parser("evidenciar",
+                       help="conclui uma task a partir de evidencia existente")
+    s.add_argument("task")
+    s.add_argument("-e", "--evidencia", required=True)
+    s.add_argument("-c", "--comando", default="")
+    s.add_argument("--commit", default="")
+    s.set_defaults(fn=cmd_evidenciar)
 
     s = sub.add_parser("stop")
     s.add_argument("nivel", choices=["STOP_ALL", "STOP_PROJECT", "STOP_SPRINT",

@@ -3,7 +3,7 @@
 
 O fixture é um repositório git independente com uma feature delimitada que
 COMEÇA QUEBRADA, para provar o ciclo TDD vermelho->verde:
-  - tests/test_stats.py tem 3 testes; 1 passa e 2 falham (mediana errada,
+  - tests/test_stats.py tem 8 testes; 4 passam e 4 falham (mediana errada,
     desvio-padrão populacional em vez de amostral).
   - a task de aceitação é corrigir `mediana()` e `desvio_padrao()`.
 
@@ -165,7 +165,10 @@ if __name__ == "__main__":
     d = Path(sys.argv[1]) if len(sys.argv) > 1 else DESTINO_PADRAO
     p = criar(d)
     print(f"fixture criado em {p}")
-    r = subprocess.run(["python3", "-m", "pytest", "tests", "-q"], cwd=str(p),
+    # sys.executable, nao "python3": no PATH desta maquina o python3 pode ser o
+    # de outro venv (o do Hermes, sem pytest), e a autoverificacao do gerador
+    # falhava com ModuleNotFoundError em vez de mostrar os testes vermelhos.
+    r = subprocess.run([sys.executable, "-m", "pytest", "tests", "-q"], cwd=str(p),
                        capture_output=True, text=True)
     print(f"estado inicial dos testes (esperado: FALHAM): exit={r.returncode}")
     print((r.stdout or r.stderr).strip()[-600:])

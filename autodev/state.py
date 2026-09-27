@@ -10,13 +10,15 @@ sentido.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable
 
-from .config import ESTADOS, TRANSICOES
+from .config import (ESTADOS, ORDEM_SPRINT, SPRINT_TERMINAIS, TERMINAIS_TASK,
+                     TRANSICOES, TRANSICOES_SPRINT)
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -67,6 +69,7 @@ CREATE TABLE IF NOT EXISTS attempts (
     fingerprint    TEXT,
     retry_after    REAL,
     log_path       TEXT,
+    origem         TEXT,                -- orquestrador | retroativo
     UNIQUE (sprint_id, task_id, attempt)
 );
 
@@ -150,8 +153,86 @@ CREATE INDEX IF NOT EXISTS idx_ckpt_sprint ON checkpoints(sprint_id, criado_em);
 """
 
 
+class SchemaDesatualizado(Exception):
+    """O banco em disco tem uma estrutura que a reconciliação não conseguiu
+    alinhar com o SCHEMA do código (ex.: coluna de PRIMARY KEY faltando, que o
+    SQLite não permite adicionar com ALTER TABLE)."""
+
+
+def _divide_colunas(corpo: str) -> list[str]:
+    """Divide por vírgula de primeiro nível (fora de parênteses e de aspas).
+
+    Existe porque o DDL pode declarar várias colunas na MESMA linha
+    (`sprint_id TEXT, task_id TEXT, agent TEXT`), e um parser linha-a-linha
+    trataria isso como uma coluna só.
+    """
+    partes: list[str] = []
+    buf: list[str] = []
+    prof = 0
+    aspas = ""
+    for ch in corpo:
+        if aspas:
+            if ch == aspas:
+                aspas = ""
+            buf.append(ch)
+        elif ch in "'\"":
+            aspas = ch
+            buf.append(ch)
+        elif ch == "(":
+            prof += 1
+            buf.append(ch)
+        elif ch == ")":
+            prof -= 1
+            buf.append(ch)
+        elif ch == "," and prof == 0:
+            partes.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        partes.append("".join(buf))
+    return partes
+
+
+def _colunas_declaradas(schema: str = SCHEMA) -> dict[str, list[tuple[str, str]]]:
+    """Extrai {tabela: [(coluna, tipo), ...]} do próprio DDL.
+
+    Usado pela reconciliação de schema. Ler o DDL em vez de manter uma segunda
+    lista à mão é o que evita a lista envelhecer em silêncio.
+    """
+    tabelas: dict[str, list[tuple[str, str]]] = {}
+    atual = ""          # "" = fora de um bloco CREATE TABLE
+    for linha in schema.splitlines():
+        s = linha.strip()
+        m = re.match(r"CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(", s)
+        if m:
+            atual = m.group(1)
+            tabelas[atual] = []
+            continue
+        if not atual:
+            continue
+        if s.startswith(")"):
+            atual = ""
+            continue
+        if not s or s.startswith("--"):
+            continue
+        for pedaco in _divide_colunas(s.split("--")[0]):
+            corpo = pedaco.strip().rstrip(",").strip()
+            if not corpo or corpo.upper().startswith(
+                    ("PRIMARY KEY", "UNIQUE", "FOREIGN KEY", "CHECK", "CONSTRAINT")):
+                continue
+            partes = corpo.split(None, 1)
+            if len(partes) == 2:
+                tabelas[atual].append((partes[0], partes[1].strip()))
+    return tabelas
+
+
 class TransicaoInvalida(Exception):
     pass
+
+
+class SprintNaoEncerravel(Exception):
+    """Tentativa de encerrar um sprint com task fora de estado terminal."""
 
 
 class WorktreeOcupado(Exception):
@@ -166,6 +247,43 @@ class StateStore:
                                     isolation_level=None)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrar()
+
+    def _migrar(self) -> None:
+        """Reconcilia o schema do código com o banco já em disco.
+
+        O SCHEMA usa CREATE TABLE IF NOT EXISTS, então coluna nova em tabela que
+        JÁ existe não aparece sozinha: o banco fica silenciosamente atrás do
+        código, e o erro só aparece quando alguém usa a coluna nova (foi assim
+        que `haq.failure_class` quebrou num banco real).
+
+        A reconciliação é genérica de propósito: as colunas são lidas do próprio
+        SCHEMA. Uma segunda lista escrita à mão envelheceria exatamente como o
+        schema velho que causou o problema.
+        """
+        faltando: list[str] = []
+        for tabela, colunas in _colunas_declaradas().items():
+            existentes = {r["name"] for r in
+                          self.conn.execute(f"PRAGMA table_info({tabela})")}
+            if not existentes:
+                continue      # tabela ainda não existe: o SCHEMA acabou de criá-la
+            for nome, tipo in colunas:
+                if nome in existentes:
+                    continue
+                if "PRIMARY KEY" in tipo.upper():
+                    faltando.append(f"{tabela}.{nome} (PRIMARY KEY: exige rebuild)")
+                    continue
+                try:
+                    self.conn.execute(
+                        f"ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}")
+                except sqlite3.OperationalError as e:
+                    faltando.append(f"{tabela}.{nome}: {e}")
+        if faltando:
+            raise SchemaDesatualizado(
+                "não foi possível reconciliar o schema: " + "; ".join(faltando))
+        # dado derivado da migração: tentativas antigas são do orquestrador
+        self.conn.execute(
+            "UPDATE attempts SET origem='orquestrador' WHERE origem IS NULL")
 
     # ---------------------------------------------------------------- infra
     @contextmanager
@@ -464,6 +582,129 @@ class StateStore:
                 return c
         return None
 
+    # ------------------------------------------------------- ciclo de vida do sprint
+    def estado_sprint(self, sprint_id: str) -> str | None:
+        """Estado atual do sprint, ou None se nunca foi registrado.
+
+        Fonte autoritativa é o banco. O `status:` do sprint.yaml é declaração de
+        intenção, escrita à mão — não o fato.
+        """
+        r = self.conn.execute(
+            "SELECT estado FROM sprint_state WHERE sprint_id=?",
+            (sprint_id,)).fetchone()
+        return r["estado"] if r else None
+
+    def transicionar_sprint(self, sprint_id: str, novo: str, motivo: str = "",
+                            dados: dict | None = None) -> None:
+        atual = self.estado_sprint(sprint_id) or "PLANEJADO"
+        if novo not in TRANSICOES_SPRINT.get(atual, set()):
+            raise TransicaoInvalida(
+                f"sprint {sprint_id}: {atual} -> {novo} não permitido")
+        anterior = self.ler_checkpoint(sprint_id) or {}
+        self.checkpoint(sprint_id, novo, {**(anterior.get("checkpoint") or {}),
+                                          **(dados or {}), "motivo": motivo})
+        self.evento(sprint_id, None, "sprint_transicao",
+                    {"de": atual, "para": novo, "motivo": motivo})
+
+    def pendentes(self, sprint_id: str) -> list[str]:
+        """Tasks fora de estado terminal, como 'T03(REVIEW)'."""
+        rows = self.conn.execute(
+            "SELECT task_id, estado FROM tasks WHERE sprint_id=?"
+            " AND estado NOT IN ('DONE','INTEGRATED') ORDER BY task_id",
+            (sprint_id,)).fetchall()
+        return [f"{r['task_id']}({r['estado']})" for r in rows]
+
+    def encerrar_sprint(self, sprint_id: str, *, resultado: str = "CONCLUIDO",
+                        resumo: str = "", forcar: bool = False) -> None:
+        """Fecha o sprint em ENCERRADO.
+
+        Recusa se houver task fora de estado terminal — encerrar com trabalho em
+        aberto é exatamente o que o HAQ existe para evitar.
+
+        Avança pelas transições VÁLIDAS em vez de gravar ENCERRADO direto: o
+        histórico do sprint precisa mostrar por onde ele passou, e a máquina de
+        estados vale também para quem está fechando.
+        """
+        atual = self.estado_sprint(sprint_id)
+        if atual in SPRINT_TERMINAIS and not forcar:
+            raise SprintNaoEncerravel(f"sprint {sprint_id} já está {atual}")
+        pend = self.pendentes(sprint_id)
+        if pend and not forcar:
+            raise SprintNaoEncerravel(
+                f"{len(pend)} task(s) fora de estado terminal: {', '.join(pend)}")
+
+        partida = atual or "PLANEJADO"
+        metadados = {"resultado": resultado, "resumo": resumo,
+                     "estado_anterior": atual,
+                     "tasks_pendentes_no_encerramento": pend,
+                     "forcado": bool(forcar)}
+        if partida in ORDEM_SPRINT:
+            caminho = ORDEM_SPRINT[ORDEM_SPRINT.index(partida) + 1:]
+        elif forcar:
+            caminho = []
+        else:
+            raise SprintNaoEncerravel(
+                f"sprint {sprint_id} está {partida}; use --forcar para encerrar")
+
+        # O checkpoint de metadados vai JUNTO com o passo final, senao ENCERRADO
+        # fica gravado duas vezes (uma pela transicao, outra pelo checkpoint).
+        for passo in caminho:
+            self.transicionar_sprint(
+                sprint_id, passo, f"encerramento: {resultado}",
+                metadados if passo == "ENCERRADO" else None)
+        if not caminho:      # sprint travado encerrado com --forcar
+            self.checkpoint(sprint_id, "ENCERRADO", metadados)
+
+        self.evento(sprint_id, None, "sprint_encerrado",
+                    {"resultado": resultado, "resumo": resumo,
+                     "pendentes": pend, "forcado": bool(forcar)})
+
+    # --------------------------------------------- conclusão por evidência (rota b)
+    def concluir_task_evidenciada(self, sprint_id: str, task_id: str, *,
+                                  evidencia: str, test_result: Any = None,
+                                  commit: str = "", agente: str = "retroativo",
+                                  origem: str = "retroativo",
+                                  motivo: str = "evidência retroativa") -> int:
+        """Conclui uma task a partir de evidência JÁ existente.
+
+        Para quando o trabalho foi feito fora do laço do orquestrador: o código
+        existe e os testes passam, mas a task nunca passou por RUNNING/VERIFYING.
+
+        Percorre o caminho VÁLIDO de transições em vez de forçar o estado, então
+        a máquina de estados continua valendo. A tentativa fica marcada com
+        `origem='retroativo'` — ninguém deve confundir isto com uma execução real
+        do orquestrador, e o relatório mostra a diferença.
+        """
+        linha = self.task(sprint_id, task_id)
+        if linha is None:
+            raise KeyError(f"task inexistente: {sprint_id}/{task_id}")
+        # Caminho válido até DONE. Andar a partir de onde a task ESTÁ evita o
+        # erro de tentar DONE->PLANNED quando ela já foi concluída antes.
+        ordem = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "DONE"]
+        estado = linha["estado"]
+        if estado in TERMINAIS_TASK or estado == "DONE":
+            raise ValueError(f"task {task_id} já está {estado}")
+        if estado not in ordem:
+            raise ValueError(
+                f"task {task_id} está em {estado}; conclusão por evidência parte"
+                f" de um dos estados {ordem}")
+        for passo in ordem[ordem.index(estado) + 1:]:
+            self.transicionar(sprint_id, task_id, passo, motivo)
+        att = self.iniciar_tentativa(
+            sprint_id, task_id, agent=agente, model="(nenhum)",
+            effort="(nenhum)", branch="main", worktree="",
+            sandbox="(nenhum)", base_commit=commit)
+        self.finalizar_tentativa(
+            sprint_id, task_id, att, status="OK", exit_code=0,
+            test_result=test_result, final_commit=commit)
+        self.conn.execute(
+            "UPDATE attempts SET origem=? WHERE sprint_id=? AND task_id=?"
+            " AND attempt=?", (origem, sprint_id, task_id, att))
+        self.evento(sprint_id, task_id, "task_concluida_por_evidencia",
+                    {"attempt": att, "evidencia": evidencia, "commit": commit,
+                     "origem": origem})
+        return att
+
     # ---------------------------------------------------------------- métricas
     def metricas(self, sprint_id: str) -> dict:
         q = lambda sql, *a: self.conn.execute(sql, a).fetchone()[0]  # noqa: E731
@@ -479,6 +720,16 @@ class StateStore:
             "waiting_resource": por_estado.get("WAITING_RESOURCE", 0),
             "tentativas_implementacao": q(
                 "SELECT COUNT(*) FROM attempts WHERE sprint_id=?", sprint_id),
+            "tentativas_total": q(
+                "SELECT COUNT(*) FROM attempts WHERE sprint_id=?", sprint_id),
+            # Tentativas que o orquestrador REALMENTE executou. Conclusão por
+            # evidência (origem='retroativo') cria linha em attempts para ficar
+            # auditável, mas não foi execução do laço — somar as duas coisas
+            # inflaria o custo do sprint.
+            "tentativas_orquestrador": q(
+                "SELECT COUNT(*) FROM attempts WHERE sprint_id=?"
+                " AND COALESCE(origem,'orquestrador') NOT IN ('retroativo')",
+                sprint_id),
             "escalonamentos": q(
                 "SELECT COUNT(*) FROM attempts WHERE sprint_id=? AND CAST(json_extract("
                 "test_result,'$.tier') AS INTEGER) > 0", sprint_id),

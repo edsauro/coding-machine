@@ -7,6 +7,7 @@ Cobre os itens da spec §25:
 from __future__ import annotations
 
 import json
+import sqlite3
 import time
 from pathlib import Path
 
@@ -15,7 +16,7 @@ import pytest
 from autodev import errors, haq, killswitch, retry
 from autodev.config import (Config, TRANSICOES, carrega_dag, ordem_topologica,
                             valida_dag)
-from autodev.state import StateStore, TransicaoInvalida
+from autodev.state import SprintNaoEncerravel, StateStore, TransicaoInvalida
 
 SPRINT = "S1"
 
@@ -325,3 +326,161 @@ def test_checkpoint_sobrevive(store):
     assert c["estado"] == "WAITING_RESOURCE"
     assert c["checkpoint"]["task_id"] == "T1"
     assert c["ultima_onda"] == 2
+
+
+# ------------------------------------------ ciclo de vida do sprint (encerrar)
+def test_sprint_nao_tem_estado_ate_ser_registrado(store):
+    """O `status:` do sprint.yaml e declaracao; o fato mora no banco."""
+    assert store.estado_sprint(SPRINT) is None
+
+
+def test_transicao_de_sprint_valida_e_invalida(store):
+    store.transicionar_sprint(SPRINT, "EM_EXECUCAO", "inicio")
+    assert store.estado_sprint(SPRINT) == "EM_EXECUCAO"
+    store.transicionar_sprint(SPRINT, "EM_VERIFICACAO", "tasks concluidas")
+    assert store.estado_sprint(SPRINT) == "EM_VERIFICACAO"
+    with pytest.raises(TransicaoInvalida):
+        store.transicionar_sprint(SPRINT, "PLANEJADO")
+
+
+def test_encerrar_recusa_com_task_fora_de_estado_terminal(store):
+    store.criar_task(SPRINT, "T1")
+    with pytest.raises(SprintNaoEncerravel) as e:
+        store.encerrar_sprint(SPRINT)
+    assert "T1(NEW)" in str(e.value)
+    assert store.estado_sprint(SPRINT) != "ENCERRADO"
+
+
+def test_encerrar_apos_concluir_as_tasks(store):
+    for t in ("T1", "T2"):
+        store.criar_task(SPRINT, t)
+        store.concluir_task_evidenciada(SPRINT, t, evidencia="modulo existe")
+    assert store.pendentes(SPRINT) == []
+    store.encerrar_sprint(SPRINT, resultado="CONCLUIDO", resumo="tudo verde")
+    assert store.estado_sprint(SPRINT) == "ENCERRADO"
+    c = store.ler_checkpoint(SPRINT)["checkpoint"]
+    assert c["resultado"] == "CONCLUIDO" and c["resumo"] == "tudo verde"
+    # o caminho tem de estar no historico: a maquina de estados vale tambem
+    # para quem esta encerrando (historico vem do mais recente para o mais antigo)
+    estados = [h["estado"] for h in store.historico_checkpoints(SPRINT)][::-1]
+    assert estados == ["EM_EXECUCAO", "EM_VERIFICACAO", "ENCERRADO"], estados
+    # e o passo final nao pode estar gravado duas vezes
+    assert estados.count("ENCERRADO") == 1
+
+
+def test_encerrar_duas_vezes_e_recusado(store):
+    store.criar_task(SPRINT, "T1")
+    store.concluir_task_evidenciada(SPRINT, "T1", evidencia="e")
+    store.encerrar_sprint(SPRINT)
+    with pytest.raises(SprintNaoEncerravel):
+        store.encerrar_sprint(SPRINT)
+
+
+def test_encerrar_forcado_registra_as_pendentes(store):
+    store.criar_task(SPRINT, "T1")
+    store.encerrar_sprint(SPRINT, resultado="ABORTADO", forcar=True)
+    assert store.estado_sprint(SPRINT) == "ENCERRADO"
+    c = store.ler_checkpoint(SPRINT)["checkpoint"]
+    assert c["forcado"] is True
+    assert c["tasks_pendentes_no_encerramento"] == ["T1(NEW)"]
+
+
+# -------------------------------------------- conclusao por evidencia (rota b)
+def test_evidencia_percorre_caminho_valido_ate_done(store):
+    store.criar_task(SPRINT, "T1")
+    att = store.concluir_task_evidenciada(SPRINT, "T1", evidencia="x.py + 12 testes")
+    assert att == 1
+    assert store.task(SPRINT, "T1")["estado"] == "DONE"
+    assert store.ultima_tentativa(SPRINT, "T1")["status"] == "OK"
+
+
+def test_evidencia_marca_origem_retroativo(store):
+    """Ninguem deve confundir isto com execucao real do orquestrador."""
+    store.criar_task(SPRINT, "T1")
+    store.concluir_task_evidenciada(SPRINT, "T1", evidencia="x")
+    assert store.ultima_tentativa(SPRINT, "T1")["origem"] == "retroativo"
+
+
+def test_evidencia_de_task_inexistente_falha(store):
+    with pytest.raises(KeyError):
+        store.concluir_task_evidenciada(SPRINT, "NOPE", evidencia="x")
+
+
+def test_evidencia_recusa_task_ja_concluida(store):
+    store.criar_task(SPRINT, "T1")
+    store.concluir_task_evidenciada(SPRINT, "T1", evidencia="x")
+    with pytest.raises(ValueError):
+        store.concluir_task_evidenciada(SPRINT, "T1", evidencia="x")
+
+
+def test_evidencia_parte_de_estado_intermediario_sem_voltar_atras(store):
+    store.criar_task(SPRINT, "T1")
+    store.transicionar(SPRINT, "T1", "PLANNED")
+    store.transicionar(SPRINT, "T1", "QUEUED")
+    store.concluir_task_evidenciada(SPRINT, "T1", evidencia="x")
+    assert store.task(SPRINT, "T1")["estado"] == "DONE"
+
+
+def test_evidencia_registra_evento_auditavel(store):
+    store.criar_task(SPRINT, "T1")
+    store.concluir_task_evidenciada(SPRINT, "T1", evidencia="relatorio.pdf")
+    ev = [e for e in store.eventos(SPRINT)
+          if e["tipo"] == "task_concluida_por_evidencia"]
+    assert len(ev) == 1
+    assert json.loads(ev[0]["payload"])["evidencia"] == "relatorio.pdf"
+
+
+# ------------------------------------------------------------------- migracao
+def test_migracao_adiciona_coluna_origem(tmp_path):
+    """Banco criado por versao anterior nao tem attempts.origem."""
+    db = tmp_path / "legado.db"
+    with StateStore(db) as st:
+        st.criar_task(SPRINT, "T1")
+        st.iniciar_tentativa(SPRINT, "T1", agent="codex", model="m", effort="low",
+                             branch="b", worktree="w", sandbox="s", base_commit="c")
+    conn = sqlite3.connect(str(db))
+    conn.execute("ALTER TABLE attempts DROP COLUMN origem")
+    conn.commit()
+    conn.close()
+    with StateStore(db) as st:
+        assert st.ultima_tentativa(SPRINT, "T1")["origem"] == "orquestrador"
+
+
+def test_colunas_declaradas_le_o_proprio_ddl():
+    """A reconciliacao le o SCHEMA; nao ha segunda lista de colunas a mao."""
+    from autodev.state import _colunas_declaradas
+    col = _colunas_declaradas()
+    for t in ("tasks", "attempts", "events", "haq", "sprint_state"):
+        assert t in col, f"{t} nao foi reconhecida no SCHEMA"
+    assert "failure_class" in [n for n, _ in col["haq"]]
+    nomes_tasks = [n for n, _ in col["tasks"]]
+    assert "sprint_id" in nomes_tasks
+    assert not any(n.upper().startswith("PRIMARY") for n in nomes_tasks), \
+        "linha de constraint foi confundida com coluna"
+
+
+def test_migracao_generica_adiciona_coluna_faltante(tmp_path):
+    """Regressao: coluna nova no SCHEMA nao aparece em banco antigo.
+
+    Foi assim que `haq.failure_class` quebrou num state.db real: os testes
+    passavam (banco novo) e o banco de verdade falhava com
+    'table haq has no column named failure_class'.
+    """
+    db = tmp_path / "legado.db"
+    with StateStore(db) as st:
+        st.criar_task(SPRINT, "T1")
+    conn = sqlite3.connect(str(db))
+    conn.execute("ALTER TABLE haq DROP COLUMN failure_class")
+    conn.commit()
+    conn.close()
+    with StateStore(db) as st:
+        colunas = {r["name"] for r in st.conn.execute("PRAGMA table_info(haq)")}
+        assert "failure_class" in colunas, "migracao nao reconciliou a coluna"
+        # e o HAQ volta a funcionar de fato
+        novo = st.haq_adicionar(
+            "H1", sprint_id=SPRINT, task_id="T1", reason="r", risk="alto",
+            dependencia="d", acao_humana="a", resultado="x", verificacao="v",
+            failure_class="PERMISSION_REQUIRED")
+        assert novo is True
+        assert st.haq_listar(SPRINT)[0]["failure_class"] == "PERMISSION_REQUIRED"
+

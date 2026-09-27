@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#
+# Barreira de privacidade — roda antes de todo commit.
+#
+# Motivo: o `sandbox.py` cria um HOME próprio para rodar os agentes e COPIA
+# `~/.codex/auth.json` para dentro dele (`.autodev/sandbox-home/`). Esse arquivo
+# tem um token OAuth vivo. Um `git add -A` distraído publicaria a credencial da
+# conta num repositório público.
+#
+# O .gitignore já cobre esses caminhos. Este hook é a segunda barreira, porque
+# .gitignore só vale para o que ninguém forçou com `git add -f`.
+#
+# Instalação (uma vez por clone):
+#     git config core.hooksPath .githooks
+#
+set -u
+
+BLOQUEADOS=(
+  ".autodev/sandbox-home"
+  ".autodev/state.db"
+  ".venv/"
+  "auth.json"
+)
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+falha=0
+
+# 1. caminhos proibidos
+for alvo in "${BLOQUEADOS[@]}"; do
+  casou=$(printf '%s\n' "$staged" | grep -F "$alvo" || true)
+  if [ -n "$casou" ]; then
+    echo "COMMIT BLOQUEADO: caminho proibido '$alvo' no stage:" >&2
+    printf '  %s\n' $casou >&2
+    falha=1
+  fi
+done
+
+# 2. segredo no CONTEUDO dos arquivos que entrariam
+# Nomes dos padroes, so para a mensagem. O valor casado NUNCA e impresso: um
+# hook que mostra o segredo na mensagem de erro vaza o segredo para o log do
+# terminal e para o log de CI — exatamente o que ele existe para evitar.
+#
+# Os literais sao montados em PEDACOS de proposito: escritos inteiros aqui, o
+# hook casaria consigo mesmo e bloquearia o proprio commit.
+JWT_PREFIXO='eyJhbGci'"Oi"
+padroes="sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|${JWT_PREFIXO}|BEGIN [A-Z ]*PRIVATE KEY|\"refresh_token\"[[:space:]]*:"
+rotulos='token OpenAI|token GitHub (pat)|token GitHub (oauth)|JWT|chave privada|refresh_token'
+for arq in $staged; do
+  [ -f "$arq" ] || continue
+  # -o imprime so o trecho casado; -n da a linha. Nao guardamos o conteudo.
+  linhas=$(grep -nIEo "$padroes" "$arq" 2>/dev/null | cut -d: -f1 | sort -un | tr '\n' ' ' || true)
+  if [ -n "$linhas" ]; then
+    echo "COMMIT BLOQUEADO: possivel segredo em '$arq' (linhas: ${linhas% })" >&2
+    echo "  padroes: $(echo "$rotulos" | tr '|' ',')" >&2
+    echo "  o valor NAO e exibido de proposito." >&2
+    falha=1
+  fi
+done
+
+if [ "$falha" -ne 0 ]; then
+  cat >&2 <<'FIM'
+
+Nada foi commitado. Se o arquivo for realmente seguro, revise o .gitignore —
+a lista de bloqueados esta no topo de .githooks/pre-commit.
+FIM
+  exit 1
+fi
+
+exit 0

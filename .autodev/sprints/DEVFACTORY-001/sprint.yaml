@@ -6,7 +6,9 @@ objetivo: >
   SPEC -> PLAN -> DAG -> WORKTREE -> AGENTE -> TESTE -> REVISÃO -> FIX ->
   RETESTE -> INTEGRAÇÃO -> VALIDAÇÃO FINAL -> RELATÓRIO.
 
-status: EM_EXECUCAO
+status: ENCERRADO         # declaracao; o FATO esta em state.db (sprint_state.estado)
+data_encerramento: "2026-09-27"
+resultado: CONCLUIDO
 deadline: null            # sem deadline de política imposto (spec §13)
 max_tentativas: 5         # espelha policies.yaml
 

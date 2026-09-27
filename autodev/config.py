@@ -34,6 +34,31 @@ TRANSICOES = {
     "BLOCKED": {"QUEUED"},
 }
 
+# Estados TERMINAIS de tarefa: nada mais a fazer, com ou sem sucesso.
+TERMINAIS_TASK = {"INTEGRATED"}
+
+# --------------------------------------------------------------------------- #
+# Estados do SPRINT
+# --------------------------------------------------------------------------- #
+# A máquina acima governa UMA tarefa. O sprint tem ciclo de vida próprio, e sem
+# um estado terminal explícito "encerrar a sprint" não existe como operação —
+# o `status:` do sprint.yaml fica congelado no que foi escrito à mão.
+#
+# Aqui a fonte é o banco (sprint_state.estado), não o yaml: o yaml declara a
+# intenção, o banco registra o fato.
+ESTADOS_SPRINT = ["PLANEJADO", "EM_EXECUCAO", "EM_VERIFICACAO", "ENCERRADO",
+                  "ABORTADO"]
+# Caminho de avanço (o ABORTADO fica de fora: é saída lateral, não etapa)
+ORDEM_SPRINT = ["PLANEJADO", "EM_EXECUCAO", "EM_VERIFICACAO", "ENCERRADO"]
+SPRINT_TERMINAIS = {"ENCERRADO", "ABORTADO"}
+TRANSICOES_SPRINT = {
+    "PLANEJADO": {"EM_EXECUCAO", "ABORTADO"},
+    "EM_EXECUCAO": {"EM_VERIFICACAO", "ABORTADO"},
+    "EM_VERIFICACAO": {"ENCERRADO", "EM_EXECUCAO", "ABORTADO"},
+    "ENCERRADO": set(),
+    "ABORTADO": set(),
+}
+
 
 def _carrega_yaml(p: Path) -> dict:
     if not p.exists():
