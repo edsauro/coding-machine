@@ -373,3 +373,39 @@ def test_relatorio_nao_alerta_quando_tudo_e_do_orquestrador(store):
     store.transicionar(SPRINT, "T01", "DONE")
     txt = report.gerar(store, SPRINT)
     assert "Atenção" not in txt
+
+
+def test_relatorio_mostra_aceitacao_gravada_na_tentativa(store):
+    """Sprint encerrado por evidencia nao pode dizer que nao teve aceitacao.
+
+    A aceitacao real fica no test_result da tentativa com origem='aceitacao_real';
+    o dict `aceitacao` so e preenchido durante um `run`. Sem o fallback a secao 6
+    dizia 'nenhum' para uma aceitacao que rodou e passou.
+    """
+    store.criar_task(SPRINT, "T15", "aceitacao autonoma")
+    store.concluir_task_evidenciada(
+        SPRINT, "T15", evidencia="aceitacao rodou",
+        origem="aceitacao_real", agente="codex",
+        test_result={"passed": 8, "failed": 0, "revisor": "agy",
+                     "veredito": "APPROVE", "findings": 1,
+                     "main_intacta": True, "commit_base": "152788fc",
+                     "commit_final": "9beee3a195f6"})
+    txt = report.gerar(store, SPRINT)
+    secao6 = txt.split("## 6.")[1].split("## 7.")[0]
+    assert "nenhum" not in secao6, "secao 6 nao deveria estar vazia"
+    assert "8 passed / 0 failed" in secao6
+    assert "agy — APPROVE" in secao6 or "agy" in secao6
+    assert "origem=aceitacao_real" in secao6      # de onde veio a evidencia
+
+
+def test_relatorio_aceitacao_do_run_tem_precedencia(store):
+    """Se o orquestrador passou o dict de aceitacao, ele manda."""
+    store.criar_task(SPRINT, "T15", "x")
+    store.concluir_task_evidenciada(
+        SPRINT, "T15", evidencia="e", origem="aceitacao_real",
+        test_result={"passed": 8, "failed": 0})
+    txt = report.gerar(store, SPRINT, aceitacao={
+        "criterio do run": {"ok": True, "evidencia": "veio do run"}})
+    secao6 = txt.split("## 6.")[1].split("## 7.")[0]
+    assert "veio do run" in secao6
+    assert "origem=aceitacao_real" not in secao6

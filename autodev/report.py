@@ -145,10 +145,44 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
         har = round(len(haq) / m["done"], 3)
 
     # --- aceitação ------------------------------------------------------------
+    # A sprint pode ter sido encerrada por EVIDÊNCIA de aceitação registrada numa
+    # tentativa (origem='aceitacao_real'), sem passar pelo dict `aceitacao` que o
+    # orquestrador monta durante um `run`. Sem este fallback, o relatório dizia
+    # "nenhum" para uma aceitação que de fato rodou e passou.
+    nota_aceitacao = ""
+    aceitacao_efetiva = dict(aceitacao)
+    if not aceitacao_efetiva:
+        for t in tent:
+            if (t["origem"] or "") != "aceitacao_real" or not t["test_result"]:
+                continue
+            try:
+                r = json.loads(t["test_result"])
+            except json.JSONDecodeError:
+                continue
+            aceitacao_efetiva = {
+                "testes passaram": {
+                    "ok": r.get("failed") == 0,
+                    "evidencia": f"{r.get('passed')} passed / {r.get('failed')} failed"
+                                 f" (agente {r.get('agente')}/{r.get('modelo')})"},
+                "revisão cruzada": {
+                    "ok": r.get("veredito") == "APPROVE",
+                    "evidencia": f"{r.get('revisor')} — {r.get('veredito')}"
+                                 f" ({r.get('findings')} findings)"},
+                "main intocada": {
+                    "ok": r.get("main_intacta") is True,
+                    "evidencia": f"commit base {r.get('commit_base')} preservado"},
+                "commit final": {
+                    "ok": bool(r.get("commit_final")),
+                    "evidencia": str(r.get("commit_final", ""))[:12]},
+            }
+            nota_aceitacao = (
+                f"\n> Evidência derivada da tentativa da task `{t['task_id']}`"
+                f" (`origem=aceitacao_real`), não de um `run` deste sprint.")
+            break
     tabela_aceitacao = _tabela(
         ["criterio", "ok", "evidencia"],
         [[k, "OK" if v.get("ok") else "FALHOU", str(v.get("evidencia", ""))[:110]]
-         for k, v in aceitacao.items()])
+         for k, v in aceitacao_efetiva.items()])
 
     # --- ciclo de vida do sprint ---------------------------------------------
     estado_spr = store.estado_sprint(sprint) or "PLANEJADO"
@@ -230,7 +264,7 @@ Tasks em andamento / não iniciadas: **{len(outros)}**
 {tabela_testes}
 ## 6. Evidência do teste de aceitação
 
-{tabela_aceitacao}
+{tabela_aceitacao}{nota_aceitacao}
 """
     if quota_teste:
         s5 += f"""

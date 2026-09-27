@@ -2,9 +2,9 @@
 
 **Objetivo:** Construir e validar um loop de codificação autônomo mínimo, capaz de levar UMA task aprovada de ponta a ponta sem intervenção humana: SPEC -> PLAN -> DAG -> WORKTREE -> AGENTE -> TESTE -> REVISÃO -> FIX -> RETESTE -> INTEGRAÇÃO -> VALIDAÇÃO FINAL -> RELATÓRIO.
 
-**Gerado em:** 2026-09-27 02:13:32
+**Gerado em:** 2026-09-27 02:24:10
 **Duração total:** 0.0 min
-**Commit do repositório:** `2e65da6180ddded2d84e6de956348bd13b3a544d`
+**Commit do repositório:** `017481b4e7d0e7ff18d7bb85e9168f9aaa503222`
 **Estado do sprint:** `ENCERRADO` — percurso: EM_EXECUCAO → EM_VERIFICACAO → ENCERRADO
 **Fonte da verdade:** `state.db` + arquivos do Sprint + Git + evidências de teste
 
@@ -114,8 +114,14 @@ Tasks em andamento / não iniciadas: **0**
 
 ## 6. Evidência do teste de aceitação
 
-_nenhum_
+| criterio | ok | evidencia |
+|---|---|---|
+| testes passaram | OK | 8 passed / 0 failed (agente codex/gpt-5.6-luna) |
+| revisão cruzada | OK | agy — APPROVE (1 findings) |
+| main intocada | OK | commit base 152788fc preservado |
+| commit final | OK | 9beee3a195f6 |
 
+> Evidência derivada da tentativa da task `T15` (`origem=aceitacao_real`), não de um `run` deste sprint.
 
 ## 7. Findings de revisão de código
 
