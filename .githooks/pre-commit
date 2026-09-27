@@ -59,6 +59,38 @@ for arq in $staged; do
   fi
 done
 
+# 3. contexto pessoal/saude no CONTEUDO
+#
+# Este repositorio e publico e trata de uma ferramenta de codificacao. Termos de
+# saude e de vida pessoal nao tem o que fazer aqui: nao servem ao projeto e
+# revelam contexto que nao pertence a um repositorio publico. O caso real que
+# motivou esta checagem foi uma tabela de "decisoes herdadas" que trouxe regras
+# de outro projeto para dentro do decisions.md.
+#
+# Os termos sao montados em PEDACOS pelo mesmo motivo do bloco acima: escritos
+# inteiros, o hook casaria consigo mesmo e bloquearia o proprio commit.
+TERMOS_privados=(
+  "carboli""thium"
+  "saude""\.db"
+  "samsung""[ _]health"
+  "espo""sa"
+  "medica""cao"
+  "diagnos""tico medico"
+)
+padrao_privado=$(IFS='|'; echo "${TERMOS_privados[*]}")
+for arq in $staged; do
+  [ -f "$arq" ] || continue
+  linhas=$(grep -nIEio "$padrao_privado" "$arq" 2>/dev/null | cut -d: -f1 \
+           | sort -un | tr '\n' ' ' || true)
+  if [ -n "$linhas" ]; then
+    echo "COMMIT BLOQUEADO: contexto pessoal/saude em '$arq' (linhas: ${linhas% })" >&2
+    echo "  Este repositorio e publico. Remova o trecho ou reescreva-o em" >&2
+    echo "  termos do projeto. Se for um falso positivo, ajuste a lista no topo" >&2
+    echo "  de .githooks/pre-commit." >&2
+    falha=1
+  fi
+done
+
 if [ "$falha" -ne 0 ]; then
   cat >&2 <<'FIM'
 

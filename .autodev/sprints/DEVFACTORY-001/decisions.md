@@ -299,9 +299,10 @@ de TDD é pior que nenhum — ele descreve o vermelho que não existe mais.
 
 | Decisão | Regra |
 |---|---|
-| Corrida vs. caminhada | velocidade máxima > 10 km/h classifica como corrida |
-| Diagnóstico | nunca apresentar como diagnóstico; PPG não é dispositivo médico |
-| Medicação | nunca orientar suspensão ou ajuste |
-| Proveniência | todo número marcado como direto / derivado / inferido |
+| Merge em main | **nunca** automático; o trabalho fica no branch do sprint |
+| Sandbox | `bwrap`, sem daemon e sem root; o HOME real nunca é montado |
+| Revisão | quem implementa não revisa |
+| Cota | espera de recurso, não falha; não consome tentativa de implementação |
+| Escalonamento | só com evidência nova; erro de ambiente nunca escala modelo |
 | Skills de terceiros | auditar antes de instalar |
 | Saída de skill | sempre em `~/workspace/s_<skill>/` |
