@@ -1,0 +1,132 @@
+# exit_code=3 duracao=150.1s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- o README.md ganha uma secao Planejador explicando o fluxo do prompt ao sprint executavel
+- a secao documenta autodev plan com o exemplo de uso e o efeito no disco
+- a secao declara explicitamente que o planejador usa um agente e por isso consome cota
+- a secao registra a limitacao de que o plano gerado sempre precisa de revisao humana antes de rodar
+- o README menciona que o comando plan nao faz merge nem push
+- os testes ficam em .autodev/tests/test_planner.py provando que as secoes exigidas existem no README
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P10: Documentar o planejador e fechar a documentacao
+
+## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+new file mode 100644
+index 0000000..a5e4c94
+--- /dev/null
++++ b/.autodev/tests/test_planner.py
+@@ -0,0 +1,28 @@
++from pathlib import Path
++
++
++README = Path(__file__).parents[2] / "README.md"
++
++
++def test_readme_documenta_o_fluxo_do_planejador():
++    texto = README.read_text(encoding="utf-8")
++
++    assert "## Planejador" in texto
++    assert "prompt" in texto.lower()
++    assert "sprint executável" in texto.lower()
++    assert "spec.md" in texto
++    assert "dag.json" in texto
++    assert "sprint.yaml" in texto
++
++
++def test_readme_documenta_uso_efeitos_e_limites_do_plan():
++    texto = README.read_text(encoding="utf-8")
++    minusculo = texto.lower()
++
++    assert 'autodev plan "<pedido em texto livre>"' in texto
++    assert "em disco" in minusculo
++    assert "agente" in minusculo
++    assert "cota" in minusculo
++    assert "revisão humana" in minusculo
++    assert "merge" in minusculo
++    assert "push" in minusculo
+diff --git a/README.md b/README.md
+index fe564ee..11558df 100644
+--- a/README.md
++++ b/README.md
+@@ -15,6 +15,29 @@ Uma tarefa aprovada roda de ponta a ponta sem intervenção humana.
+ 
+ ---
+ 
++## Planejador
++
++O planejador transforma um pedido em texto livre em um sprint executável. O
++fluxo é: o prompt do usuário é enviado a um agente, o agente produz o plano
++com as tarefas e suas dependências, e o plano é validado pelas mesmas regras
++do DAG usado pelo orquestrador. Depois, os artefatos são gravados em disco no
++diretório `.autodev/sprints/<id>/`: `spec.md`, `dag.json` e `sprint.yaml`.
++
++Para usar:
++
++```bash
++autodev plan "<pedido em texto livre>"
++```
++
++Esse comando cria o sprint planejado em disco, pronto para ser inspecionado e
++então executado pelo fluxo normal. O planejador usa um agente para elaborar o
++plano e, por isso, consome cota de agente/API. O plano gerado sempre precisa de
++revisão humana antes de rodar: confira as tarefas, critérios e dependências
++antes de iniciar o sprint. O comando `plan` não faz merge nem push; ele apenas
++produz os arquivos do sprint.
++
++---
++
+ ## Por que não é só "chamar o Codex num loop"
+ 
+ Porque o valor está no que acontece **quando dá errado**. O projeto trata como
+```
+
+## Saida dos testes
+```
+........................................................................ [ 53%]
+..............................................ss..............           [100%]
+132 passed, 2 skipped in 7.30s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h17m54s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h17m54s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"b31fa376-66d1-49bf-a696-f0222cc3f20c-9"}
+

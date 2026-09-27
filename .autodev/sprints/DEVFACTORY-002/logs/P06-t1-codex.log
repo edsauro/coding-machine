@@ -1,0 +1,96 @@
+# exit_code=0 duracao=117.8s modelo=gpt-5.6-luna effort=low failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P06: Invocar o agente em modo planejamento
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe a funcao planejar(raiz, prompt_usuario, agente) em autodev/planner.py que devolve um Plano
+- reusa agents.invocar do modulo de agentes em vez de chamar o binario diretamente
+- grava o prompt e a resposta do agente em .autodev/sprints/<sprint_id>/logs/plano-<agente>.log
+- cota esgotada (failure_class CODEX_QUOTA) propaga a excecao CotaEsgotada definida em autodev/planner.py, sem virar plano vazio
+- resposta sem JSON reconhecivel levanta PlanoInvalido citando o trecho inicial da resposta
+- o teste usa o driver falso via AUTODEV_FAKE_AGENT e nao gasta cota real
+- os testes ficam em .autodev/tests/test_planner.py
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Contexto do projeto
+# DEVFACTORY-002 — Planejador: do prompt ao plano executável
+
+## O que esta sprint entrega
+
+Um comando novo, `autodev plan "<pedido em texto livre>"`, que produz um sprint
+executável em disco (`spec.md` + `dag.json` + `sprint.yaml`), validado pelas
+mesmas regras que o `autodev` já aplica na carga do DAG.
+
+Hoje esse passo é manual: alguém escreve o `spec.md` e o `dag.json` à mão antes
+de o orquestrador fazer qualquer coisa. Esta sprint fecha essa metade.
+
+## CONTRATO DE INTERFACES (não invente outros nomes)
+
+Estas assinaturas são usadas por tasks de ondas diferentes. Se você precisa de
+algo que não está aqui, **use o que está aqui**; não crie uma variante.
+
+```
+autodev/planner.py
+  @dataclass Plano:      titulo, objetivo, repositorio, tasks, prompt_original
+  @dataclass TaskPlano:  id, titulo, criterios, deps, agente, teste
+  validar_plano(plano) -> list[str]            # vazio = válido
+  parsear_plano(texto) -> Plano
+  validar_e_ordenar(plano) -> list[list[str]]  # ondas; reusa ordem_topologica
+  escrever_sprint(raiz, plano) -> Path
+  planejar(raiz, prompt_usuario, agente) -> Plano
+  exceções: PlanoInvalido, SprintJaExiste, CotaEsgotada
+  constante: PALAVRAS_VAGAS
+
+autodev/plan_prompt.py
+  PROMPT_PLANO: str
+  montar_prompt_plano(prompt_usuario) -> str
+```
+
+## REGRAS DURAS PARA O AGENTE
+
+1. **Trabalhe SOMENTE no seu worktree.** Nunca faça `cd` para fora dele, nunca
+   toque no repositório principal, nunca faça merge nem push.
+2. **Rode os testes antes de terminar:**
+   `python3 -m pytest .autodev/tests/ -q`
+   A suíte inteira tem que ficar verde. `python3` aqui é resolvido pelo runner
+   para o interpretador do projeto — use exatamente esta forma.
+3. **Os testes novos vão nos arquivos já indicados nos seus critérios.** Não
+   crie um arquivo de teste novo se o critério nomeia um existente.
+4. **Não invente APIs do projeto.** Os módulos existentes e seus nomes reais:
+   `agents.invocar`, `config.ordem_topologica`, `state.StateStore`,
+   `testrunner.rodar`, `sandbox.rodar`, `worktree.WorktreeManager`,
+   `planner` (novo). Confira a assinatura no arquivo antes de chamar.
+5. **Não altere o comportamento existente** para fazer o seu teste passar. Se um
+   teste antigo falhar, o problema é o seu código.
+6. **Cada critério é verificável.** Se você não consegue provar um critério com
+   um teste ou com um comando, o critério não foi atendido.
+7. **Sem dados pessoais.** Nada de nomes, caminhos de HOME ou credenciais em
+   código, teste ou documentação.
+
+## Por que o
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-002-P06-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+===== STDOUT =====
+Implementado `planejar` com `agents.invocar`, logs, tratamento de cota e respostas inválidas, além dos testes e prompt de planejamento.
+
+RESULTADO: Task P06 implementada | TESTES: 135 passed — `/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q` (o `python3` padrão não possui pytest)
+
+===== STDERR =====
+

@@ -1,0 +1,26 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q
+exit=1 (7.6s)
+
+...........................................................F............ [ 52%]
+...................................................ss............        [100%]
+=================================== FAILURES ===================================
+___________ test_plan_existente_imprime_mensagem_clara_sem_traceback ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-saurus/pytest-0/test_plan_existente_imprime_me0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f941603af50>
+capsys = <_pytest.capture.CaptureFixture object at 0x7f941603b2d0>
+
+    def test_plan_existente_imprime_mensagem_clara_sem_traceback(tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "RAIZ", tmp_path)
+        monkeypatch.setattr("autodev.planner.planejar", lambda *args: (_ for _ in ()).throw(SprintJaExiste("S-001")))
+        assert cli.main(["plan", "pedido"]) == 1
+        saida = capsys.readouterr().out
+>       assert "S-001" in saida and "ja existe" in saida.lower() and "Traceback" not in saida
+E       AssertionError: assert ('S-001' in 'sprint já existe: S-001\n' and 'ja existe' in 'sprint já existe: s-001\n')
+E        +  where 'sprint já existe: s-001\n' = <built-in method lower of str object at 0x7f9416075300>()
+E        +    where <built-in method lower of str object at 0x7f9416075300> = 'sprint já existe: S-001\n'.lower
+
+.autodev/tests/test_cli.py:132: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_cli.py::test_plan_existente_imprime_mensagem_clara_sem_traceback
+1 failed, 134 passed, 2 skipped in 7.39s

@@ -1,0 +1,202 @@
+# exit_code=3 duracao=160.5s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- existe a funcao parsear_plano(texto) em autodev/planner.py que devolve um Plano
+- aceita JSON puro, JSON dentro de cerca de codigo com crase tripla e JSON cercado por texto explicativo
+- levanta PlanoInvalido (definida em autodev/planner.py) quando nao ha JSON reconhecivel
+- levanta PlanoInvalido quando o JSON nao tem a chave tasks
+- importa as dataclasses de autodev/planner.py em vez de redefinir
+- os testes ficam em .autodev/tests/test_planner.py e cobrem os 3 formatos aceitos e 2 recusas
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P03: Parsear a resposta do agente de forma tolerante
+
+## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+new file mode 100644
+index 0000000..a949d4b
+--- /dev/null
++++ b/.autodev/tests/test_planner.py
+@@ -0,0 +1,54 @@
++import json
++
++import pytest
++
++from autodev.planner import Plano, PlanoInvalido, TaskPlano, parsear_plano
++
++
++PLANO = {
++    "titulo": "Sprint de teste",
++    "objetivo": "Validar o parser",
++    "repositorio": "projeto",
++    "tasks": [
++        {
++            "id": "T01",
++            "titulo": "Implementar parser",
++            "criterios": ["aceita JSON"],
++            "deps": [],
++            "agente": "codex",
++            "teste": "pytest",
++        }
++    ],
++}
++
++
++@pytest.mark.parametrize("texto", [
++    json.dumps(PLANO),
++    "```json\n" + json.dumps(PLANO) + "\n```",
++    "Resposta do agente:\n" + json.dumps(PLANO) + "\nFim.",
++])
++def test_parseia_os_formatos_tolerados(texto):
++    plano = parsear_plano(texto)
++
++    assert isinstance(plano, Plano)
++    assert isinstance(plano.tasks[0], TaskPlano)
++    assert plano.tasks[0].id == "T01"
++    assert plano.prompt_original == texto
++
++
++def test_recusa_texto_sem_json():
++    with pytest.raises(PlanoInvalido):
++        parsear_plano("não há um plano aqui")
++
++
++def test_recusa_json_sem_tasks():
++    with pytest.raises(PlanoInvalido):
++        parsear_plano(json.dumps({"titulo": "incompleto"}))
++
++
++def test_ignora_objeto_json_irrelevante_no_texto_explicativo():
++    texto = "Metadados: {}\nPlano gerado:\n" + json.dumps(PLANO)
++
++    plano = parsear_plano(texto)
++
++    assert plano.titulo == "Sprint de teste"
+diff --git a/autodev/planner.py b/autodev/planner.py
+new file mode 100644
+index 0000000..403a12c
+--- /dev/null
++++ b/autodev/planner.py
+@@ -0,0 +1,72 @@
++"""Modelos e parsing tolerante da resposta do agente planejador."""
++from __future__ import annotations
++
++import json
++from dataclasses import dataclass, field
++
++
++class PlanoInvalido(ValueError):
++    """Resposta do agente que não contém um plano reconhecível."""
++
++
++@dataclass
++class TaskPlano:
++    id: str
++    titulo: str
++    criterios: list[str]
++    deps: list[str] = field(default_factory=list)
++    agente: str = "codex"
++    teste: str = ""
++
++
++@dataclass
++class Plano:
++    titulo: str
++    objetivo: str
++    repositorio: str
++    tasks: list[TaskPlano]
++    prompt_original: str = ""
++
++
++def _encontrar_json(texto: str) -> dict:
++    decodificador = json.JSONDecoder()
++    primeiro_objeto = None
++    for inicio, caractere in enumerate(texto):
++        if caractere != "{":
++            continue
++        try:
++            valor, _ = decodificador.raw_decode(texto[inicio:])
++        except json.JSONDecodeError:
++            continue
++        if isinstance(valor, dict):
++            primeiro_objeto = primeiro_objeto or valor
++            if "tasks" in valor:
++                return valor
++    if primeiro_objeto is not None:
++        return primeiro_objeto
++    raise PlanoInvalido("resposta não contém JSON reconhecível")
++
++
++def parsear_plano(texto: str) -> Plano:
++    """Converte JSON puro ou embutido em texto em um :class:`Plano`."""
++    try:
++        dados = _encontrar_json(texto)
++    except (TypeError, PlanoInvalido) as erro:
++        if isinstance(erro, PlanoInvalido):
++            raise
++        raise PlanoInvalido("resposta não contém JSON reconhecível") from erro
++
++    if "tasks" not in dados:
++        raise PlanoInvalido("JSON do plano não contém a chave tasks")
++
++    try:
++        tarefas = [TaskPlano(**task) for task in dados["tasks"]]
++        return Plano(
++            titulo=dados.get("titulo", ""),
++            objetivo=dados.get("objetivo", ""),
++            repositorio=dados.get("repositorio", ""),
++            tasks= tarefas,
++            prompt_original=texto,
++        )
++    except (TypeError, ValueError) as erro:
++        raise PlanoInvalido("JSON do plano possui tasks inválidas") from erro
+```
+
+## Saida dos testes
+```
+........................................................................ [ 52%]
+..............................................ss..................       [100%]
+136 passed, 2 skipped in 7.32s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 138h54m48s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 138h54m48s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"84a1c876-85ca-4d06-b1e4-3fc6a4e9c05e-9"}
+

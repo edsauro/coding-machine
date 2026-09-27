@@ -1,0 +1,119 @@
+# exit_code=3 duracao=138.8s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- existe autodev/plan_prompt.py com a constante PROMPT_PLANO (string) e a funcao montar_prompt_plano(prompt_usuario)
+- montar_prompt_plano devolve uma string que CONTEM o prompt do usuario sem alteracao
+- o prompt exige que o agente responda APENAS um JSON com as chaves titulo, objetivo, repositorio e tasks
+- o prompt exige que cada task tenha id, titulo, criterios, deps, agente e teste
+- o prompt proibe criterio vago: exige que cada criterio mencione um arquivo ou um comando de teste concreto
+- o prompt exige que a ultima task seja sempre um teste de aceitacao ponta a ponta
+- os testes ficam em .autodev/tests/test_planner.py e provam que os elementos obrigatorios aparecem no prompt montado
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P02: Criar autodev/plan_prompt.py com o prompt de planejamento
+
+## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+new file mode 100644
+index 0000000..0e14cf6
+--- /dev/null
++++ b/.autodev/tests/test_planner.py
+@@ -0,0 +1,23 @@
++from autodev.plan_prompt import PROMPT_PLANO, montar_prompt_plano
++
++
++def test_prompt_montado_preserva_prompt_usuario_sem_alteracao():
++    prompt_usuario = "Implemente X\ncom detalhes: {literal}"
++
++    prompt = montar_prompt_plano(prompt_usuario)
++
++    assert prompt_usuario in prompt
++
++
++def test_prompt_montado_exige_contrato_completo_do_plano():
++    prompt = montar_prompt_plano("pedido")
++
++    assert PROMPT_PLANO in prompt
++    assert "APENAS um JSON" in prompt
++    for chave in ("titulo", "objetivo", "repositorio", "tasks"):
++        assert chave in prompt
++    for campo in ("id", "titulo", "criterios", "deps", "agente", "teste"):
++        assert campo in prompt
++    assert "arquivo" in prompt or "comando de teste" in prompt
++    assert "ultima task" in prompt.lower()
++    assert "teste de aceitacao ponta a ponta" in prompt.lower()
+diff --git a/autodev/plan_prompt.py b/autodev/plan_prompt.py
+new file mode 100644
+index 0000000..bb450a7
+--- /dev/null
++++ b/autodev/plan_prompt.py
+@@ -0,0 +1,19 @@
++"""Prompt usado pelo planejador para obter um plano executável em JSON."""
++
++PROMPT_PLANO = """Você é um agente de planejamento de software.
++
++Responda APENAS um JSON válido, sem markdown, comentários ou texto adicional.
++O JSON deve ter exatamente as chaves: titulo, objetivo, repositorio e tasks.
++Cada item de tasks deve ter as chaves: id, titulo, criterios, deps, agente e teste.
++Cada criterio deve ser concreto e mencionar um arquivo ou um comando de teste
++concreto; proíba e não use critérios vagos.
++A ultima task (última tarefa) deve ser sempre um teste de aceitacao ponta a ponta
++(teste de aceitação), com seu
++arquivo e comando de teste concretos descritos nos critérios e em teste.
++Use deps para declarar as dependências entre tasks e produza um plano executável.
++"""
++
++
++def montar_prompt_plano(prompt_usuario):
++    """Monta o prompt de planejamento preservando o pedido original literalmente."""
++    return f"{PROMPT_PLANO}\nPedido do usuário:\n{prompt_usuario}"
+```
+
+## Saida dos testes
+```
+........................................................................ [ 53%]
+..............................................ss..............           [100%]
+132 passed, 2 skipped in 7.31s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h11m9s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h11m9s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"d31ccfdc-3fc6-4bdc-84dc-617453bddda6-9"}
+

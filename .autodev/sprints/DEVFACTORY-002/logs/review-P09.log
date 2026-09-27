@@ -1,0 +1,230 @@
+# exit_code=3 duracao=151.6s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- a spec.md gerada por escrever_sprint contem a secao Prompt original com o texto do usuario literal
+- o dag.json gerado registra o campo prompt_original
+- o comando autodev report inclui o prompt original na secao de contexto quando ele existe no dag.json
+- plano sem prompt_original e aceito, e a secao aparece como nao informado, sem quebrar o relatorio
+- os testes ficam em .autodev/tests/test_planner.py e .autodev/tests/test_adapters.py
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P09: Registrar a rastreabilidade do prompt ao plano
+
+## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_adapters.py b/.autodev/tests/test_adapters.py
+index 401b4c9..916189c 100644
+--- a/.autodev/tests/test_adapters.py
++++ b/.autodev/tests/test_adapters.py
+@@ -409,3 +409,15 @@ def test_relatorio_aceitacao_do_run_tem_precedencia(store):
+     secao6 = txt.split("## 6.")[1].split("## 7.")[0]
+     assert "veio do run" in secao6
+     assert "origem=aceitacao_real" not in secao6
++
++
++def test_relatorio_inclui_prompt_original_no_contexto(store):
++    txt = report.gerar(store, SPRINT, prompt_original="Pedido literal do usuario")
++    contexto = txt.split("## Contexto")[1].split("## 1.")[0]
++    assert "Pedido literal do usuario" in contexto
++
++
++def test_relatorio_indica_prompt_nao_informado(store):
++    txt = report.gerar(store, SPRINT)
++    contexto = txt.split("## Contexto")[1].split("## 1.")[0]
++    assert "não informado" in contexto
+diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+new file mode 100644
+index 0000000..894d64d
+--- /dev/null
++++ b/.autodev/tests/test_planner.py
+@@ -0,0 +1,25 @@
++import json
++
++from autodev.planner import Plano, TaskPlano, escrever_sprint
++
++
++def test_escrever_sprint_preserva_prompt_literal_na_spec_e_no_dag(tmp_path):
++    prompt = "Criar API: validar 'entrada' & manter acentos"
++    plano = Plano("Sprint", "Objetivo", str(tmp_path), [
++        TaskPlano("T01", "Implementar", ["autodev/x.py: teste"], [], "codex", "pytest")
++    ], prompt)
++
++    destino = escrever_sprint(tmp_path, plano)
++
++    spec = (destino / "spec.md").read_text(encoding="utf-8")
++    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
++    assert "## Prompt original" in spec
++    assert prompt in spec
++    assert dag["prompt_original"] == prompt
++
++
++def test_escrever_sprint_aceita_plano_sem_prompt(tmp_path):
++    plano = Plano("Sprint", "Objetivo", str(tmp_path), [], "")
++    destino = escrever_sprint(tmp_path, plano)
++    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
++    assert dag["prompt_original"] == ""
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 547b0d2..5455155 100644
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -127,6 +127,8 @@ def cmd_report(args) -> int:
+         f = d / "report-extras.json"
+         if f.exists():
+             extra = json.loads(f.read_text())
++        dag = json.loads((d / "dag.json").read_text(encoding="utf-8"))
++        extra.setdefault("prompt_original", dag.get("prompt_original", ""))
+         txt = rp.gerar(st, args.sprint, objetivo=sp.get("objetivo", ""),
+                        git_commit=commit_atual(RAIZ), **extra)
+     destino = d / "SPRINT-REPORT.md"
+diff --git a/autodev/planner.py b/autodev/planner.py
+new file mode 100644
+index 0000000..4ae1b26
+--- /dev/null
++++ b/autodev/planner.py
+@@ -0,0 +1,63 @@
++"""Tipos e persistência mínima do plano produzido pelo planejador."""
++from __future__ import annotations
++
++import json
++import re
++from dataclasses import asdict, dataclass, field
++from pathlib import Path
++
++
++class PlanoInvalido(ValueError):
++    pass
++
++
++class SprintJaExiste(FileExistsError):
++    pass
++
++
++@dataclass
++class TaskPlano:
++    id: str
++    titulo: str
++    criterios: list[str]
++    deps: list[str] = field(default_factory=list)
++    agente: str = "codex"
++    teste: str = ""
++
++
++@dataclass
++class Plano:
++    titulo: str
++    objetivo: str
++    repositorio: str
++    tasks: list[TaskPlano]
++    prompt_original: str = ""
++
++
++def _sprint_id(titulo: str) -> str:
++    valor = re.sub(r"[^A-Za-z0-9]+", "-", titulo).strip("-").upper()
++    return valor or "SPRINT-PLANEJADO"
++
++
++def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
++    raiz = Path(raiz)
++    sprint_id = _sprint_id(plano.titulo)
++    destino = raiz / ".autodev" / "sprints" / sprint_id
++    if destino.exists():
++        raise SprintJaExiste(f"sprint ja existe: {sprint_id}")
++    destino.mkdir(parents=True)
++    tasks = [asdict(task) for task in plano.tasks]
++    (destino / "dag.json").write_text(json.dumps({
++        "sprint_id": sprint_id, "versao": 1,
++        "prompt_original": plano.prompt_original or "", "tasks": tasks,
++    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    (destino / "sprint.yaml").write_text(
++        f"sprint_id: {sprint_id}\ntitulo: {plano.titulo}\n"
++        f"objetivo: {plano.objetivo}\nstatus: PLANEJADO\n"
++        f"repositorio:\n  raiz: {plano.repositorio}\n  merge_em_main: false\n",
++        encoding="utf-8")
++    prompt = plano.prompt_original or "nao informado"
++    (destino / "spec.md").write_text(
++        f"# {plano.titulo}\n\n## Objetivo\n\n{plano.objetivo}\n\n"
++        f"## Prompt original\n\n{prompt}\n", encoding="utf-8")
++    return destino
+diff --git a/autodev/report.py b/autodev/report.py
+index ffdef68..7aab29f 100644
+--- a/autodev/report.py
++++ b/autodev/report.py
+@@ -32,7 +32,7 @@ def _tabela(cabecalhos: list[str], linhas: list[list]) -> str:
+ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = None,
+           devios: list[str] | None = None, divida: list[str] | None = None,
+           quota_teste: dict | None = None, git_commit: str = "",
+-          duracao_s: float = 0.0) -> str:
++          duracao_s: float = 0.0, prompt_original: str = "") -> str:
+     m = store.metricas(sprint)
+     tasks = store.tasks(sprint)
+     haq = store.haq_listar(sprint)
+@@ -199,6 +199,13 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
+ **Fonte da verdade:** `state.db` + arquivos do Sprint + Git + evidências de teste
+ 
+ ---
++"""
++
++    contexto = prompt_original or "não informado"
++    s_contexto = f"""
++## Contexto
++
++**Prompt original:** {contexto}
+ """
+ 
+     s1 = f"""
+@@ -330,7 +337,7 @@ _(ver decisões e recomendações no fim deste documento)_
+         [[_fmt_ts(e["ts"]), e["tipo"], e["task_id"] or "-",
+           str(e["payload"])[:90]] for e in eventos[:40]])
+ 
+-    return (cab + s1 + s2 + s3 + s5 + s7 + s13 +
++    return (cab + s_contexto + s1 + s2 + s3 + s5 + s7 + s13 +
+             "\n## Apêndice — últimos eventos do Sprint\n\n" + eventos_resumo)
+```
+
+## Saida dos testes
+```
+........................................................................ [ 52%]
+................................................ss..............         [100%]
+134 passed, 2 skipped in 7.31s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h20m44s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h20m44s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"123bb865-bc03-44f9-8235-c28a45820434-9"}
+

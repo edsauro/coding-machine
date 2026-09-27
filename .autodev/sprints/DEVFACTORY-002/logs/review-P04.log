@@ -1,0 +1,252 @@
+# exit_code=3 duracao=155.6s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- existe a funcao validar_e_ordenar(plano) em autodev/planner.py que reusa ordem_topologica do modulo de config
+- devolve as ondas de execucao e recusa plano ciclico com mensagem citando os ids envolvidos
+- existe a lista PALAVRAS_VAGAS com termos como melhorar, otimizar, refatorar, revisar, ajustar
+- um criterio que usa PALAVRAS_VAGAS sem citar arquivo nem comando de teste e recusado com o id da task e o indice do criterio
+- um criterio concreto que cita arquivo ou comando de teste e aceito
+- os testes ficam em .autodev/tests/test_planner.py e provam as recusas e a aceitacao
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P04: Validar o plano contra o DAG real e contra criterio vago
+
+## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+new file mode 100644
+index 0000000..66c0cb9
+--- /dev/null
++++ b/.autodev/tests/test_planner.py
+@@ -0,0 +1,70 @@
++from autodev.planner import PALAVRAS_VAGAS, Plano, PlanoInvalido, TaskPlano
++from autodev.planner import validar_e_ordenar, validar_plano
++
++
++def plano(*tasks):
++    return Plano("Sprint", "Objetivo", "repo", list(tasks), "prompt")
++
++
++def task(task_id, criterios, deps=None):
++    return TaskPlano(task_id, task_id, criterios, deps or [], "codex", "pytest")
++
++
++def test_validar_e_ordenar_devolve_ondas_do_dag():
++    p = plano(task("A", ["cria autodev/planner.py"]),
++              task("B", ["python3 -m pytest .autodev/tests/ -q"], ["A"]),
++              task("C", ["edita autodev/config.py"], ["A"]))
++
++    assert validar_e_ordenar(p) == [["A"], ["B", "C"]]
++
++
++def test_validar_e_ordenar_recusa_ciclo_citando_ids():
++    p = plano(task("T1", ["edita autodev/planner.py"], ["T2"]),
++              task("T2", ["pytest .autodev/tests/ -q"], ["T1"]))
++
++    try:
++        validar_e_ordenar(p)
++    except PlanoInvalido as exc:
++        assert "T1" in str(exc) and "T2" in str(exc)
++    else:
++        raise AssertionError("plano cíclico deveria ser recusado")
++
++
++def test_palavras_vagas_recusa_criterio_sem_arquivo_ou_teste():
++    assert {"melhorar", "otimizar", "refatorar", "revisar", "ajustar"} <= set(PALAVRAS_VAGAS)
++    erros = validar_plano(plano(task("P04", ["refatorar o código"])))
++
++    assert any("P04" in erro and "critério 0" in erro for erro in erros)
++
++
++def test_criterio_vago_com_arquivo_ou_comando_de_teste_e_aceito():
++    assert validar_plano(plano(task("P04", ["refatorar autodev/planner.py"]))) == []
++    assert validar_plano(plano(task("P04", ["ajustar e rodar python3 -m pytest .autodev/tests/ -q"]))) == []
++
++
++def test_criterio_vago_com_evidencia_em_markdown_e_extensao_comum_e_aceito():
++    assert validar_plano(plano(task("P04", ["melhorar `pyproject.toml`"]))) == []
++    assert validar_plano(plano(task("P04", ["revisar 'scripts/check.sh'"]))) == []
++
++
++def test_validar_plano_recusa_plano_sem_tasks():
++    assert validar_plano(plano()) == ["plano sem tasks"]
++
++
++def test_validar_plano_recusa_ids_duplicados():
++    erros = validar_plano(plano(task("P04", ["cria autodev/planner.py"]),
++                                task("P04", ["cria autodev/config.py"])))
++
++    assert "ids duplicados no plano" in erros
++
++
++def test_validar_plano_recusa_task_sem_criterios():
++    erros = validar_plano(plano(task("P04", [])))
++
++    assert "task P04 sem criterios" in erros
++
++
++def test_validar_plano_recusa_dependencia_inexistente():
++    erros = validar_plano(plano(task("P04", ["edita autodev/planner.py"], ["P03"])))
++
++    assert "task P04 depende de P03, que não existe" in erros
+diff --git a/autodev/planner.py b/autodev/planner.py
+new file mode 100644
+index 0000000..8b756c4
+--- /dev/null
++++ b/autodev/planner.py
+@@ -0,0 +1,106 @@
++"""Tipos e validações do plano produzido pelo planejador."""
++from __future__ import annotations
++
++from dataclasses import dataclass, field
++import re
++
++from .config import ordem_topologica
++
++
++PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
++
++
++class PlanoInvalido(ValueError):
++    """Plano que não pode ser convertido em um DAG executável."""
++
++
++class SprintJaExiste(Exception):
++    pass
++
++
++class CotaEsgotada(Exception):
++    pass
++
++
++@dataclass
++class TaskPlano:
++    id: str
++    titulo: str
++    criterios: list[str]
++    deps: list[str] = field(default_factory=list)
++    agente: str = "codex"
++    teste: str = ""
++
++
++@dataclass
++class Plano:
++    titulo: str
++    objetivo: str
++    repositorio: str
++    tasks: list[TaskPlano]
++    prompt_original: str
++
++
++def _tem_evidencia(criterio: str) -> bool:
++    evidencia = r"(?:[\w./-]+\.(?:py|js|ts|json|yaml|yml|md|toml|sh)|pytest\b|python(?:3)?\s+-m\s+pytest\b)"
++    return bool(re.search(rf"(?:^|[\s`'\"]){evidencia}", criterio, re.IGNORECASE))
++
++
++def _ids_do_ciclo(tasks: list[TaskPlano]) -> list[str]:
++    grafo = {task.id: task.deps for task in tasks}
++    visitando: list[str] = []
++    visitados: set[str] = set()
++
++    def visitar(node: str) -> list[str] | None:
++        if node in visitando:
++            return visitando[visitando.index(node):] + [node]
++        if node in visitados:
++            return None
++        visitando.append(node)
++        for dep in grafo.get(node, []):
++            ciclo = visitar(dep)
++            if ciclo:
++                return ciclo
++        visitando.pop()
++        visitados.add(node)
++        return None
++
++    for task_id in grafo:
++        ciclo = visitar(task_id)
++        if ciclo:
++            return ciclo
++    return []
++
++
++def validar_plano(plano: Plano) -> list[str]:
++    erros: list[str] = []
++    if not plano.tasks:
++        return ["plano sem tasks"]
++    ids = [task.id for task in plano.tasks]
++    if len(ids) != len(set(ids)):
++        erros.append("ids duplicados no plano")
++    conhecidos = set(ids)
++    for task in plano.tasks:
++        if not task.criterios:
++            erros.append(f"task {task.id} sem criterios")
++        for dep in task.deps:
++            if dep not in conhecidos:
++                erros.append(f"task {task.id} depende de {dep}, que não existe")
++        for indice, criterio in enumerate(task.criterios):
++            if any(palavra in criterio.casefold() for palavra in PALAVRAS_VAGAS) and not _tem_evidencia(criterio):
++                erros.append(f"task {task.id}, critério {indice}: critério vago sem arquivo ou comando de teste")
++    ciclo = _ids_do_ciclo(plano.tasks)
++    if ciclo:
++        erros.append("ciclo entre tasks: " + " -> ".join(ciclo))
++    return erros
++
++
++def validar_e_ordenar(plano: Plano) -> list[list[str]]:
++    erros = validar_plano(plano)
++    if erros:
++        raise PlanoInvalido("Plano inválido:\n- " + "\n- ".join(erros))
++    dag = {"tasks": [{"id": task.id, "deps": task.deps} for task in plano.tasks]}
++    try:
++        return ordem_topologica(dag)
++    except ValueError as exc:
++        raise PlanoInvalido(str(exc)) from exc
+```
+
+## Saida dos testes
+```
+........................................................................ [ 51%]
+..............................................ss.....................    [100%]
+139 passed, 2 skipped in 7.29s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h5m15s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h5m15s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"d7ea2c50-ec2a-49c6-9c7d-a295ef862a08-9"}
+

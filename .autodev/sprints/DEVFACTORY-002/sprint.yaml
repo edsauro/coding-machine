@@ -11,7 +11,10 @@ objetivo: >
   vez que o orquestrador roda um backlog de varias tasks em varias ondas, em vez
   de uma unica task de fixture.
 
-status: PLANEJADO          # declaracao; o FATO esta em state.db (sprint_state.estado)
+status: EM_EXECUCAO        # declaracao; o FATO esta em state.db (sprint_state.estado)
+# Executou em 2026-09-27 (03:09 -> 05:42) e parou: 1 de 10 tasks integrada, 9
+# bloqueadas por conflito de merge. NAO foi encerrado — o encerramento e decisao
+# do autor. Nada foi para a main. Ver decisions.md D-07 para a causa raiz.
 data_encerramento: null
 resultado: null
 deadline: null

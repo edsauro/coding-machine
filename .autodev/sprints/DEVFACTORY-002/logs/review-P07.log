@@ -1,0 +1,345 @@
+# exit_code=3 duracao=152.4s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- a CLI aceita autodev plan 'texto do pedido' e autodev plan --de arquivo.md
+- o comando usa a funcao planejar de autodev/planner.py e escreve o sprint com escrever_sprint
+- plano invalido imprime os erros de validacao um por linha e devolve exit code 1, sem traceback
+- sucesso imprime o sprint_id gerado e o caminho onde ele foi escrito e devolve exit code 0
+- sprint ja existente imprime mensagem clara e devolve exit code 1, sem traceback
+- existe autodev plan --help funcional
+- os testes ficam em .autodev/tests/test_cli.py e cobrem sucesso, plano invalido e sprint ja existente
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P07: Adicionar o comando autodev plan na CLI
+
+## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_cli.py b/.autodev/tests/test_cli.py
+index ab4ae93..62fd7b0 100644
+--- a/.autodev/tests/test_cli.py
++++ b/.autodev/tests/test_cli.py
+@@ -6,7 +6,10 @@ código de saída 0 esconde a falha de qualquer script que chame o CLI.
+ """
+ from __future__ import annotations
+ 
++import pytest
++
+ from autodev import cli
++from autodev.planner import PlanoInvalido, SprintJaExiste
+ from autodev.state import StateStore
+ 
+ 
+@@ -78,3 +81,59 @@ def test_evidenciar_caminho_feliz(tmp_path, monkeypatch, capsys):
+     saida = capsys.readouterr().out
+     assert rc == 0
+     assert "DONE" in saida and "retroativo" in saida
++
++
++def test_plan_escreve_sprint_e_imprime_id_e_caminho(tmp_path, monkeypatch, capsys):
++    chamadas = {}
++
++    def planejar(raiz, prompt_usuario, agente):
++        chamadas["planejar"] = (raiz, prompt_usuario, agente)
++        return object()
++
++    def escrever_sprint(raiz, plano):
++        chamadas["escrever"] = (raiz, plano)
++        return tmp_path / ".autodev" / "sprints" / "S-001"
++
++    monkeypatch.setattr("autodev.planner.planejar", planejar)
++    monkeypatch.setattr("autodev.planner.escrever_sprint", escrever_sprint)
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    assert cli.main(["plan", "implementar o pedido"]) == 0
++    saida = capsys.readouterr().out
++    assert "S-001" in saida and str(tmp_path / ".autodev" / "sprints" / "S-001") in saida
++    assert chamadas["planejar"] == (tmp_path, "implementar o pedido", "codex")
++    assert "escrever" in chamadas
++
++
++def test_plan_aceita_arquivo_como_pedido(tmp_path, monkeypatch):
++    pedido = tmp_path / "pedido.md"
++    pedido.write_text("pedido vindo do arquivo\n", encoding="utf-8")
++    recebido = []
++    monkeypatch.setattr("autodev.planner.planejar", lambda raiz, prompt_usuario, agente: recebido.append(prompt_usuario) or object())
++    monkeypatch.setattr("autodev.planner.escrever_sprint", lambda raiz, plano: tmp_path)
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    assert cli.main(["plan", "--de", str(pedido)]) == 0
++    assert recebido == ["pedido vindo do arquivo\n"]
++
++
++def test_plan_invalido_imprime_erros_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    monkeypatch.setattr("autodev.planner.planejar", lambda *args: (_ for _ in ()).throw(PlanoInvalido(["erro um", "erro dois"])))
++    assert cli.main(["plan", "pedido"]) == 1
++    saida = capsys.readouterr().out
++    assert saida.splitlines() == ["erro um", "erro dois"]
++    assert "Traceback" not in saida
++
++
++def test_plan_existente_imprime_mensagem_clara_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    monkeypatch.setattr("autodev.planner.planejar", lambda *args: (_ for _ in ()).throw(SprintJaExiste("S-001")))
++    assert cli.main(["plan", "pedido"]) == 1
++    saida = capsys.readouterr().out
++    assert "S-001" in saida and "ja existe" in saida.lower() and "Traceback" not in saida
++
++
++def test_plan_help_funciona(capsys):
++    with pytest.raises(SystemExit) as exc:
++        cli.main(["plan", "--help"])
++    assert exc.value.code == 0
++    assert "--de" in capsys.readouterr().out
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 547b0d2..341af25 100644
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -241,6 +241,34 @@ def cmd_evidenciar(args) -> int:
+     return 0
+ 
+ 
++def cmd_plan(args) -> int:
++    from .planner import CotaEsgotada, PlanoInvalido, SprintJaExiste
++    pedido = args.pedido
++    if args.de:
++        try:
++            pedido = Path(args.de).read_text(encoding="utf-8")
++        except OSError as e:
++            print(f"erro ao ler pedido: {e}")
++            return 1
++    try:
++        from .planner import escrever_sprint, planejar
++        plano = planejar(RAIZ, pedido, args.agente)
++        destino = escrever_sprint(RAIZ, plano)
++    except PlanoInvalido as e:
++        for erro in e.erros:
++            print(erro)
++        return 1
++    except SprintJaExiste as e:
++        print(f"sprint ja existe: {e}")
++        return 1
++    except CotaEsgotada as e:
++        print(f"cota esgotada: {e}")
++        return 1
++    print(f"sprint criado: {destino.name}")
++    print(f"escrito em: {destino}")
++    return 0
++
++
+ def main(argv: list[str] | None = None) -> int:
+     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
+     p.add_argument("--sprint", default=SPRINT_PADRAO)
+@@ -286,6 +314,13 @@ def main(argv: list[str] | None = None) -> int:
+     s.add_argument("--commit", default="")
+     s.set_defaults(fn=cmd_evidenciar)
+ 
++    s = sub.add_parser("plan", help="cria um sprint a partir de um pedido")
++    origem = s.add_mutually_exclusive_group(required=True)
++    origem.add_argument("pedido", nargs="?", help="pedido em texto livre")
++    origem.add_argument("--de", metavar="ARQUIVO", help="lê o pedido de um arquivo")
++    s.add_argument("--agente", default="codex")
++    s.set_defaults(fn=cmd_plan)
++
+     s = sub.add_parser("stop")
+     s.add_argument("nivel", choices=["STOP_ALL", "STOP_PROJECT", "STOP_SPRINT",
+                                      "STOP_TASK"])
+diff --git a/autodev/plan_prompt.py b/autodev/plan_prompt.py
+new file mode 100644
+index 0000000..8b3f725
+--- /dev/null
++++ b/autodev/plan_prompt.py
+@@ -0,0 +1,10 @@
++"""Prompt usado para transformar um pedido em um plano estruturado."""
++
++PROMPT_PLANO = """Converta o pedido do usuário em YAML com titulo, objetivo, repositorio e tasks.
++Cada task deve ter id, titulo, criterios, deps, agente e teste.
++Responda somente com o YAML do plano.
++"""
++
++
++def montar_prompt_plano(prompt_usuario: str) -> str:
++    return f"{PROMPT_PLANO}\nPedido do usuário:\n{prompt_usuario}"
+diff --git a/autodev/planner.py b/autodev/planner.py
+new file mode 100644
+index 0000000..43fcf9d
+--- /dev/null
++++ b/autodev/planner.py
+@@ -0,0 +1,130 @@
++"""Criação e persistência de planos de sprint."""
++from __future__ import annotations
++
++import json
++from dataclasses import dataclass, field
++from pathlib import Path
++
++import yaml
++
++from .config import ordem_topologica, valida_dag
++
++PALAVRAS_VAGAS = {"coisa", "algo", "melhorar", "ajustar", "implementar"}
++
++
++class PlanoInvalido(ValueError):
++    def __init__(self, erros: list[str]):
++        self.erros = list(erros)
++        super().__init__("; ".join(self.erros))
++
++
++class SprintJaExiste(FileExistsError):
++    pass
++
++
++class CotaEsgotada(RuntimeError):
++    pass
++
++
++@dataclass
++class TaskPlano:
++    id: str
++    titulo: str
++    criterios: list[str]
++    deps: list[str] = field(default_factory=list)
++    agente: str = "codex"
++    teste: str = ""
++
++
++@dataclass
++class Plano:
++    titulo: str
++    objetivo: str
++    repositorio: str
++    tasks: list[TaskPlano]
++    prompt_original: str
++
++
++def _task(data: dict) -> TaskPlano:
++    return TaskPlano(id=str(data.get("id", "")), titulo=str(data.get("titulo", "")),
++                     criterios=list(data.get("criterios", [])),
++                     deps=list(data.get("deps", [])), agente=str(data.get("agente", "codex")),
++                     teste=str(data.get("teste", "")))
++
++
++def parsear_plano(texto: str) -> Plano:
++    try:
++        data = yaml.safe_load(texto)
++    except yaml.YAMLError as exc:
++        raise PlanoInvalido([f"plano não é YAML válido: {exc}"]) from exc
++    if not isinstance(data, dict):
++        raise PlanoInvalido(["plano precisa ser um objeto YAML"])
++    return Plano(titulo=str(data.get("titulo", "")), objetivo=str(data.get("objetivo", "")),
++                 repositorio=str(data.get("repositorio", "")),
++                 tasks=[_task(t) for t in data.get("tasks", [])],
++                 prompt_original=str(data.get("prompt_original", "")))
++
++
++def validar_plano(plano: Plano) -> list[str]:
++    erros: list[str] = []
++    if not plano.titulo.strip():
++        erros.append("titulo é obrigatório")
++    if not plano.objetivo.strip():
++        erros.append("objetivo é obrigatório")
++    if not plano.repositorio.strip():
++        erros.append("repositorio é obrigatório")
++    if not plano.tasks:
++        erros.append("o plano precisa de ao menos uma task")
++    dag = {"tasks": [{"id": t.id, "titulo": t.titulo, "criterios": t.criterios,
++                       "deps": t.deps} for t in plano.tasks]}
++    erros.extend(valida_dag(dag))
++    return erros
++
++
++def validar_e_ordenar(plano: Plano) -> list[list[str]]:
++    erros = validar_plano(plano)
++    if erros:
++        raise PlanoInvalido(erros)
++    return ordem_topologica({"tasks": [{"id": t.id, "deps": t.deps} for t in plano.tasks]})
++
++
++def _novo_id(raiz: Path) -> str:
++    base = raiz / ".autodev" / "sprints"
++    existentes = {p.name for p in base.iterdir()} if base.exists() else set()
++    n = 1
++    while f"PLAN-{n:03d}" in existentes:
++        n += 1
++    return f"PLAN-{n:03d}"
++
++
++def escrever_sprint(raiz: Path, plano: Plano) -> Path:
++    validar_e_ordenar(plano)
++    raiz = Path(raiz)
++    sprint_id = _novo_id(raiz)
++    destino = raiz / ".autodev" / "sprints" / sprint_id
++    if destino.exists():
++        raise SprintJaExiste(sprint_id)
++    destino.mkdir(parents=True)
++    (destino / "spec.md").write_text(f"# {plano.titulo}\n\n{plano.objetivo}\n", encoding="utf-8")
++    dag = {"sprint_id": sprint_id, "tasks": [
++        {"id": t.id, "titulo": t.titulo, "criterios": t.criterios, "deps": t.deps,
++         "agente": t.agente, "teste": t.teste} for t in plano.tasks]}
++    (destino / "dag.json").write_text(json.dumps(dag, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    (destino / "sprint.yaml").write_text(yaml.safe_dump(
++        {"sprint_id": sprint_id, "titulo": plano.titulo, "objetivo": plano.objetivo},
++        allow_unicode=True, sort_keys=False), encoding="utf-8")
++    return destino
++
++
++def planejar(raiz: Path, prompt_usuario: str, agente: str) -> Plano:
++    texto = prompt_usuario.strip()
++    if not texto:
++        raise PlanoInvalido(["pedido não pode ser vazio"])
++    titulo = texto.splitlines()[0].strip()[:120]
++    plano = Plano(titulo=titulo, objetivo=texto, repositorio=str(raiz),
++                  tasks=[TaskPlano("T01", titulo, ["pedido atendido"], teste="pytest")],
++                  prompt_original=prompt_usuario)
++    erros = validar_plano(plano)
++    if erros:
++        raise PlanoInvalido(erros)
++    return plano
+```
+
+## Saida dos testes
+```
+........................................................................ [ 52%]
+...................................................ss............        [100%]
+135 passed, 2 skipped in 7.34s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h26m35s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h26m35s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"ba2d6979-b4ff-45d4-904b-7845d02ef2ab-9"}
+

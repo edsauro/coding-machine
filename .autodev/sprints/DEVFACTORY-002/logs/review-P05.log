@@ -1,0 +1,253 @@
+# exit_code=3 duracao=150.8s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- existe a funcao escrever_sprint(raiz, plano) em autodev/planner.py
+- cria .autodev/sprints/<sprint_id>/ com spec.md, dag.json e sprint.yaml
+- o dag.json gerado tem as chaves sprint_id, versao e tasks, e cada task preserva id, titulo, criterios, deps, agente e teste
+- a sprint.yaml gerada tem sprint_id, titulo, objetivo, status: PLANEJADO e o bloco repositorio com raiz e merge_em_main: false
+- a spec.md gerada comeca com o prompt original do usuario em uma secao chamada Prompt original
+- a funcao recusa sobrescrever um sprint ja existente levantando SprintJaExiste
+- os testes ficam em .autodev/tests/test_planner.py e escrevem em tmp_path, nunca no repositorio real
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P05: Escrever o sprint planejado em disco
+
+## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+new file mode 100644
+index 0000000..672713c
+--- /dev/null
++++ b/.autodev/tests/test_planner.py
+@@ -0,0 +1,93 @@
++import json
++
++import pytest
++import yaml
++
++from autodev.planner import Plano, SprintJaExiste, TaskPlano, escrever_sprint
++
++
++def plano_de_teste(prompt="pedido original"):
++    return Plano(
++        titulo="Sprint de persistencia",
++        objetivo="Escrever os artefatos do sprint",
++        repositorio=".",
++        tasks=[
++            TaskPlano(
++                id="P01",
++                titulo="Implementar persistencia",
++                criterios=["existe autodev/planner.py"],
++                deps=[],
++                agente="codex",
++                teste="python3 -m pytest .autodev/tests/ -q",
++            )
++        ],
++        prompt_original=prompt,
++    )
++
++
++def test_escrever_sprint_persiste_os_tres_artefatos(tmp_path):
++    plano = plano_de_teste()
++
++    destino = escrever_sprint(tmp_path, plano)
++
++    assert destino.parent == tmp_path / ".autodev" / "sprints"
++    assert {p.name for p in destino.iterdir()} == {"spec.md", "dag.json", "sprint.yaml"}
++
++    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
++    assert set(dag) >= {"sprint_id", "versao", "tasks"}
++    assert dag["versao"] == 1
++    assert dag["tasks"] == [
++        {
++            "id": "P01",
++            "titulo": "Implementar persistencia",
++            "criterios": ["existe autodev/planner.py"],
++            "deps": [],
++            "agente": "codex",
++            "teste": "python3 -m pytest .autodev/tests/ -q",
++        }
++    ]
++
++    sprint = yaml.safe_load((destino / "sprint.yaml").read_text(encoding="utf-8"))
++    assert sprint["sprint_id"] == destino.name
++    assert sprint["titulo"] == plano.titulo
++    assert sprint["objetivo"] == plano.objetivo
++    assert sprint["status"] == "PLANEJADO"
++    assert sprint["repositorio"] == {"raiz": ".", "merge_em_main": False}
++
++    spec = (destino / "spec.md").read_text(encoding="utf-8")
++    assert spec.startswith("## Prompt original\n\n" + plano.prompt_original)
++
++
++def test_escrever_sprint_recusa_sobrescrever_sprint_existente(tmp_path):
++    plano = plano_de_teste()
++    destino = escrever_sprint(tmp_path, plano)
++    marcador = destino / "spec.md"
++    marcador.write_text("nao sobrescrever", encoding="utf-8")
++
++    with pytest.raises(SprintJaExiste):
++        escrever_sprint(tmp_path, plano)
++
++    assert marcador.read_text(encoding="utf-8") == "nao sobrescrever"
++
++
++@pytest.mark.parametrize(
++    ("titulo", "prompt"),
++    [
++        ("", ""),
++        ("Sprint: API / versão 2!", ""),
++    ],
++)
++def test_escrever_sprint_normaliza_dados_opcionais(tmp_path, titulo, prompt):
++    plano = plano_de_teste(prompt)
++    plano.titulo = titulo
++    plano.repositorio = ""
++
++    destino = escrever_sprint(tmp_path, plano)
++
++    assert destino.name == ("sprint-planejado" if not titulo else "sprint-api-vers-o-2")
++    sprint = yaml.safe_load((destino / "sprint.yaml").read_text(encoding="utf-8"))
++    assert sprint["repositorio"] == {"raiz": ".", "merge_em_main": False}
++    spec = (destino / "spec.md").read_text(encoding="utf-8")
++    assert spec.startswith("## Prompt original\n\nnão informado")
++    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
++    assert "prompt_original" not in dag
+diff --git a/autodev/planner.py b/autodev/planner.py
+new file mode 100644
+index 0000000..4a84b1b
+--- /dev/null
++++ b/autodev/planner.py
+@@ -0,0 +1,83 @@
++"""Tipos e persistência do plano de uma sprint."""
++from __future__ import annotations
++
++import json
++import re
++from dataclasses import dataclass, field
++from pathlib import Path
++
++import yaml
++
++
++class SprintJaExiste(FileExistsError):
++    """O diretório do sprint já existe e não pode ser sobrescrito."""
++
++
++@dataclass
++class TaskPlano:
++    id: str
++    titulo: str
++    criterios: list[str]
++    deps: list[str] = field(default_factory=list)
++    agente: str = "codex"
++    teste: str = ""
++
++
++@dataclass
++class Plano:
++    titulo: str
++    objetivo: str
++    repositorio: str
++    tasks: list[TaskPlano]
++    prompt_original: str = ""
++
++
++def _sprint_id(plano: Plano) -> str:
++    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", plano.titulo).strip("-").lower()
++    return slug or "sprint-planejado"
++
++
++def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
++    """Escreve os artefatos do plano, sem substituir um sprint existente."""
++    raiz = Path(raiz)
++    sprint_id = _sprint_id(plano)
++    destino = raiz / ".autodev" / "sprints" / sprint_id
++    if destino.exists():
++        raise SprintJaExiste(f"sprint já existe: {sprint_id}")
++
++    repositorio = {
++        "raiz": str(plano.repositorio or "."),
++        "merge_em_main": False,
++    }
++    tasks = [
++        {
++            "id": task.id,
++            "titulo": task.titulo,
++            "criterios": task.criterios,
++            "deps": task.deps,
++            "agente": task.agente,
++            "teste": task.teste,
++        }
++        for task in plano.tasks
++    ]
++    destino.mkdir(parents=True)
++    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks}
++    if plano.prompt_original:
++        dag["prompt_original"] = plano.prompt_original
++    (destino / "dag.json").write_text(
++        json.dumps(dag, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
++    )
++    sprint = {
++        "sprint_id": sprint_id,
++        "titulo": plano.titulo,
++        "objetivo": plano.objetivo,
++        "status": "PLANEJADO",
++        "repositorio": repositorio,
++    }
++    (destino / "sprint.yaml").write_text(
++        yaml.safe_dump(sprint, allow_unicode=True, sort_keys=False), encoding="utf-8"
++    )
++    prompt = plano.prompt_original or "não informado"
++    spec = f"## Prompt original\n\n{prompt}\n\n## Objetivo\n\n{plano.objetivo}\n"
++    (destino / "spec.md").write_text(spec, encoding="utf-8")
++    return destino
+```
+
+## Saida dos testes
+```
+........................................................................ [ 52%]
+..............................................ss................         [100%]
+134 passed, 2 skipped in 7.32s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h32m56s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h32m56s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"c3fb3adc-6d09-47f8-8cf6-229b9c4ff3e9-9"}
+

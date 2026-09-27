@@ -511,3 +511,59 @@ def test_falha_de_permissao_vira_haq_e_nao_para_o_sprint(tmp_path, monkeypatch):
                   "Exact human action:", "Expected result:",
                   "How Hermes verifies completion:"):
         assert campo in txt
+
+
+# =================================================== dependências e integração
+@pytest.mark.xfail(strict=True, reason=(
+    "BUG CONHECIDO: o worktree de toda task nasce da main (worktree.py: "
+    "`base = base or commit_atual(self.repo)`), então uma task que declara `deps` "
+    "espera pela dependência mas começa SEM o código dela. O DAG é respeitado para "
+    "ORDEM e nunca para CONTEÚDO. Quando duas tasks tocam o mesmo arquivo, cada uma "
+    "escreve a sua versão a partir da main e o merge colide (add/add). "
+    "Remova esta marca quando a task passar a ser baseada no branch de integração."))
+def test_task_dependente_enxerga_o_trabalho_da_dependencia(tmp_path, monkeypatch):
+    """Task com `deps` precisa partir do resultado da dependência, não da main.
+
+    Prova executável do que derrubou a primeira noite autônoma: 1 de 10 tarefas
+    integrada, 9 em conflito de merge, em cinco rodadas seguidas.
+
+    O ensaio com agente simulado passou 10 de 10 porque cada passo escrevia um
+    arquivo DISTINTO. Sobreposição é exatamente o que os dados reais têm e os
+    simulados não tinham — e é onde o defeito mora.
+    """
+    t1 = {"id": "T01", "titulo": "corrigir stats", "deps": [], "agente": "codex",
+          "criterios": ["mediana() devolve a mediana real",
+                        "todos os testes de tests/test_stats.py passam"],
+          "estimativa": "S"}
+    t2 = {"id": "T02", "titulo": "ajustar stats de novo", "deps": ["T01"],
+          "agente": "codex",
+          "criterios": ["mediana() continua correta apos o ajuste",
+                        "todos os testes de tests/test_stats.py passam"],
+          "estimativa": "S"}
+    # As duas tasks escrevem O MESMO arquivo, com conteúdos DIVERGENTES.
+    #
+    # Cuidado com o desenho do caso: se a segunda entrega for um SUPERCONJUNTO da
+    # primeira (mesmo conteúdo + linhas novas no fim), o git resolve sozinho e não
+    # conflita — o teste passaria sem provar nada. Foi o primeiro erro deste teste.
+    # Conteúdo genuinamente diferente conflita, e é o que duas tasks reais fazem.
+    _t2 = STATS_CORRIGIDO.replace(
+        "Mediana de uma lista nao vazia. Nao muta a entrada.",
+        "Mediana de uma lista nao vazia (ajustada na T02).")
+    assert _t2 != STATS_CORRIGIDO, "o caso precisa divergir de verdade"
+    fx, _ = _ambiente(tmp_path, monkeypatch, {"sequencia": [
+        {"acao": "editar", "arquivo": "src/stats.py", "conteudo": STATS_CORRIGIDO},
+        {"acao": "editar", "arquivo": "src/stats.py", "conteudo": _t2},
+    ]}, tarefas=[t1, t2])
+
+    o = _orquestrador(fx, monkeypatch, modo_teste=True)
+    r = o.rodar()
+
+    por_task = {t.task_id: t.estado_final for t in r.tasks}
+    t2_final = o.store.task(SPRINT, "T02")["estado"]
+
+    assert por_task.get("T01") in ("DONE", "INTEGRATED"), por_task
+    assert t2_final in ("DONE", "INTEGRATED"), (
+        "a T02 depende da T01 e devia ter partido do trabalho dela — o merge "
+        f"colidiu porque cada uma escreveu src/stats.py a partir da main "
+        f"(estado final: {t2_final})")
+    assert o.store.task(SPRINT, "T01")["estado"] == "INTEGRATED"

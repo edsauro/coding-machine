@@ -1,0 +1,27 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q
+exit=1 (7.7s)
+
+........................................................................ [ 53%]
+..............................................ss.............F           [100%]
+=================================== FAILURES ===================================
+_____________ test_prompt_montado_exige_contrato_completo_do_plano _____________
+
+    def test_prompt_montado_exige_contrato_completo_do_plano():
+        prompt = montar_prompt_plano("pedido")
+    
+        assert PROMPT_PLANO in prompt
+        assert "APENAS um JSON" in prompt
+        for chave in ("titulo", "objetivo", "repositorio", "tasks"):
+            assert chave in prompt
+        for campo in ("id", "titulo", "criterios", "deps", "agente", "teste"):
+            assert campo in prompt
+        assert "arquivo" in prompt or "comando de teste" in prompt
+>       assert "ultima task" in prompt.lower()
+E       AssertionError: assert 'ultima task' in 'você é um agente de planejamento de software.\n\nresponda apenas um json válido, sem markdown, comentários ou texto a...este.\nuse deps para declarar as dependências entre tasks e produza um plano executável.\n\npedido do usuário:\npedido'
+E        +  where 'você é um agente de planejamento de software.\n\nresponda apenas um json válido, sem markdown, comentários ou texto a...este.\nuse deps para declarar as dependências entre tasks e produza um plano executável.\n\npedido do usuário:\npedido' = <built-in method lower of str object at 0x5639be566970>()
+E        +    where <built-in method lower of str object at 0x5639be566970> = 'Você é um agente de planejamento de software.\n\nResponda APENAS um JSON válido, sem markdown, comentários ou texto a...este.\nUse deps para declarar as dependências entre tasks e produza um plano executável.\n\nPedido do usuário:\npedido'.lower
+
+.autodev/tests/test_planner.py:22: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_planner.py::test_prompt_montado_exige_contrato_completo_do_plano
+1 failed, 131 passed, 2 skipped in 7.57s

@@ -1,0 +1,147 @@
+# exit_code=0 duracao=35.3s modelo=gpt-5.6-terra effort=medium failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P07: Adicionar o comando autodev plan na CLI
+
+## Criterios de aceitacao (todos obrigatorios)
+- a CLI aceita autodev plan 'texto do pedido' e autodev plan --de arquivo.md
+- o comando usa a funcao planejar de autodev/planner.py e escreve o sprint com escrever_sprint
+- plano invalido imprime os erros de validacao um por linha e devolve exit code 1, sem traceback
+- sucesso imprime o sprint_id gerado e o caminho onde ele foi escrito e devolve exit code 0
+- sprint ja existente imprime mensagem clara e devolve exit code 1, sem traceback
+- existe autodev plan --help funcional
+- os testes ficam em .autodev/tests/test_cli.py e cobrem sucesso, plano invalido e sprint ja existente
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Contexto do projeto
+# DEVFACTORY-002 — Planejador: do prompt ao plano executável
+
+## O que esta sprint entrega
+
+Um comando novo, `autodev plan "<pedido em texto livre>"`, que produz um sprint
+executável em disco (`spec.md` + `dag.json` + `sprint.yaml`), validado pelas
+mesmas regras que o `autodev` já aplica na carga do DAG.
+
+Hoje esse passo é manual: alguém escreve o `spec.md` e o `dag.json` à mão antes
+de o orquestrador fazer qualquer coisa. Esta sprint fecha essa metade.
+
+## CONTRATO DE INTERFACES (não invente outros nomes)
+
+Estas assinaturas são usadas por tasks de ondas diferentes. Se você precisa de
+algo que não está aqui, **use o que está aqui**; não crie uma variante.
+
+```
+autodev/planner.py
+  @dataclass Plano:      titulo, objetivo, repositorio, tasks, prompt_original
+  @dataclass TaskPlano:  id, titulo, criterios, deps, agente, teste
+  validar_plano(plano) -> list[str]            # vazio = válido
+  parsear_plano(texto) -> Plano
+  validar_e_ordenar(plano) -> list[list[str]]  # ondas; reusa ordem_topologica
+  escrever_sprint(raiz, plano) -> Path
+  planejar(raiz, prompt_usuario, agente) -> Plano
+  exceções: PlanoInvalido, SprintJaExiste, CotaEsgotada
+  constante: PALAVRAS_VAGAS
+
+autodev/plan_prompt.py
+  PROMPT_PLANO: str
+  montar_prompt_plano(prompt_usuario) -> str
+```
+
+## REGRAS DURAS PARA O AGENTE
+
+1. **Trabalhe SOMENTE no seu worktree.** Nunca faça `cd` para fora dele, nunca
+   toque no repositório principal, nunca faça merge nem push.
+2. **Rode os testes antes de terminar:**
+   `python3 -m pytest .autodev/tests/ -q`
+   A suíte inteira tem que ficar verde. `python3` aqui é resolvido pelo runner
+   para o interpretador do projeto — use exatamente esta forma.
+3. **Os testes novos vão nos arquivos já indicados nos seus critérios.** Não
+   crie um arquivo de teste novo se o critério nomeia um existente.
+4. **Não invente APIs do projeto.** Os módulos existentes e seus nomes reais:
+   `agents.invocar`, `config.ordem_topologica`, `state.StateStore`,
+   `testrunner.rodar`, `sandbox.rodar`, `worktree.WorktreeManager`,
+   `planner` (novo). Confira a assinatura no arquivo antes de chamar.
+5. **Não altere o comportamento existente** para fazer o seu teste passar. Se um
+   teste antigo falhar, o problema é o seu código.
+6. **Cada critério é verificável.** Se você não consegue provar um critério com
+   um teste ou com um comando, o critério não foi atendido.
+7. **Sem dados pessoais.** Nada de nomes, caminhos de HOME ou credenciais em
+   código, teste ou documentação.
+
+## Por que o
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-002-P07-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+  - tentativa 2: TEST_FAILURE (exit 1) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+...........................................................F............ [ 52%]
+...................................................ss............        [100%]
+=================================== FAILURES ===================================
+___________ test_plan_existente_imprime_mensagem_clara_sem_traceback ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-saurus/pytest-0/test_plan_existente_imprime_me0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f941603af50>
+capsys = <_pytest.capture.CaptureFixture object at 0x7f941603b2d0>
+
+    def test_plan_existente_imprime_mensagem_clara_sem_traceback(tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "RAIZ", tmp_path)
+        monkeypatch.setattr("autodev.planner.planejar", lambda *args: (_ for _ in ()).throw(SprintJaExiste("S-001")))
+        assert cli.main(["plan", "pedido"]) == 1
+        saida = capsys.readouterr().out
+>       assert "S-001" in saida and "ja existe" in saida.lower() and "Traceback" not in saida
+E       AssertionError: assert ('S-001' in 'sprint já existe: S-001\n' and 'ja existe' in 'sprint já existe: s-001\n')
+E        +  where 'sprint já existe: s-001\n' = <built-in method lower of str object at 0x7f9416075300>()
+E        +    where <built-in method lower of str object at 0x7f9416075300> = 'sprint já existe: S-001\n'.lower
+
+.autodev/tests/test_cli.py:132: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_cli.py::test_plan_existente_imprime_mensagem_clara_sem_traceback
+1 failed, 134 passed, 2 skipped in 7.39s
+
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_cli.py
+  - autodev/cli.py
+  - autodev/plan_prompt.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #3.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-terra/medium
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+Ajustei a mensagem de sprint existente para `sprint ja existe: <id>`, compatível com o teste de regressão e sem traceback.
+
+RESULTADO: corrigida a saída de sprint já existente no `autodev plan` | TESTES: `python3 -m pytest .autodev/tests/ -q` bloqueado — o `python3` deste ambiente não possui `pytest` instalado (`No module named pytest`)
+
+===== STDERR =====
+

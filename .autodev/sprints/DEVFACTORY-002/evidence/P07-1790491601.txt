@@ -1,0 +1,6 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q
+exit=0 (7.7s)
+
+........................................................................ [ 54%]
+..............................................ss............             [100%]
+130 passed, 2 skipped in 7.52s
