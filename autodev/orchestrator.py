@@ -547,6 +547,26 @@ class Orquestrador:
         integ = integration.Integrador(
             self.raiz, self.cfg.branch_integracao(self.sprint), self.sprint)
         wt_int = integ.garantir_worktree()
+        # Comando de teste para os portões de integração.
+        #
+        # Sem informar, o portão cai na AUTO-DETECÇÃO e devolve "nenhum" quando o
+        # projeto não casa com os detectores (sem pyproject.toml, sem pytest.ini e
+        # sem tests/ na raiz) — aí o runner sai com 127 e a integração reprova
+        # SEMPRE, por falta de comando e não por teste vermelho. Bug real,
+        # encontrado no primeiro backlog multi-task: cada task passava nos seus
+        # testes e a integração inteira era rejeitada.
+        comandos: dict[str, str] = {}
+        cmd_teste = (self.sprint_yaml.get("aceitacao") or {}).get("comando")
+        if not cmd_teste:
+            for t in self.dag.get("tasks", []):
+                if t.get("teste"):
+                    cmd_teste = t["teste"]
+                    break
+        if cmd_teste:
+            comandos["testes"] = cmd_teste
+        else:
+            self.log("AVISO: sprint sem comando de teste declarado — o portão de "
+                     "integração vai depender da auto-detecção")
         for t in tasks_done:
             r = integ.merge_task(t["task_id"], t["branch"], wt_int)
             if not r.merge_ok:
@@ -554,7 +574,7 @@ class Orquestrador:
                 self.store.forcar_estado(self.sprint, t["task_id"], "RETRY",
                                          f"conflito de merge: {r.conflito[:200]}")
                 continue
-            portoes = integ.rodar_portoes(wt_int,
+            portoes = integ.rodar_portoes(wt_int, comandos=comandos,
                                           evidencia_dir=self.dir_sprint / "evidence")
             for p in portoes:
                 self.log(f"  portao {p.nome}: {'OK' if p.ok else 'FALHOU'}")

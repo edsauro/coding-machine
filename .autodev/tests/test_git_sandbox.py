@@ -258,7 +258,14 @@ def test_portao_de_testes_reprova_suite_quebrada(repo, cfg):
 def test_portao_de_seguranca_pega_segredo(tmp_path):
     d = tmp_path / "x"
     d.mkdir()
-    (d / "config.py").write_text('API_KEY = "sk-abcdef1234567890"\n')
+    # A chave é MONTADA em runtime de propósito. Escrita como literal, este
+    # arquivo passaria a casar com o próprio padrão que o portão procura — e o
+    # portão reprovaria a si mesmo, derrubando a integração inteira do sprint.
+    # Não é hipótese: aconteceu, e a integração foi rejeitada por causa do teste
+    # do portão. O que o portão lê é o arquivo escrito, então a montagem em
+    # runtime mantém o teste fiel.
+    falso = "sk-" + "x" * 20
+    (d / "config.py").write_text(f'API_KEY = "{falso}"\n')
     integ = Integrador(d, "b")
     p = integ._portao_seguranca(d)
     assert not p.ok, "segredo embutido deve reprovar o portao"
