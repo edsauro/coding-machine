@@ -67,6 +67,9 @@ class ResultadoSprint:
     tasks: list[ResumoTask] = field(default_factory=list)
     parado_por: str | None = None
     duracao_s: float = 0.0
+    # True quando o único motivo de não haver progresso é espera de cota: é
+    # "volte depois", não travamento — o vigia usa isso para decidir se retoma.
+    aguardando_recurso: bool = False
 
     @property
     def concluidas(self) -> int:
@@ -486,11 +489,31 @@ class Orquestrador:
                         res.tasks.append(ResumoTask(task_id, "BLOCKED", 0,
                                                     motivo=f"deps {faltando}"))
                         continue
+                    # ---- portão de cota ---------------------------------------
+                    # "Cota é espera de recurso, não falha" só valia no papel: a
+                    # espera era REGISTRADA e ninguém a RESPEITAVA. O orquestrador
+                    # reinvocava o agente antes de retry_after, então as 5h10m de
+                    # espera nunca aconteciam de fato — era só um número no banco.
+                    pendente = self.store.espera_pendente(self.sprint, task_id)
+                    if pendente:
+                        faltam = int(pendente - time.time())
+                        self.log(f"{task_id}: cota esgotada — aguardando {faltam}s "
+                                 f"({faltam / 60:.0f} min) antes de tentar de novo")
+                        res.tasks.append(ResumoTask(
+                            task_id, "WAITING_RESOURCE", 0,
+                            motivo=f"espera de recurso: faltam {faltam}s"))
+                        res.aguardando_recurso = True
+                        continue
+                    # a espera venceu (ou nunca houve): fecha a espera e tenta
+                    self.store.resolver_esperas(self.sprint, task_id)
                     rst = self.executar_task(task_id)
                     res.tasks.append(rst)
                     self.store.checkpoint(self.sprint, rst.estado_final,
                                           {"task_id": task_id, "resumo": rst.motivo},
                                           onda_i)
+            # Nada progrediu por espera de cota: é "volte depois", não falha.
+            if res.aguardando_recurso and not res.concluidas:
+                res.parado_por = "aguardando recurso (cota)"
             # ---- integração ---------------------------------------------------
             self._checa_parada("integrar")
             res_done = [t for t in self.store.tasks(self.sprint)

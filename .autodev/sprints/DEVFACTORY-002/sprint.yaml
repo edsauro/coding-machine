@@ -1,0 +1,41 @@
+sprint_id: DEVFACTORY-002
+titulo: Planejador — do prompt ao plano executavel
+objetivo: >
+  Fechar a metade da frente do fluxo: hoje alguem precisa escrever spec.md e
+  dag.json A MAO antes de o orquestrador fazer qualquer coisa. Esta sprint
+  entrega o planejador, que recebe um pedido em texto livre e produz um sprint
+  executavel (spec.md + dag.json + sprint.yaml) validado contra as mesmas regras
+  que o autodev ja aplica na carga.
+
+  Alem disso, esta sprint e o primeiro teste de ESCALA do motor: e a primeira
+  vez que o orquestrador roda um backlog de varias tasks em varias ondas, em vez
+  de uma unica task de fixture.
+
+status: PLANEJADO          # declaracao; o FATO esta em state.db (sprint_state.estado)
+data_encerramento: null
+resultado: null
+deadline: null
+max_tentativas: 5          # espelha policies.yaml
+
+# Comando de teste por task. OBRIGATORIO aqui: este repositorio nao tem
+# pyproject.toml nem tests/ na raiz, entao a auto-deteccao devolveria "nenhum"
+# e toda task falharia por falta de comando. `python3` e resolvido pelo runner
+# para o interpretador do projeto (.venv/bin/python), que o sandbox ja monta.
+aceitacao:
+  comando: "python3 -m pytest .autodev/tests/ -q"
+  evidencia: ".autodev/sprints/DEVFACTORY-002/evidence/"
+
+# Politica de custo: comecar sempre no degrau mais barato (spec §9)
+modelo_inicial: gpt-5.6-luna
+effort_inicial: low
+
+repositorio:
+  raiz: .
+  branch_integracao: sprint/DEVFACTORY-002/integration
+  merge_em_main: false     # NUNCA. O trabalho fica no branch para revisao humana.
+
+ambiente:
+  detectado_em: "2026-09-27"
+  os: "Arch Linux 7.2.3-arch1-3"
+  python: "3.11.16"
+  sandbox: "bwrap (sem daemon, sem root)"

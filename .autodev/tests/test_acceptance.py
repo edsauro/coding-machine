@@ -255,6 +255,51 @@ def test_cota_repetida_nao_bloqueia_a_task(tmp_path, monkeypatch):
     assert o3.store.task(SPRINT, "T01")["estado"] in ("DONE", "INTEGRATED")
 
 
+def test_espera_de_cota_nao_vencida_nao_reinvoca_o_agente(tmp_path, monkeypatch):
+    """Portão de cota: `retry_after` no futuro NÃO pode disparar nova chamada.
+
+    Antes deste portão a espera era só REGISTRADA — o orquestrador reinvocava o
+    agente na hora e as 5h10m nunca aconteciam de fato. Numa noite inteira com
+    vigia retomando, isso martelaria a cota até o sol nascer.
+    """
+    fx, spec = _ambiente(tmp_path, monkeypatch, {"sequencia": [
+        {"acao": "quota"},
+        {"acao": "editar", "arquivo": "src/stats.py", "conteudo": STATS_CORRIGIDO},
+    ]})
+    conta = Path(spec).with_suffix(".count")
+
+    o = _orquestrador(fx, monkeypatch, modo_teste=True)
+    o.rodar()
+    assert o.store.task(SPRINT, "T01")["estado"] == "WAITING_RESOURCE"
+    assert int(conta.read_text()) == 1, "a 1ª chamada é a que descobre a cota"
+
+    # ---- 2ª execução SEM liberar o relógio: a espera está no futuro ---------
+    o2 = _orquestrador(fx, monkeypatch, modo_teste=True)
+    res = o2.rodar()
+
+    assert o2.store.task(SPRINT, "T01")["estado"] == "WAITING_RESOURCE"
+    assert o2.store.task(SPRINT, "T01")["esperas_cota"] == 1, \
+        "não podia ter batido na cota de novo"
+    assert int(conta.read_text()) == 1, \
+        "o agente foi REINVOCADO antes do retry_after vencer"
+    assert res.aguardando_recurso is True
+    assert res.parado_por == "aguardando recurso (cota)", \
+        "o vigia precisa distinguir 'volte depois' de travamento"
+    assert res.concluidas == 0
+
+    # ---- liberando o relógio: retoma e a espera fica RESOLVIDA -------------
+    o2.store.conn.execute("UPDATE resource_waits SET retry_after=? WHERE sprint_id=?",
+                          (time.time() - 1, SPRINT))
+    o2.store.conn.commit()
+    o3 = _orquestrador(fx, monkeypatch, modo_teste=True)
+    o3.rodar()
+
+    assert o3.store.task(SPRINT, "T01")["estado"] in ("DONE", "INTEGRATED")
+    pend = o3.store.conn.execute(
+        "SELECT COUNT(*) c FROM resource_waits WHERE resolvido=0").fetchone()["c"]
+    assert pend == 0, f"a espera vencida devia estar resolvida, restam {pend}"
+
+
 # ============================================================ retry (T10)
 def test_retry_apos_teste_vermelho_reenfileira_e_conclui(tmp_path, monkeypatch):
     """Regressão: a 2ª tentativa reentra pela máquina de estados.

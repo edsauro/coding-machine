@@ -538,6 +538,29 @@ class StateStore:
             "SELECT * FROM resource_waits WHERE resolvido=0 AND retry_after<=?",
             (agora,)).fetchall())
 
+    def espera_pendente(self, sprint_id: str, task_id: str,
+                        agora: float | None = None) -> float | None:
+        """`retry_after` da espera de recurso ainda NÃO vencida, ou None.
+
+        É o portão que faz "cota é espera de recurso, não falha" valer de fato:
+        sem ele o orquestrador reinvocava o agente antes da hora e as 5h10m de
+        espera nunca aconteciam — só eram registradas.
+        """
+        agora = agora or time.time()
+        r = self.conn.execute(
+            "SELECT MIN(retry_after) AS t FROM resource_waits"
+            " WHERE sprint_id=? AND task_id=? AND resolvido=0 AND retry_after>?",
+            (sprint_id, task_id, agora)).fetchone()
+        return r["t"] if r and r["t"] is not None else None
+
+    def resolver_esperas(self, sprint_id: str, task_id: str) -> int:
+        """Marca as esperas da task como resolvidas (vamos tentar de novo)."""
+        antes = self.conn.total_changes
+        self.conn.execute(
+            "UPDATE resource_waits SET resolvido=1 WHERE sprint_id=? AND task_id=?"
+            " AND resolvido=0", (sprint_id, task_id))
+        return self.conn.total_changes - antes
+
     # ---------------------------------------------------------------- checkpoint
     def checkpoint(self, sprint_id: str, estado: str, dados: dict,
                    onda: int | None = None) -> None:

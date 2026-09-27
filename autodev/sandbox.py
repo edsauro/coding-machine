@@ -116,6 +116,12 @@ def montar_cmd(spec: SandboxSpec) -> list[str]:
     if not spec.permite_rede:
         cmd += ["--unshare-net"]
     cmd += ["--setenv", "HOME", "/tmp/home"]
+    # Marcador explícito: a suíte do projeto pode conter testes que só fazem
+    # sentido rodando no HOST (os que verificam o isolamento a partir de fora).
+    # Sem um marcador eles tentam ANINHAR sandbox e confundem o HOME efêmero
+    # com o real — foi assim que a suíte do próprio Coding_Machine passou a
+    # falhar 2 testes dentro do sandbox e derrubava toda task da sprint.
+    cmd += ["--setenv", "AUTODEV_SANDBOX", "1"]
     return cmd
 
 

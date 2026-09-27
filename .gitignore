@@ -13,6 +13,7 @@
 .autodev/state.db
 .autodev/state.db-journal
 .autodev/state.db-wal
+.autodev/state.db-shm
 
 # Worktrees efêmeros dos agentes (git worktree add).
 .autodev/worktrees/*/

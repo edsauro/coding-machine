@@ -5,6 +5,7 @@ branch de integração, isolamento.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,17 @@ from autodev.integration import Integrador
 from autodev.state import WorktreeOcupado
 from autodev.worktree import (WorktreeManager, arquivos_alterados, branch_existe,
                               commit_atual, git)
+
+# Os testes que verificam o isolamento olham de FORA, a partir do host. Quando a
+# suíte roda dentro do sandbox (AUTODEV_SANDBOX=1, posto pelo próprio sandbox) o
+# HOME já é o efêmero /tmp/home, e as premissas deles deixam de valer: não dá
+# para aninhar sandbox sem confundir o HOME real com o efêmero. Sem este skip a
+# suíte do Coding_Machine falhava 2 testes dentro do sandbox — e como o
+# orquestrador roda os testes das tasks DENTRO do sandbox, toda task da sprint
+# falhava junto.
+SOB_SANDBOX = os.environ.get("AUTODEV_SANDBOX") == "1"
+NAO_ANINHAVEL = pytest.mark.skipif(
+    SOB_SANDBOX, reason="verifica o isolamento a partir do host; não é aninhável")
 
 
 # ---------------------------------------------------------------- T04 worktrees
@@ -95,6 +107,7 @@ def test_sandbox_monta_worktree_escrevivel(tmp_path):
     assert (wt / "b.txt").read_text().strip() == "novo", "escrita deve chegar ao host"
 
 
+@NAO_ANINHAVEL
 def test_sandbox_esconde_caminhos_proibidos(tmp_path, cfg):
     if not sandbox.disponivel():
         pytest.skip("bwrap ausente")
@@ -110,6 +123,7 @@ def test_sandbox_esconde_caminhos_proibidos(tmp_path, cfg):
     assert len(r["escondidos"]) == len(proibidos)
 
 
+@NAO_ANINHAVEL
 def test_sandbox_home_e_efemero(tmp_path):
     if not sandbox.disponivel():
         pytest.skip("bwrap ausente")

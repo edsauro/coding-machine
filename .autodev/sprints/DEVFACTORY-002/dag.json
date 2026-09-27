@@ -1,0 +1,192 @@
+{
+  "sprint_id": "DEVFACTORY-002",
+  "versao": 1,
+  "criterio_paralelizacao": "tasks acopladas ficam em ondas separadas; paralelizar so quando os arquivos tocados sao disjuntos",
+  "tasks": [
+    {
+      "id": "P01",
+      "titulo": "Criar autodev/planner.py com os tipos do plano e validacao de schema",
+      "criterios": [
+        "existe autodev/planner.py com as dataclasses Plano e TaskPlano",
+        "Plano tem os campos: titulo, objetivo, repositorio, tasks (lista de TaskPlano) e prompt_original",
+        "TaskPlano tem os campos: id, titulo, criterios (lista de str), deps (lista de str), agente e teste",
+        "existe a funcao validar_plano(plano) que devolve lista de erros (vazia = valido)",
+        "validar_plano recusa: plano sem tasks, task sem criterios, id duplicado, dep apontando para id inexistente e ciclo entre deps",
+        "existe autodev/planner.py e os testes ficam em .autodev/tests/test_planner.py",
+        "o teste .autodev/tests/test_planner.py prova um plano valido e pelo menos 4 planos invalidos distintos",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": [],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P02",
+      "titulo": "Criar autodev/plan_prompt.py com o prompt de planejamento",
+      "criterios": [
+        "existe autodev/plan_prompt.py com a constante PROMPT_PLANO (string) e a funcao montar_prompt_plano(prompt_usuario)",
+        "montar_prompt_plano devolve uma string que CONTEM o prompt do usuario sem alteracao",
+        "o prompt exige que o agente responda APENAS um JSON com as chaves titulo, objetivo, repositorio e tasks",
+        "o prompt exige que cada task tenha id, titulo, criterios, deps, agente e teste",
+        "o prompt proibe criterio vago: exige que cada criterio mencione um arquivo ou um comando de teste concreto",
+        "o prompt exige que a ultima task seja sempre um teste de aceitacao ponta a ponta",
+        "os testes ficam em .autodev/tests/test_planner.py e provam que os elementos obrigatorios aparecem no prompt montado",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": [],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P03",
+      "titulo": "Parsear a resposta do agente de forma tolerante",
+      "criterios": [
+        "existe a funcao parsear_plano(texto) em autodev/planner.py que devolve um Plano",
+        "aceita JSON puro, JSON dentro de cerca de codigo com crase tripla e JSON cercado por texto explicativo",
+        "levanta PlanoInvalido (definida em autodev/planner.py) quando nao ha JSON reconhecivel",
+        "levanta PlanoInvalido quando o JSON nao tem a chave tasks",
+        "importa as dataclasses de autodev/planner.py em vez de redefinir",
+        "os testes ficam em .autodev/tests/test_planner.py e cobrem os 3 formatos aceitos e 2 recusas",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P01"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P04",
+      "titulo": "Validar o plano contra o DAG real e contra criterio vago",
+      "criterios": [
+        "existe a funcao validar_e_ordenar(plano) em autodev/planner.py que reusa ordem_topologica do modulo de config",
+        "devolve as ondas de execucao e recusa plano ciclico com mensagem citando os ids envolvidos",
+        "existe a lista PALAVRAS_VAGAS com termos como melhorar, otimizar, refatorar, revisar, ajustar",
+        "um criterio que usa PALAVRAS_VAGAS sem citar arquivo nem comando de teste e recusado com o id da task e o indice do criterio",
+        "um criterio concreto que cita arquivo ou comando de teste e aceito",
+        "os testes ficam em .autodev/tests/test_planner.py e provam as recusas e a aceitacao",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P01"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P05",
+      "titulo": "Escrever o sprint planejado em disco",
+      "criterios": [
+        "existe a funcao escrever_sprint(raiz, plano) em autodev/planner.py",
+        "cria .autodev/sprints/<sprint_id>/ com spec.md, dag.json e sprint.yaml",
+        "o dag.json gerado tem as chaves sprint_id, versao e tasks, e cada task preserva id, titulo, criterios, deps, agente e teste",
+        "a sprint.yaml gerada tem sprint_id, titulo, objetivo, status: PLANEJADO e o bloco repositorio com raiz e merge_em_main: false",
+        "a spec.md gerada comeca com o prompt original do usuario em uma secao chamada Prompt original",
+        "a funcao recusa sobrescrever um sprint ja existente levantando SprintJaExiste",
+        "os testes ficam em .autodev/tests/test_planner.py e escrevem em tmp_path, nunca no repositorio real",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P03", "P04"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P06",
+      "titulo": "Invocar o agente em modo planejamento",
+      "criterios": [
+        "existe a funcao planejar(raiz, prompt_usuario, agente) em autodev/planner.py que devolve um Plano",
+        "reusa agents.invocar do modulo de agentes em vez de chamar o binario diretamente",
+        "grava o prompt e a resposta do agente em .autodev/sprints/<sprint_id>/logs/plano-<agente>.log",
+        "cota esgotada (failure_class CODEX_QUOTA) propaga a excecao CotaEsgotada definida em autodev/planner.py, sem virar plano vazio",
+        "resposta sem JSON reconhecivel levanta PlanoInvalido citando o trecho inicial da resposta",
+        "o teste usa o driver falso via AUTODEV_FAKE_AGENT e nao gasta cota real",
+        "os testes ficam em .autodev/tests/test_planner.py",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P03", "P04"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P07",
+      "titulo": "Adicionar o comando autodev plan na CLI",
+      "criterios": [
+        "a CLI aceita autodev plan 'texto do pedido' e autodev plan --de arquivo.md",
+        "o comando usa a funcao planejar de autodev/planner.py e escreve o sprint com escrever_sprint",
+        "plano invalido imprime os erros de validacao um por linha e devolve exit code 1, sem traceback",
+        "sucesso imprime o sprint_id gerado e o caminho onde ele foi escrito e devolve exit code 0",
+        "sprint ja existente imprime mensagem clara e devolve exit code 1, sem traceback",
+        "existe autodev plan --help funcional",
+        "os testes ficam em .autodev/tests/test_cli.py e cobrem sucesso, plano invalido e sprint ja existente",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P05", "P06"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P08",
+      "titulo": "Provar a aceitacao: do prompt ao sprint executavel",
+      "criterios": [
+        "existe o teste test_aceitacao_do_planejador em .autodev/tests/test_acceptance.py",
+        "o teste usa o driver falso para devolver um plano com 3 tasks e nao gasta cota real",
+        "o teste prova que o sprint escrito em tmp_path passa a validacao do autodev init sem erro",
+        "o teste prova que o dag.json gerado e aceito por ordem_topologica e produz pelo menos 2 ondas",
+        "o teste prova que um plano com criterio vago e recusado com mensagem que cita a task",
+        "o teste roda a suite do sprint gerado com o driver falso e prova que as tasks executam de ponta a ponta",
+        "os testes ficam em .autodev/tests/test_acceptance.py",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P07"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "L",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P09",
+      "titulo": "Registrar a rastreabilidade do prompt ao plano",
+      "criterios": [
+        "a spec.md gerada por escrever_sprint contem a secao Prompt original com o texto do usuario literal",
+        "o dag.json gerado registra o campo prompt_original",
+        "o comando autodev report inclui o prompt original na secao de contexto quando ele existe no dag.json",
+        "plano sem prompt_original e aceito, e a secao aparece como nao informado, sem quebrar o relatorio",
+        "os testes ficam em .autodev/tests/test_planner.py e .autodev/tests/test_adapters.py",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P07"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    },
+    {
+      "id": "P10",
+      "titulo": "Documentar o planejador e fechar a documentacao",
+      "criterios": [
+        "o README.md ganha uma secao Planejador explicando o fluxo do prompt ao sprint executavel",
+        "a secao documenta autodev plan com o exemplo de uso e o efeito no disco",
+        "a secao declara explicitamente que o planejador usa um agente e por isso consome cota",
+        "a secao registra a limitacao de que o plano gerado sempre precisa de revisao humana antes de rodar",
+        "o README menciona que o comando plan nao faz merge nem push",
+        "os testes ficam em .autodev/tests/test_planner.py provando que as secoes exigidas existem no README",
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+      ],
+      "deps": ["P08", "P09"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S",
+      "teste": "python3 -m pytest .autodev/tests/ -q"
+    }
+  ]
+}
