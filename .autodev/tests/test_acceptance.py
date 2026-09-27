@@ -514,15 +514,18 @@ def test_falha_de_permissao_vira_haq_e_nao_para_o_sprint(tmp_path, monkeypatch):
 
 
 # =================================================== dependências e integração
-@pytest.mark.xfail(strict=True, reason=(
-    "BUG CONHECIDO: o worktree de toda task nasce da main (worktree.py: "
-    "`base = base or commit_atual(self.repo)`), então uma task que declara `deps` "
-    "espera pela dependência mas começa SEM o código dela. O DAG é respeitado para "
-    "ORDEM e nunca para CONTEÚDO. Quando duas tasks tocam o mesmo arquivo, cada uma "
-    "escreve a sua versão a partir da main e o merge colide (add/add). "
-    "Remova esta marca quando a task passar a ser baseada no branch de integração."))
 def test_task_dependente_enxerga_o_trabalho_da_dependencia(tmp_path, monkeypatch):
-    """Task com `deps` precisa partir do resultado da dependência, não da main.
+    """Task com `deps` parte do resultado da dependência, não da main.
+
+    Régua do D-07. Este teste nasceu marcado `xfail(strict=True)` quando o
+    worktree de toda task ainda nascia da main: o DAG era respeitado para ORDEM e
+    nunca para CONTEÚDO, e duas tasks que tocavam o mesmo arquivo colidiam no
+    merge. Ele falhava provando o defeito.
+
+    A marca foi removida quando o conserto entrou (`_base_do_worktree` + integração
+    a cada onda) — a marca estrita virou XPASS e obrigou a removê-la, que era
+    exatamente o combinado. Se alguém voltar a basear o worktree na main, este
+    teste quebra de novo.
 
     Prova executável do que derrubou a primeira noite autônoma: 1 de 10 tarefas
     integrada, 9 em conflito de merge, em cinco rodadas seguidas.

@@ -22,7 +22,8 @@ from . import sandbox as sbx
 from . import testrunner
 from .config import Config, carrega_dag, carrega_sprint, ordem_topologica
 from .state import StateStore, TransicaoInvalida, WorktreeOcupado
-from .worktree import WorktreeManager, arquivos_alterados, commit_atual
+from .worktree import (WorktreeManager, arquivos_alterados, branch_existe,
+                       commit_atual, git)
 
 PROMPT_TASK = """Voce e o agente de implementacao de uma task de um Sprint autonomo.
 
@@ -212,6 +213,25 @@ class Orquestrador:
             self.log(f"recuperacao: {rel}")
         return rel
 
+    # --------------------------------------------------------------- base
+    def _base_do_worktree(self) -> str:
+        """Commit base do worktree de uma task.
+
+        O DAG era respeitado para ORDEM e nunca para CONTEUDO. `WorktreeManager`
+        criava todo worktree a partir da `main`, entao uma task que declarava
+        `deps` esperava pela dependencia e mesmo assim comecava SEM o codigo dela:
+        reimplementava o que ja existia e escrevia a sua propria versao dos mesmos
+        arquivos — e no merge as versoes colidiam. Numa noite real isso deu 1 task
+        integrada de 10, com as outras 9 em CONFLITO em cinco rodadas seguidas.
+
+        A integracao acontece a cada onda, entao o tip do branch de integracao ja
+        contem o trabalho integrado das dependencias. Base e o que o DAG prometia.
+        """
+        branch = f"sprint/{self.sprint}/integration"
+        if branch_existe(self.raiz, branch):
+            return git("rev-parse", branch, cwd=self.raiz).strip()
+        return commit_atual(self.raiz)
+
     # ------------------------------------------------------------ uma task
     def executar_task(self, task_id: str) -> ResumoTask:
         spec = next(t for t in self.dag["tasks"] if t["id"] == task_id)
@@ -236,7 +256,8 @@ class Orquestrador:
             self.store.forcar_estado(self.sprint, task_id, "QUEUED",
                                      "selecionado pelo orquestrador")
 
-        wt = self.wm.criar(self.sprint, task_id, agente)
+        wt = self.wm.criar(self.sprint, task_id, agente,
+                           base=self._base_do_worktree())
         try:
             self.store.adquirir_worktree(str(wt.caminho), task_id, agente)
         except WorktreeOcupado as e:
@@ -511,19 +532,26 @@ class Orquestrador:
                     self.store.checkpoint(self.sprint, rst.estado_final,
                                           {"task_id": task_id, "resumo": rst.motivo},
                                           onda_i)
+                # ---- integração da onda -------------------------------------
+                # D-07: integra a CADA onda, e não uma única vez no fim. É o que
+                # faz o worktree da onda seguinte nascer com o código já integrado
+                # das dependências (ver _base_do_worktree). Integrar só no fim,
+                # com todo worktree partindo da main, foi o que deu 1 task
+                # integrada de 10 na primeira noite real: as outras 9
+                # reimplementaram o mesmo contrato e colidiram no merge, cinco
+                # rodadas seguidas.
+                self._checa_parada("integrar")
+                res_done = [t for t in self.store.tasks(self.sprint)
+                            if t["estado"] == "DONE"]
+                if res_done:
+                    self.log(f"integrando {len(res_done)} task(s) da onda {onda_i}")
+                    self.integrar(res_done)
+                    # rede de segurança: main nunca é tocada
+                    self.log(f"branch atual do repo: {commit_atual(self.raiz)[:8]} "
+                             f"(main intacta — merge automatico proibido)")
             # Nada progrediu por espera de cota: é "volte depois", não falha.
             if res.aguardando_recurso and not res.concluidas:
                 res.parado_por = "aguardando recurso (cota)"
-            # ---- integração ---------------------------------------------------
-            self._checa_parada("integrar")
-            res_done = [t for t in self.store.tasks(self.sprint)
-                        if t["estado"] == "DONE"]
-            if res_done:
-                self.log(f"integrando {len(res_done)} task(s) no branch do sprint")
-                self.integrar(res_done)
-                # rede de segurança: main nunca é tocada
-                self.log(f"branch atual do repo: {commit_atual(self.raiz)[:8]} "
-                         f"(main intacta — merge automatico proibido no Sprint 1)")
         except killswitch.ParadoPorKillSwitch as e:
             self.log(f"PARADO: {e}")
             res.parado_por = str(e)
