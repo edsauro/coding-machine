@@ -31,3 +31,18 @@ reproduz o corpo de `main` (`2ca6ce2`), antes da inserção defeituosa; a fixtur
 `sprint/DEVFACTORY-002/P10-codex` (`785988d`), até antes das subseções que vazaram
 para dentro dele. A preservação é provada contra esses snapshots históricos, não
 contra texto derivado pelo teste.
+
+## D-26 — 2026-09-28 — P02 isola a seção Planejador até o próximo título de nível igual ou superior
+
+O helper `_secao_planejador()` deixou de procurar somente `\n## ` e agora encerra
+no primeiro `\n# ` ou `\n## `. A asserção de isolamento foi trocada porque o corte
+anterior incluía as subseções `### Ciclo de vida do sprint` e `### Conclusão por
+evidência`, fazendo o teste aceitar texto de outro assunto como se fosse conteúdo
+do Planejador.
+
+A prova de preservação da suíte foi registrada antes/depois: o arquivo histórico
+da P10 tinha 4 casos coletados; esta versão mantém esses 4 e adiciona 1 caso no
+próprio `.autodev/tests/test_plan_docs.py`, totalizando 5 casos coletados. A
+contagem não diminuiu (4 → 5). O novo caso injeta uma subseção `### Ciclo de vida
+do sprint` no texto lido e falha com a implementação antiga, pois exige que esse
+texto não apareça na seção retornada.
