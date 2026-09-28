@@ -1,0 +1,125 @@
+{
+  "sprint_id": "DEVFACTORY-003",
+  "versao": 1,
+  "criterio_paralelizacao": "tasks sem dependencia entre si E sem arquivo em comum podem rodar na mesma onda",
+  "tasks": [
+    {
+      "id": "P01",
+      "titulo": "Detectar colisao de arquivo entre tasks do plano",
+      "criterios": [
+        "existe a funcao colisoes_de_arquivo(plano) em autodev/planner.py devolvendo lista de dicts com as chaves task_a, task_b, arquivo e onda",
+        "duas tasks da MESMA onda que citam o mesmo arquivo produzem uma colisao",
+        "duas tasks que citam o mesmo arquivo em ondas DIFERENTES nao produzem colisao de mesma onda (viram aviso, nao erro)",
+        "duas tasks distintas que citam o mesmo arquivo de teste produzem colisao em qualquer onda (a armadilha que quebrou a sprint 2, D-16)",
+        "validar_plano(plano) inclui as colisoes na lista de erros, citando os dois ids e o caminho do arquivo",
+        "os testes ficam em .autodev/tests/test_plan_colisoes.py e provam os tres casos: mesma onda, ondas diferentes e mesmo arquivo de teste",
+        "estende autodev/planner.py preservando as dataclasses e funcoes existentes (Plano, TaskPlano, validar_plano, parsear_plano, validar_e_ordenar, escrever_sprint) sem remover nem renomear nada"
+      ],
+      "deps": [],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/test_plan_colisoes.py -q"
+    },
+    {
+      "id": "P02",
+      "titulo": "Barrar colisao na mesma onda no validador do motor",
+      "criterios": [
+        "valida_dag em autodev/config.py recusa DAG com duas tasks na mesma onda citando o mesmo arquivo, citando os ids e o caminho",
+        "a recusa alcanca o comando autodev init, que ja chama valida_dag",
+        "plano com o mesmo arquivo em ondas diferentes continua valido (aviso, nao erro)",
+        "os testes ficam em .autodev/tests/test_plan_guarda.py e rodam com python3 -m pytest .autodev/tests/test_plan_guarda.py -q",
+        "estende autodev/config.py preservando valida_dag, ordem_topologica e carga_dag existentes, sem remover nem renomear nada"
+      ],
+      "deps": ["P01"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/test_plan_guarda.py -q"
+    },
+    {
+      "id": "P03",
+      "titulo": "Relatorio de impacto do plano em modulo proprio",
+      "criterios": [
+        "existe autodev/plan_impacto.py com a funcao impacto(plano) devolvendo dict com as chaves ondas, arquivos_por_task, colisoes e sem_arquivo",
+        "impacto usa colisoes_de_arquivo importada de autodev/planner.py em vez de reimplementar a checagem",
+        "autodev/plan_impacto.py nao importa a CLI e nao cria ciclo de import com autodev/planner.py",
+        "a funcao e pura: nao escreve em disco nem chama agente",
+        "os testes ficam em .autodev/tests/test_plan_impacto.py e rodam com python3 -m pytest .autodev/tests/test_plan_impacto.py -q"
+      ],
+      "deps": ["P01"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/test_plan_impacto.py -q"
+    },
+    {
+      "id": "P04",
+      "titulo": "Comando autodev prever: impacto do plano antes de rodar",
+      "criterios": [
+        "a CLI aceita autodev prever <sprint_id> e imprime, por onda, os arquivos prometidos por cada task e as colisoes encontradas",
+        "autodev prever aceita --json e imprime o mesmo conteudo em JSON valido",
+        "sprint inexistente devolve exit code 1 com mensagem clara, sem traceback",
+        "os testes ficam em .autodev/tests/test_plan_cli_prever.py e rodam com python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q",
+        "estende autodev/cli.py preservando os subcomandos existentes (detect, init, status, run, resume, report, haq, quota, metrics, encerrar, evidenciar, desbloquear, stop, start) sem remover nenhum"
+      ],
+      "deps": ["P02", "P03"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S",
+      "teste": "python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q"
+    },
+    {
+      "id": "P05",
+      "titulo": "Portao de aprovacao humana do plano",
+      "criterios": [
+        "sprint.yaml aceita o bloco aprovacao com as chaves por, quando e hash_dag (sha256 do dag.json)",
+        "autodev run recusa rodar sprint PLANEJADO sem aprovacao registrada, dizendo qual comando registra a aprovacao",
+        "existe o comando autodev aprovar <sprint_id> --por <nome> que grava a aprovacao com o hash atual do dag.json",
+        "depois de aprovar, autodev run aceita o sprint e registra um evento de aprovacao no historico",
+        "dag.json alterado depois da aprovacao invalida a aprovacao (hash nao confere) e o run recusa de novo, citando a divergencia",
+        "os testes ficam em .autodev/tests/test_plan_aprovacao.py e rodam com python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q",
+        "estende autodev/cli.py e autodev/orchestrator.py preservando os subcomandos e o laco de execucao atuais, sem remover nem renomear nada"
+      ],
+      "deps": ["P04"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "M",
+      "teste": "python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q"
+    },
+    {
+      "id": "P06",
+      "titulo": "Aceitacao ponta a ponta do portao do plano",
+      "criterios": [
+        "existe o teste test_portao_do_plano em .autodev/tests/test_plan_portao_aceitacao.py",
+        "o teste usa o driver falso de agente e nao gasta cota real",
+        "o teste prova que um plano com colisao na mesma onda e recusado pelo validador antes de qualquer agente rodar",
+        "o teste prova que um sprint PLANEJADO sem aprovacao nao roda, e que apos autodev aprovar ele roda e integra",
+        "o teste prova que alterar o dag.json depois da aprovacao invalida a aprovacao",
+        "os testes rodam com python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q"
+      ],
+      "deps": ["P05"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S",
+      "teste": "python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q"
+    },
+    {
+      "id": "P07",
+      "titulo": "Documentar o portao do plano e o checklist derivado do D-16",
+      "criterios": [
+        "README.md ganha a secao Portao do plano descrevendo o fluxo planejar, prever, aprovar, rodar",
+        "a secao traz o checklist de plano derivado do D-16: arquivo de teste proprio por task, sem colisao de arquivo na mesma onda, criterio de preservacao ao editar modulo de outra task e criterio sempre citando arquivo ou comando",
+        "README.md atualiza a secao Estado atual com a contagem de testes e o estado das sprints 1, 2 e 3",
+        "o README.md documenta o script .autodev/scripts/verificar_plano.py com um exemplo de uso",
+        ".autodev/sprints/DEVFACTORY-003/decisions.md registra a decisao de exigir aprovacao humana e cita o D-16 da sprint 2 como evidencia",
+        "os testes ficam em .autodev/tests/test_plan_docs.py e provam que as secoes citadas existem no README.md"
+      ],
+      "deps": ["P06"],
+      "agente": "codex",
+      "paralelizavel": true,
+      "estimativa": "S",
+      "teste": "python3 -m pytest .autodev/tests/test_plan_docs.py -q"
+    }
+  ]
+}

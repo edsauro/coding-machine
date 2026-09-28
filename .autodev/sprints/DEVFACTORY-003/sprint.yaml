@@ -1,0 +1,47 @@
+sprint_id: DEVFACTORY-003
+titulo: Portao de qualidade do plano e aprovacao humana
+objetivo: >
+  Fechar o buraco que a sprint 2 expos: o DAG era aceito mesmo mandando tasks
+  apagarem o trabalho umas das outras. Esta sprint poe a checagem no codigo —
+  colisao de arquivo na mesma onda e mesmo arquivo de teste viram erro, criterio
+  sem arquivo concreto vira erro, edicao de modulo de outra task sem criterio de
+  preservacao vira aviso — e exige aprovacao humana registrada (por, quando e
+  hash do dag.json) antes de o sprint rodar. Inclui relatorio de impacto do plano
+  (autodev prever) para o autor ver o que o plano promete tocar antes de aprovar.
+
+status: PLANEJADO          # declaracao; o FATO esta em state.db (sprint_state.estado)
+data_encerramento: null
+resultado: null
+deadline: null
+max_tentativas: 5          # espelha policies.yaml
+# Esta sprint NAO comeca antes de DEVFACTORY-002 estar integrada: o planejador
+# (autodev/planner.py) e a base de P01..P04.
+depende_de: DEVFACTORY-002
+
+# Comando de teste por task. Obrigatorio: o repositorio nao tem pyproject.toml
+# nem tests/ na raiz, entao a auto-deteccao devolveria "nenhum".
+aceitacao:
+  comando: "python3 -m pytest .autodev/tests/ -q"
+  evidencia: ".autodev/sprints/DEVFACTORY-003/evidence/"
+
+# Politica de custo: comecar sempre no degrau mais barato (spec §9)
+modelo_inicial: gpt-5.6-luna
+effort_inicial: low
+
+repositorio:
+  raiz: .
+  branch_integracao: sprint/DEVFACTORY-003/integration
+  merge_em_main: false     # NUNCA. O trabalho fica no branch para revisao humana.
+
+# Portao de aprovacao (preenchido pelo `autodev aprovar <sprint> --por <nome>`):
+#   aprovacao:
+#     por: <nome>
+#     quando: "2026-09-27T23:00:00-03:00"
+#     hash_dag: <sha256 do dag.json>
+aprovacao: null
+
+ambiente:
+  detectado_em: "2026-09-27"
+  os: "Arch Linux 7.2.3-arch1-3"
+  python: "3.11.16"
+  sandbox: "bwrap (sem daemon, sem root)"
