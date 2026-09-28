@@ -96,11 +96,23 @@ def extrair_tocados(task: dict) -> set[str]:
 
 def _sentencas(texto: str) -> list[str]:
     """Separa instrucoes para nao confundir uma proibicao com um comando."""
-    return [trecho.strip() for trecho in re.split(r"[;\n]", texto) if trecho.strip()]
+    return [
+        trecho.strip()
+        for trecho in re.split(r"[;\n]+|\.(?=\s|$)", texto)
+        if trecho.strip()
+    ]
 
 
 def _comando_de_teste_incorreto(texto: str, *, campo_teste: bool) -> bool:
     """Reconhece comandos pytest afirmativos fora da forma do runner."""
+    if campo_teste:
+        if not texto.strip():
+            return False
+        for trecho in _sentencas(texto):
+            if CAMINHO_VENV_RELATIVO.search(trecho) and not NEGACOES_COMANDO.search(trecho):
+                return True
+        return COMANDO_PYTEST_CORRETO.search(texto) is None
+
     for trecho in _sentencas(texto):
         if NEGACOES_COMANDO.search(trecho):
             continue
@@ -108,11 +120,19 @@ def _comando_de_teste_incorreto(texto: str, *, campo_teste: bool) -> bool:
         contem_venv = CAMINHO_VENV_RELATIVO.search(trecho) is not None
         if not (contem_pytest or contem_venv):
             continue
+        # Um caminho relativo de venv afirmativo e sempre um comando invalido,
+        # mesmo quando a frase tambem cita a forma correta.
+        if contem_venv:
+            return True
         if COMANDO_PYTEST_CORRETO.search(trecho):
             continue
         # Nos criterios, uma simples referencia a pytest sem instrucao de
-        # execucao nao e um comando. O campo `teste` e sempre executavel.
-        if campo_teste or re.search(r"\b(?:teste|testar|rode|rodar|comando)\b|[:`>$]", trecho, re.I):
+        # execucao nao e um comando.
+        if re.search(
+            r"\b(?:test\w*|rod\w*|execut\w*|su[ií]te|comando)\b|[:`>$]",
+            trecho,
+            re.I,
+        ):
             return True
     return False
 
@@ -167,7 +187,7 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
             _comando_de_teste_incorreto(c, campo_teste=False)
             for c in t.get("criterios", [])
         )
-        if not teste.strip() or _comando_de_teste_incorreto(teste, campo_teste=True) or criterio_incorreto:
+        if _comando_de_teste_incorreto(teste, campo_teste=True) or criterio_incorreto:
             erros.append(
                 f"E5: {t['id']} usa comando de teste fora da forma exigida; "
                 "o worktree nao tem venv — use python3 -m pytest ..."
