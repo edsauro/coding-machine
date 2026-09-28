@@ -88,6 +88,25 @@ Testes do próprio orquestrador:
 .venv/bin/python -m pytest .autodev/tests/ -q
 ```
 
+### Acompanhar ao vivo (tela de eventos)
+
+```bash
+./tela.sh                  # tela permanente: cabeçalho do sprint + uma linha por evento
+./tela.sh --once           # um quadro só (para log ou pipe)
+./tela.sh --intervalo 5 --linhas 25 --tudo
+```
+
+O cabeçalho traz sprint, estado, quantas tarefas já foram integradas, se há rodada
+viva e a fila; abaixo, cada evento do motor em uma linha curta — reinício da
+codificação e teste, fim de desenvolvimento, testes do pacote, revisão aprovada ou
+reprovada (com revisor e número de achados), integração com o commit, bloqueio, espera
+de cota e HAQ que dependem de você. É só leitura (abre o `state.db` em modo `ro`) e sai
+com Ctrl-C. No Hyprland/Omarchy, para deixar sempre à mão:
+
+```
+bind = SUPER, D, exec, $terminal --title=tela-devfactory -e ~/Code/Coding_Machine/tela.sh
+```
+
 ### Ciclo de vida do sprint
 
 Tarefas têm 12 estados; o **sprint** tem os seus:
