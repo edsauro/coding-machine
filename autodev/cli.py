@@ -2,6 +2,7 @@
 
 Uso:
   python3 -m autodev detect                 # T01
+  python3 -m autodev plan "pedido"          # cria um sprint planejado
   python3 -m autodev init                   # valida DAG e cria as tasks
   python3 -m autodev status                 # estado atual do Sprint
   python3 -m autodev run [--parar-em T07]   # executa o Sprint
@@ -241,6 +242,40 @@ def cmd_evidenciar(args) -> int:
     return 0
 
 
+def cmd_plan(args) -> int:
+    """Planeja um pedido, valida o resultado e persiste um novo sprint."""
+    from . import planner
+
+    if args.de is not None:
+        try:
+            pedido = args.de.read_text(encoding="utf-8")
+        except OSError as erro:
+            print(f"erro ao ler {args.de}: {erro}")
+            return 1
+    else:
+        pedido = args.pedido
+
+    try:
+        plano = planner.planejar(RAIZ, pedido, "codex")
+        erros = planner.validar_plano(plano)
+        if erros:
+            for erro in erros:
+                print(erro)
+            return 1
+        planner.validar_e_ordenar(plano)
+        destino = planner.escrever_sprint(RAIZ, plano)
+    except planner.PlanoInvalido as erro:
+        for linha in str(erro).splitlines():
+            print(linha)
+        return 1
+    except planner.SprintJaExiste as erro:
+        print(f"não foi possível criar o sprint: {erro}")
+        return 1
+
+    print(f"sprint {destino.name} escrito em {destino}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
     p.add_argument("--sprint", default=SPRINT_PADRAO)
@@ -248,6 +283,13 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("detect").set_defaults(fn=cmd_detect)
     sub.add_parser("init").set_defaults(fn=cmd_init)
+
+    s = sub.add_parser("plan", help="planeja um pedido e escreve um novo sprint")
+    fonte = s.add_mutually_exclusive_group(required=True)
+    fonte.add_argument("pedido", nargs="?", help="texto do pedido")
+    fonte.add_argument("--de", type=Path, metavar="ARQUIVO",
+                       help="lê o pedido de um arquivo Markdown")
+    s.set_defaults(fn=cmd_plan)
 
     s = sub.add_parser("status")
     s.add_argument("-v", "--verbose", action="store_true")
