@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+import yaml
 
 from . import config
 
@@ -45,6 +48,57 @@ class Plano:
 
 class PlanoInvalido(ValueError):
     """Indica que a resposta do agente não contém um plano reconhecível."""
+
+
+class SprintJaExiste(FileExistsError):
+    """Indica que o diretório de destino do sprint já existe."""
+
+
+def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
+    """Persiste um plano em um novo diretório sequencial de sprint."""
+    diretorio_sprints = Path(raiz) / ".autodev" / "sprints"
+    diretorio_sprints.mkdir(parents=True, exist_ok=True)
+
+    numeros = [
+        int(casamento.group(1))
+        for caminho in diretorio_sprints.iterdir()
+        if (casamento := re.fullmatch(r"DEVFACTORY-(\d+)", caminho.name))
+    ]
+    sprint_id = f"DEVFACTORY-{max(numeros, default=0) + 1:03d}"
+    destino = diretorio_sprints / sprint_id
+    try:
+        destino.mkdir()
+    except FileExistsError as erro:
+        raise SprintJaExiste(f"sprint já existe: {sprint_id}") from erro
+
+    tasks = [asdict(task) for task in plano.tasks]
+    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks}
+    (destino / "dag.json").write_text(
+        json.dumps(dag, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    sprint = {
+        "sprint_id": sprint_id,
+        "titulo": plano.titulo,
+        "objetivo": plano.objetivo,
+        "status": "PLANEJADO",
+        "repositorio": {
+            "raiz": plano.repositorio,
+            "merge_em_main": False,
+        },
+    }
+    (destino / "sprint.yaml").write_text(
+        yaml.safe_dump(sprint, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    spec = (
+        f"# Prompt original\n\n{plano.prompt_original}\n\n"
+        f"# {plano.titulo}\n\n{plano.objetivo}\n"
+    )
+    (destino / "spec.md").write_text(spec, encoding="utf-8")
+    return destino
 
 
 def parsear_plano(texto: str) -> Plano:
