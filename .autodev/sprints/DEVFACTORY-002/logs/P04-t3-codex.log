@@ -1,4 +1,4 @@
-# exit_code=0 duracao=14.1s modelo=gpt-5.6-luna effort=low failure_class=None
+# exit_code=-15 duracao=23.5s modelo=gpt-5.6-sol effort=low failure_class=UNKNOWN
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -87,7 +87,7 @@ autodev/plan_prompt.py
 
 
 ===== STDOUT =====
-Aguardando sua aprovação do desenho para iniciar a implementação.
+
 
 ===== STDERR =====
 

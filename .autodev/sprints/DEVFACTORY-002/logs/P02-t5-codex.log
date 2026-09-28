@@ -1,4 +1,4 @@
-# exit_code=0 duracao=34.7s modelo=gpt-5.6-luna effort=low failure_class=None
+# exit_code=0 duracao=44.0s modelo=gpt-6-astra effort=low failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -87,8 +87,35 @@ autodev/plan_prompt.py
    RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
 
 
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 10: REVIEW_FAILURE (exit 0) — 
+  - tentativa 11: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+ tautologia 'PROMPT_PLANO in prompt'): ficam VERDES (1) remover '; proiba e nao use criterios vagos', (2) remover a exigencia de arquivo/comando da regra de criterio ('Cada criterio deve ser concreto e mencionar um arquivo ou um comando de teste concreto' -> 'Cada criterio deve ser concreto') - justamente o criterio 5 da task, que sobrevive porque a palavra 'arquivo' tambem aparece na frase do E2E (linha 21 e 'arquivo' in prompt or 'comando de teste' in prompt), (3) 'Cada item de tasks pode ter as chaves' no lugar de 'deve ter' (campo obrigatorio vira opcional), (4) 'as chaves titulo, objetivo, repositorio, tasks e outras que quiser' no lugar de 'exatamente as chaves' (contraria o criterio 3), (5) remover 'sem markdown, comentarios ou texto adicional'. Ficam VERMELHAS apenas as mutacoes que tiram 'APENAS um JSON' ou 'ultima task'/E2E. Ou seja: 3 dos 4 requisitos de conteudo exigidos na task nao estao travados por teste - o verde de 132 nao prova esses criterios.", "correcao_sugerida": "Trocar substrings soltas por assercoes de contrato: exigir a frase com modalidade ('Cada item de tasks deve ter as chaves: id, titulo, criterios, deps, agente e teste'), exigir a exigencia de evidencia ('mencionar um arquivo ou um comando de teste'), exigir 'exatamente as chaves: titulo, objetivo, repositorio e tasks', proibir formas permissivas ('pode ter' not in prompt) e amarrar a ultima task ao E2E com regex DOTALL (ex.: re.search(r'ultima task.*teste de aceitacao ponta a ponta', prompt, re.S))."}, {"severidade": "baixa", "arquivo": "autodev/plan_prompt.py", "linha": 7, "descricao": "Redacao defeituosa onde a sprint diz que o texto do prompt e o que define a qualidade da entrega: 'proiba e nao use criterios vagos' e imperativo transitivo sem objeto claro dirigido ao proprio autor do plano (ele cumpre a regra, nao a 'proibe'); e a frase do E2E quebra no meio da oracao ('...ponta a ponta\\n(teste de aceitacao), com seu\\narquivo e comando de teste...'), com 'ultima/ultima tarefa' e 'aceitacao/aceitacao' misturando grafias na mesma frase (a versao t1 dizia 'teste de aceitacao' e foi reescrita em t2 para casar com a assercao lowercase do teste - a mudanca veio do IMPLEMENTADOR para o teste passar, direcao correta, mas deixou o texto híbrido).", "correcao_sugerida": "Reescrever como: 'Nunca use criterios vagos: cada criterio deve citar um arquivo do repositorio ou um comando de teste concreto.' e emendar a frase do E2E em uma linha logica so, com grafia unica ('A ultima task deve ser sempre um teste de aceitacao ponta a ponta, com o arquivo e o comando de teste concretos nos criterios e no campo teste.')."}, {"severidade": "baixa", "arquivo": "autodev/plan_prompt.py", "linha": 17, "descricao": "montar_prompt_plano nao valida a entrada e nao ha teste para isso: execucao real devolve silenciosamente 'Pedido do usuario:\\nNone' com None, '...\\n42' com 42 e '...\\n' com '' - pedido invalido viraria um plano sobre a string 'None'. Nao viola criterio de aceitacao (simplicidade > confiabilidade) e nenhum teste cobre o caso.", "correcao_sugerida": "Recusar entrada nao-str ou vazia (ValueError) e cobrir com um teste em .autodev/tests/test_planner.py; se preferir manter simples, deixar explicito no docstring que a validacao e responsabilidade do chamador."}, {"severidade": "baixa", "arquivo": "autodev/plan_prompt.py", "linha": 4, "descricao": "Tensao de contrato (fora do criterio desta task, mas que a integracao vai pagar): o prompt manda o agente emitir 'exatamente as chaves: titulo, objetivo, repositorio e tasks', enquanto spec.md:19 define Plano com 'prompt_original' e P09 exige rastreabilidade do prompt ao plano. O criterio de P02 exige exatamente essas 4 chaves, entao a implementacao obedece; o risco e P03/P09 assumirem que o agente entrega a 5a chave.", "correcao_sugerida": "Deixar explicito no prompt que 'prompt_original' e preenchido pelo parser (fora do JSON do agente), ou alinhar spec.md/criterio - a decisao e do plano da sprint, nao do diff."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_planner.py
+  - autodev/plan_prompt.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #5.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 5a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
 ===== STDOUT =====
-RESULTADO: Implementação já presente de `autodev/plan_prompt.py` e testes em `.autodev/tests/test_planner.py` | TESTES: verificação direta OK; `python3 -m pytest .autodev/tests/ -q` não executou (`pytest` não instalado no ambiente)
+RESULTADO: Prompt revisado e testes reforçados para verificar regras completas e preservação literal da entrada | TESTES: `python3 -m pytest .autodev/tests/ -q` bloqueado pelo ambiente: `No module named pytest`; `git diff --check` passou.
 
 ===== STDERR =====
 

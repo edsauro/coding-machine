@@ -1,0 +1,120 @@
+# exit_code=3 duracao=149.5s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P03: Parsear a resposta do agente de forma tolerante
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe a funcao parsear_plano(texto) em autodev/planner.py que devolve um Plano
+- aceita JSON puro, JSON dentro de cerca de codigo com crase tripla e JSON cercado por texto explicativo
+- levanta PlanoInvalido (definida em autodev/planner.py) quando nao ha JSON reconhecivel
+- levanta PlanoInvalido quando o JSON nao tem a chave tasks
+- importa as dataclasses de autodev/planner.py em vez de redefinir
+- os testes ficam em .autodev/tests/test_planner.py e cobrem os 3 formatos aceitos e 2 recusas
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Contexto do projeto
+# DEVFACTORY-002 — Planejador: do prompt ao plano executável
+
+## O que esta sprint entrega
+
+Um comando novo, `autodev plan "<pedido em texto livre>"`, que produz um sprint
+executável em disco (`spec.md` + `dag.json` + `sprint.yaml`), validado pelas
+mesmas regras que o `autodev` já aplica na carga do DAG.
+
+Hoje esse passo é manual: alguém escreve o `spec.md` e o `dag.json` à mão antes
+de o orquestrador fazer qualquer coisa. Esta sprint fecha essa metade.
+
+## CONTRATO DE INTERFACES (não invente outros nomes)
+
+Estas assinaturas são usadas por tasks de ondas diferentes. Se você precisa de
+algo que não está aqui, **use o que está aqui**; não crie uma variante.
+
+```
+autodev/planner.py
+  @dataclass Plano:      titulo, objetivo, repositorio, tasks, prompt_original
+  @dataclass TaskPlano:  id, titulo, criterios, deps, agente, teste
+  validar_plano(plano) -> list[str]            # vazio = válido
+  parsear_plano(texto) -> Plano
+  validar_e_ordenar(plano) -> list[list[str]]  # ondas; reusa ordem_topologica
+  escrever_sprint(raiz, plano) -> Path
+  planejar(raiz, prompt_usuario, agente) -> Plano
+  exceções: PlanoInvalido, SprintJaExiste, CotaEsgotada
+  constante: PALAVRAS_VAGAS
+
+autodev/plan_prompt.py
+  PROMPT_PLANO: str
+  montar_prompt_plano(prompt_usuario) -> str
+```
+
+## REGRAS DURAS PARA O AGENTE
+
+1. **Trabalhe SOMENTE no seu worktree.** Nunca faça `cd` para fora dele, nunca
+   toque no repositório principal, nunca faça merge nem push.
+2. **Rode os testes antes de terminar:**
+   `python3 -m pytest .autodev/tests/ -q`
+   A suíte inteira tem que ficar verde. `python3` aqui é resolvido pelo runner
+   para o interpretador do projeto — use exatamente esta forma.
+3. **Os testes novos vão nos arquivos já indicados nos seus critérios.** Não
+   crie um arquivo de teste novo se o critério nomeia um existente.
+4. **Não invente APIs do projeto.** Os módulos existentes e seus nomes reais:
+   `agents.invocar`, `config.ordem_topologica`, `state.StateStore`,
+   `testrunner.rodar`, `sandbox.rodar`, `worktree.WorktreeManager`,
+   `planner` (novo). Confira a assinatura no arquivo antes de chamar.
+5. **Não altere o comportamento existente** para fazer o seu teste passar. Se um
+   teste antigo falhar, o problema é o seu código.
+6. **Cada critério é verificável.** Se você não consegue provar um critério com
+   um teste ou com um comando, o critério não foi atendido.
+7. **Sem dados pessoais.** Nada de nomes, caminhos de HOME ou credenciais em
+   código, teste ou documentação.
+
+## Por que o
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-002-P03-agy
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 6: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+remocao equivalente nas tasks P04/P06/P07/P08, o que nao existe."}, {"severidade": "alta", "arquivo": ".autodev/tests/test_planner.py", "linha": 1, "descricao": "O mesmo diff apaga os 6 testes do P01 (plano valido, sem tasks, task sem criterios, ids duplicados, dep inexistente e ciclo entre deps) e os substitui por 4 testes novos. Isso deixa de cumprir o criterio do P01 'o teste .autodev/tests/test_planner.py prova um plano valido e pelo menos 4 planos invalidos distintos' e reduz a cobertura de regressao do contrato do sprint sem que nenhum teste novo detecte a perda (a suite fica verde justamente porque o codigo e os testes foram removidos juntos).", "correcao_sugerida": "Preservar os 6 testes existentes no arquivo e acrescentar os testes de parsear_plano abaixo deles; se o arquivo foi reescrito por conveniencia, restaurar as funcoes auxiliares task()/plano() e os casos removidos."}, {"severidade": "media", "arquivo": "autodev/planner.py", "linha": 63, "descricao": "TaskPlano(**task) aceita somente os campos exatos: um plano do agente com qualquer chave extra (ex.: 'estimativa' ou 'paralelizavel', que o proprio dag.json do sprint usa) faz TypeError e derruba o plano INTEIRO como PlanoInvalido. Probe: {'tasks': [{'id': 'T01', 'titulo': 't', 'criterios': ['c'], 'extra': 1}]} -> PlanoInvalido 'JSON do plano possui tasks invalidas'. Como a task se chama 'parsear de forma tolerante' e o alvo e saida de LLM (que acrescenta campos com frequencia), a tolerancia acaba so no envelope do texto, nao no conteudo. Esse caminho de erro nao tem teste (as 2 recusas cobrem so ausencia de JSON e ausencia de 'tasks').", "correcao_sugerida": "Construir a task filtrando as chaves conhecidas (ex.: {k: v for k, v in task.items() if k in campos_de_TaskPlano}) ou usar dataclasses.fields(TaskPlano) para montar um dict limpo, e adicionar um teste com chave extra garantindo que o plano e aceito."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 52, "descricao": "O try/except em volta de _encontrar_json com 'if isinstance(erro, PlanoInvalido): raise' e codigo defensivo confuso e sem teste: o ramo TypeError so e alcancavel com entrada nao-str (probe com None e com bytes devolveu PlanoInvalido, mas nenhum teste exercita isso). E complexidade paga sem cobertura, contra a ordem de prioridade simplicidade > confiabilidade do sprint.", "correcao_sugerida": "Simplificar: deixar PlanoInvalido propagar direto de _encontrar_json e, se a intencao for blindar entrada nao-str, validar no inicio com 'if not isinstance(texto, str): raise PlanoInvalido(...)' e cobrir com um teste."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_planner.py", "linha": 33, "descricao": "O teste parametrizado dos 3 formatos so verifica isinstance/tasks[0].id/prompt_original; nao verifica titulo, objetivo nem repositorio. Uma implementacao que lesse apenas 'tasks' e devolvesse titulo='' nessas 3 entradas passaria nos 3 casos (so o teste extra da linha 54 confere titulo, e apenas no formato com objeto irrelevante antes).", "correcao_sugerida": "Acrescentar asserts de plano.titulo/objetivo/repositorio e de len(plano.tasks) dentro do teste parametrizado, provando o mapeamento completo do JSON para o dataclass nos 3 formatos."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 46, "descricao": "O fallback 'primeiro_objeto' faz o parser reportar a mensagem errada quando o JSON esta malformado: com trailing comma ('{...,}'), o objeto de topo nao decodifica, um objeto interno sem 'tasks' e devolvido e o erro final e 'JSON do plano nao contem a chave tasks', quando o problema real e JSON invalido - confunde o diagnostico do orquestrador. No mesmo trecho ha ruido de estilo ('tasks= tarefas', linha 68) que passa por todos os portoes.", "correcao_sugerida": "Distinguir os dois casos (JSON invalido x JSON valido sem tasks) na mensagem de excecao, por exemplo guardando o motivo da ultima falha de decodificacao, e corrigir o espacamento em 'tasks=tarefas'."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_planner.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #4.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 4a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 122h38m39s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 122h38m39s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"2fb556c9-e536-4a84-bc09-96c7ca1e4bfe-9"}
+

@@ -368,3 +368,44 @@ quem estourou cota foi o agente secundário: ele sai da rodada, a tentativa é
 o driver determinístico: nenhuma espera fica em nome do agy, a tentativa dele é
 devolvida e o agy sai da rodada), `test_reserva_entra_quando_o_revisor_da_escada_falha`
 (`sem_cota == ["agy"]`).
+
+## D-16 **[causa-raiz]** — o DAG mandava 8 tasks escreverem no MESMO arquivo de teste
+
+**Achado (22:08, 1ª rodada com o revisor Hermes de verdade):** as tentativas de P02
+nos degraus 3, 4 e 5 passaram nos testes (132→139 verdes) e foram reprovadas nas
+três revisões com o mesmo finding: *"o diff apaga `autodev/planner.py` e os 6 testes
+da P01"*.
+
+**Causa:** o `dag.json` da sprint manda **8 das 10 tasks** gravarem os testes em
+`.autodev/tests/test_planner.py` (P01, P02, P03, P04, P05, P06, P09, P10) e **6**
+editarem `autodev/planner.py` (P01, P03, P04, P05, P06, P07). Cada task que
+obedece aos próprios critérios SUBSTITUI os testes da anterior; o revisor reprova
+por regressão (está certo em reprovar); a task queima as 5 tentativas e bloqueia.
+Mais: P03/P04 (mesma onda), P05/P06 (mesma onda) e P08/P09 (mesma onda) editam os
+mesmos arquivos em paralelo — conflito `add/add` garantido na integração.
+
+**Isto é a explicação do fracasso da 1ª noite**, não a capacidade dos modelos:
+as 9 tasks bloqueadas seguiam um contrato que se contradizia.
+
+**Correção (decisão autônoma do Hermes, 2026-09-27 22:15 — reversível):**
+1. **arquivo de teste próprio por task** (`test_plan_prompt.py`, `test_plan_parser.py`,
+   `test_plan_validacao.py`, `test_plan_escrita.py`, `test_plan_agente.py`,
+   `test_plan_cli.py`, `test_plan_aceitacao.py`, `test_plan_rastreabilidade.py`,
+   `test_plan_docs.py`) — nenhum colide com arquivo já existente no repositório;
+2. **critério de preservação obrigatório** em P02–P10: proibido remover ou
+   reescrever arquivo de teste de outra task, e a suíte inteira continua verde
+   (`python3 -m pytest .autodev/tests/ -q`);
+3. **módulo compartilhado é ESTENDIDO, não reescrito**: `autodev/planner.py` mantém
+   `Plano`, `TaskPlano` e `validar_plano`;
+4. **serialização**: P04 dep. P03, P06 dep. P05, P09 dep. P08 — tasks que mexem no
+   mesmo arquivo deixam de rodar em paralelo na mesma onda.
+
+O `dag.json` anterior está preservado em
+`.autodev/sprints/DEVFACTORY-002/dag.json.antes-da-correcao-D16`.
+
+**A régua não baixou:** os critérios ficaram mais precisos (arquivo próprio nomeado,
+preservação verificável por comando) e a revisão continua reprovando regressão.
+
+**Reabertura:** P02–P10 voltaram ao 3º degrau (sol/low) com os worktrees recriados
+do zero a partir da integração da P01 (`b963e0e`) — as tentativas antigas ficaram
+arquivadas nos branches `arquivo/DEVFACTORY-002/P0X-antes-D16`, para auditoria.
