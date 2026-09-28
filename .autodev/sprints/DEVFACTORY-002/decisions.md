@@ -518,3 +518,104 @@ em `dag.json.antes-da-correcao-D19`.
 **Reabertura:** P09 volta ao 3º degrau (sol/low, contador 2) com o worktree
 realinhado automaticamente pela correção D-18; o trabalho antigo, escrito contra o
 contrato impossível, fica arquivado em `refs/arquivo/`.
+
+## D-20 — A espera de cota passa a usar o reset informado pelo próprio agente
+
+**Achado (28/09):** duas vezes na mesma madrugada o motor dormiu **por cima** do
+reset real, porque trata a espera como um valor fixo de política (5h10m):
+
+- 08:39 — o codex avisou `try again at 9:10 AM` (31 min) e o motor registrou 5h10m;
+- 03:45 — o codex avisou 03:41 e o motor esperava até 04:37 (56 min a mais).
+
+**Correção:** `errors.reset_de_cota()` lê as formas reais que aparecem em produção —
+`try again at 9:10 AM` e `try again at Sep 28th, 2026 3:41 AM` (codex),
+`Resets in 120h58m47s` (agy) e `resets in 5 hours`. `errors.espera_efetiva()` aplica
+o valor lido **somente quando é menor que a política**: a política segue como **teto**,
+para que um reset absurdo (o agy anunciou 5 DIAS) não estacione o sprint por dias;
+reset abaixo de 30s é tratado como ruído, para não bater na cota em laço apertado.
+Tudo com `agora` injetável — os testes não dependem do relógio da máquina.
+
+**De quebra:** o log do checkpoint parava de imprimir o literal `HEAD` e passa a
+imprimir o sha real (`.autodev/sprints/DEVFACTORY-002/logs/orquestrador.log`).
+
+**Testes:** 15 novos em `.autodev/tests/test_reset_de_cota.py` (suite do motor: 182).
+
+## D-21 — Fechamento da sprint: 10 de 10 integradas
+
+**Resultado:** as 10 tasks foram integradas na branch
+`sprint/DEVFACTORY-002/integration` (P01 `b963e0e` … P10 `785988d`), com os 4 portões
+(build, testes, lint, segurança) OK em cada integração. Suíte do projeto terminou em
+**203 testes verdes** e a suíte do motor em **194**.
+
+**Faltas de revisão declaradas (não escondidas):** as aprovações finais da **P09**
+(09:52) e da **P10** (09:54) saíram do **portão determinístico**, porque agy e Hermes
+estavam sem cota naquele instante — é a última reserva da cadeia do autor (o revisor
+nunca para o sprint), mas é mais fraca que uma revisão por LLM. Com créditos repostos,
+as duas revisões foram **refeitas por LLM** sobre o mesmo diff integrado
+(`hermes/deepseek-flash`, evidência em
+`~/.hermes/cache/scratch/revisoes-p09-p10/*-veredito-relido.json`); o resultado está
+registrado no fechamento do sprint.
+
+**Pendências do autor (não são falhas, são decisões):**
+
+1. **Merge em `main`** — o dry-run aponta conflito em **dois** arquivos que mudaram nas
+   duas pontas: `.autodev/sprints/DEVFACTORY-002/decisions.md` (add/add, já previsto
+   pelo revisor da P09) e `README.md` (a tela de eventos de um lado, a documentação do
+   planejador do outro). A resolução correta é **somar os dois lados**, não escolher um.
+2. **HAQ-002** (sprint 1) — autorizar o encerramento com conclusão retroativa.
+3. **DEVFACTORY-003** (planejada) — aprovar ou ajustar o objetivo antes de iniciar.
+
+## D-22 — Revisão retroativa por LLM da P09 e da P10 (créditos repostos)
+
+Refeitas as duas revisões que só tinham o portão determinístico, sobre o **mesmo diff
+integrado** (`hermes/deepseek-flash`, evidência em
+`~/.hermes/cache/scratch/revisoes-p09-p10/{P09,P10}-veredito-relido.json`). As duas
+voltaram **REQUEST_CHANGES** — nenhuma das duas foi aprovada por decoro.
+
+**P09 — 1 alta, 1 média, 3 baixas.** O achado ALTA é sobre **prova, não código**: o
+critério do D-19 exige provar que a cobertura não caiu, e o `decisions.md` da branch
+admitia que a contagem "não pôde ser comprovada" — com um diagnóstico de ambiente
+**errado** (dizia que `python3` não tem pytest; o correto é o interpretador do
+projeto, `.venv/bin/python`, como o próprio README manda). O código em si foi
+verificado pelo revisor ponta a ponta.
+
+**Resolvido por medição independente** (`~/.hermes/cache/scratch/prova_cobertura_p09.py`,
+worktrees temporários, interpretador do projeto, somente leitura):
+
+```
+base  a9445a39: 186 coletados · 158 defs de teste
+HEAD  1942b63e: 201 coletados · 163 defs de teste
+cobertura NÃO caiu: +15 coletados, +5 defs
+```
+
+Com a prova medida e registrada aqui, o achado ALTA fica atendido.
+
+**P10 — 2 médias, 4 baixas.** Os dois achados médios são reais e ficam **abertos**:
+
+1. `README.md:91` — a seção `## Planejador` foi inserida **dentro** de `## Como rodar`,
+   o que rebaixa `### Ciclo de vida do sprint` e `### Conclusão por evidência` a
+   subseções do Planejador. Estrutura de documentação errada.
+2. `.autodev/tests/test_plan_docs.py:13` — o helper `_secao_planejador()` corta a seção
+   no próximo `\n## `, então o teste examina também as subseções seguintes que não são
+   do Planejador: **prova menos do que anuncia** (mesma classe de defeito que o revisor
+   já havia apontado em outra task).
+
+Baixas registradas: `README.md:105` diz que a execução "consome cota do agente
+configurado", mas o agente do planejador é fixo em código (`cli.py:268`, `"codex"`);
+`README.md:167` mantém "123 testes passando" (obsoleto, pré-existente); a evidência
+anexada à tentativa ("203 passed") não reproduz — a árvore revisada coleta 205; e o
+comando do critério (`python3 -m pytest`) **não roda nesta máquina** (o `python3` do
+sistema não tem pytest; o runner do motor resolve para o venv, mas uma pessoa ou um
+revisor rodando o comando literal falha) — corrigir a redação dos critérios nos
+próximos DAGs.
+
+**Nada foi alterado à mão no trabalho integrado.** Os achados médios da P10 e as
+baixas entram como proposta de uma sprint curta de correção
+(`DEVFACTORY-004`), que **depende de aprovação do autor** antes de ser executada —
+mesma regra das outras sprints.
+
+**Merge:** as duas pontas mudaram `decisions.md` e `README.md`, então o merge em `main`
+conflita exatamente nesses dois arquivos; a resolução correta é **somar os dois lados**
+(o log de decisões e as duas seções de documentação). Conferido também que
+`dag.json` **não** regride: só o `main` mexeu nele desde a base do merge, então o
+conserto do D-19 é preservado.
