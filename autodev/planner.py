@@ -129,7 +129,8 @@ def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
         raise SprintJaExiste(f"sprint já existe: {sprint_id}") from erro
 
     tasks = [asdict(task) for task in plano.tasks]
-    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks}
+    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks,
+           "prompt_original": plano.prompt_original}
     (destino / "dag.json").write_text(
         json.dumps(dag, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

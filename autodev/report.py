@@ -32,7 +32,7 @@ def _tabela(cabecalhos: list[str], linhas: list[list]) -> str:
 def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = None,
           devios: list[str] | None = None, divida: list[str] | None = None,
           quota_teste: dict | None = None, git_commit: str = "",
-          duracao_s: float = 0.0) -> str:
+          duracao_s: float = 0.0, prompt_original: str | None = None) -> str:
     m = store.metricas(sprint)
     tasks = store.tasks(sprint)
     haq = store.haq_listar(sprint)
@@ -197,6 +197,12 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
 **Commit do repositório:** `{git_commit or '-'}`
 **Estado do sprint:** `{estado_spr}` — percurso: {caminho_spr}
 **Fonte da verdade:** `state.db` + arquivos do Sprint + Git + evidências de teste
+
+## Contexto
+
+### Prompt original
+
+{prompt_original if prompt_original else 'nao informado'}
 
 ---
 """
