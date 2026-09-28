@@ -65,15 +65,17 @@ def planejar(raiz: str | Path, prompt_usuario: str, agente: str) -> Plano:
     raiz = Path(raiz)
     sprints = raiz / ".autodev" / "sprints"
     candidatos = sorted(
-        caminho
+        (caminho
         for caminho in sprints.glob("DEVFACTORY-[0-9]*")
-        if caminho.is_dir() and re.fullmatch(r"DEVFACTORY-\d+", caminho.name)
+        if caminho.is_dir() and re.fullmatch(r"DEVFACTORY-\d+", caminho.name)),
+        key=lambda caminho: int(caminho.name.split("-")[-1]),
     )
     if not candidatos:
         raise PlanoInvalido("nenhum sprint encontrado para registrar o planejamento")
 
     prompt = montar_prompt_plano(prompt_usuario)
     log_path = candidatos[-1] / "logs" / f"plano-{agente}.log"
+    historico = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
     resultado = agents.invocar(
         agents.Invocacao(
             agente=agente,
@@ -86,9 +88,18 @@ def planejar(raiz: str | Path, prompt_usuario: str, agente: str) -> Plano:
         ),
         config.Config.carregar(),
     )
+    if historico:
+        # O adaptador sobrescreve o log; preserve as invocações anteriores.
+        atual = log_path.read_text(encoding="utf-8")
+        log_path.write_text(historico + "\n" + atual, encoding="utf-8")
 
     if resultado.failure_class == "CODEX_QUOTA":
         raise CotaEsgotada("cota do Codex esgotada durante o planejamento")
+    if not resultado.ok:
+        raise RuntimeError(
+            f"falha do agente: {resultado.failure_class}; "
+            f"exit_code={resultado.exit_code}; {resultado.stderr or resultado.stdout}"
+        )
 
     resposta = resultado.stdout or resultado.stderr
     try:
