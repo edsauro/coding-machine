@@ -16,12 +16,23 @@ e igualdade do corpo integral com fixtures). A contagem da suíte sobe de 194 pa
 
 ## D-26 — 2026-09-28 — P03 remove afirmações instáveis do README
 
-O README deixa de afirmar que o planejador consome cota do agente configurado,
-porque essa formulação não corresponde ao contrato fixo de `cmd_plan` e a base
-atual não contém essa implementação. A contagem fixa de testes foi substituída
-pelo comando `python3 -m pytest .autodev/tests/ -q`. O novo teste verifica as duas
-afirmações contra o texto e, quando o comando existe, contra a chamada real do
-planejador; nenhum teste anterior foi removido ou enfraquecido.
+O README deixa de afirmar que o planejador consome cota do agente configurado.
+Nesta base, a leitura AST de `autodev/cli.py` confirma que `cmd_plan` não existe;
+portanto, a afirmação não pode ser sustentada por uma assinatura real. O teste
+amarra explicitamente essa ausência à proibição da frase, para que a afirmação não
+volte sem que o teste seja atualizado para o contrato de uma futura implementação.
+
+A contagem fixa foi substituída pelo comando
+`python3 -m pytest .autodev/tests/ -q`, contextualizado como comando resolvido pelo
+runner para o interpretador do projeto. O teste agora guarda a regra: em `Estado
+atual`, o comando deve existir e nenhum padrão `N testes passando` é permitido.
+
+A fixture `readme_estrutura/planejador.md` foi ajustada somente para remover a
+frase obsoleta que ela espelhava; como o teste P01 compara o corpo integral, todo o
+restante do oráculo histórico permaneceu idêntico e sua força foi preservada.
+Nenhum caso anterior foi removido ou enfraquecido. Medição registrada na revisão:
+base `6a09d82`, 224 nós / 224 passando; HEAD, 226 nós / 226 passando; nenhum nó
+anterior removido.
 
 ## D-25 — 2026-09-28 — P01 fixa a árvore completa do README
 

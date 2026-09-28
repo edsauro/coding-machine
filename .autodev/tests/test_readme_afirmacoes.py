@@ -1,4 +1,5 @@
 import ast
+import re
 from pathlib import Path
 
 
@@ -11,24 +12,23 @@ def _cmd_plan_source():
                  and n.name == "cmd_plan"), None)
 
 
-def test_readme_nao_afirma_agente_configurado_e_contagem_fixa():
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "consome cota do agente configurado" not in readme
-    assert "Suíte do orquestrador: 123 testes passando" not in readme
-    assert "python3 -m pytest .autodev/tests/ -q" in readme
+def _corpo_da_secao(readme: str, titulo: str) -> str:
+    inicio = re.search(rf"^## {re.escape(titulo)}$", readme, re.MULTILINE)
+    assert inicio, f"README não contém a seção {titulo!r}"
+    fim = re.search(r"^## ", readme[inicio.end() :], re.MULTILINE)
+    return readme[inicio.start() : inicio.end() + (fim.start() if fim else len(readme))]
 
 
-def test_afirmacao_do_planejador_bate_com_o_codigo_real():
+def test_readme_nao_afirma_cota_configurada_sem_cmd_plan():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     cmd_plan = _cmd_plan_source()
-    if "agente `codex`" in readme:
-        assert cmd_plan is not None, "README anuncia planejador, mas cmd_plan sumiu"
-        assert any(
-            isinstance(n, ast.Call)
-            and isinstance(n.func, ast.Attribute)
-            and n.func.attr == "planejar"
-            and len(n.args) >= 3
-            and isinstance(n.args[2], ast.Constant)
-            and n.args[2].value == "codex"
-            for n in ast.walk(cmd_plan)
-        ), "README anuncia agente fixo codex, mas cmd_plan não o fixa"
+    assert cmd_plan is None, "atualize este teste para a assinatura real de cmd_plan"
+    assert "consome cota do agente configurado" not in readme
+
+
+def test_estado_atual_mede_suite_sem_contagem_fixa():
+    estado_atual = _corpo_da_secao(
+        (ROOT / "README.md").read_text(encoding="utf-8"), "Estado atual"
+    )
+    assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+    assert not re.search(r"\d+\s+testes passando", estado_atual, re.IGNORECASE)

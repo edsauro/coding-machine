@@ -186,7 +186,9 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 
 ## Estado atual
 
-- Para medir a suíte do orquestrador, rode `python3 -m pytest .autodev/tests/ -q`.
+- Para medir a suíte do orquestrador, rode com o interpretador do projeto
+  (o runner resolve `python3` para o ambiente virtual):
+  `python3 -m pytest .autodev/tests/ -q`.
 - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
   ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
