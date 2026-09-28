@@ -28,6 +28,25 @@ ROTULO_SPRINT = {
     "DEVFACTORY-003": "Sprint 003\n(portão do plano · nunca executada)",
     "DEVFACTORY-004": "Sprint 004\n(correções da revisão retroativa)",
 }
+# ---- atribuição de causa (CURADA, com a decisão que a descreve) --------------
+# O motor grava a CLASSE da falha (TEST_FAILURE, REVIEW_FAILURE, CODEX_QUOTA...),
+# mas não grava de quem era a culpa. Estas janelas foram atribuídas à mão, olhando o
+# log e as decisões — e é por isso que aparecem separadas do dado bruto, nunca no
+# lugar dele. Objetivo: medir o modelo sem cobrar dele o defeito do teste/do plano.
+CLASSES_INFRA = {"CODEX_QUOTA", "QUOTA_AGENTE", "NETWORK_ERROR", "ENVIRONMENT_ERROR",
+                 "DEPENDENCY_ERROR", "PERMISSION_REQUIRED", "SECRET_REQUIRED",
+                 "RED_ACTION_REQUIRED", "AGENT_CRASH", "UNKNOWN"}
+CAUSA_TESTE_OU_PLANO = {
+    ("DEVFACTORY-002", "P02"): ((1, 5), "D-16: duas tasks donas do mesmo arquivo de teste"),
+    ("DEVFACTORY-002", "P03"): ((1, 5), "D-16: idem"),
+    ("DEVFACTORY-002", "P09"): ((1, 3), "D-16: idem (aprovado e refeito no laço de integração)"),
+    ("DEVFACTORY-004", "P01"): ((1, 6), "D-23: critério mandava .venv dentro do worktree"),
+    ("DEVFACTORY-004", "P04"): ((1, 5), "D-23: idem"),
+}
+CAUSA_TESTE_OU_PLANO_EXTRA = {
+    ("DEVFACTORY-002", "P09"): ((4, 8), "D-19: contrato de preservação impossível"),
+}
+
 def pacotes_do_banco() -> dict[str, list[str]]:
     """Pacotes de cada sprint lidos do BANCO (não escritos à mão).
 
@@ -88,15 +107,56 @@ def carrega() -> tuple[dict, dict, dict]:
         })
 
     # ---- quanto cada pacote precisou, e onde ele terminou ---------------------
+    # Além do custo (chamadas), o que o pacote RENDEU de avaliação: quantas
+    # aprovações, quantas reprovações do aprovador e quantas chamadas nem chegaram a
+    # ser avaliadas. E, separado do dado bruto, a atribuição de causa (curada).
     resumo_pacotes = []
     for sprint, tasks in por_sprint.items():
         for tid in sorted(tasks):
             c = tasks[tid]
+            linhas_do_pacote = [l for l in linhas_codex
+                                if l["sprint_id"] == sprint and l["task_id"] == tid]
+            vereditos = Counter()
+            aprovada_em, modelo_aprovou = None, ""
+            for i, l in enumerate(linhas_do_pacote, 1):
+                rv = json.loads(l["review_result"] or "{}")
+                v = rv.get("veredito")
+                vereditos[v or "sem avaliação"] += 1
+                if v == "APPROVE":
+                    aprovada_em = i
+                    modelo_aprovou = (f"{l['model']}/{l['effort']}" if l["model"]
+                                      else "(sem modelo)")
+            infra = sum(1 for l in linhas_do_pacote
+                        if (l["failure_class"] or "") in CLASSES_INFRA)
+            janelas = [CAUSA_TESTE_OU_PLANO.get((sprint, tid)),
+                       CAUSA_TESTE_OU_PLANO_EXTRA.get((sprint, tid))]
+            culpa, notas = 0, []
+            for j in janelas:
+                if not j:
+                    continue
+                (a, b), nota = j
+                # a janela não conta de novo a chamada que nem chegou a rodar
+                # (cota/crash): ela já está na coluna de infraestrutura, e contá-la
+                # duas vezes inflava o desconto (zerava o "do modelo" da P09).
+                culpa += sum(1 for l in linhas_do_pacote
+                             if a <= l["attempt"] <= b
+                             and (l["failure_class"] or "") not in CLASSES_INFRA)
+                notas.append(f"{nota} (chamadas {a}–{b})")
             maximo = max(c)
             resumo_pacotes.append({
                 "sprint": sprint, "task": tid, "chamadas": sum(c.values()),
-                "max_tentativa": maximo,
+                "max_tentativa": maximo, "min_tentativa": min(c),
                 "titulo": titulos.get(tid, ""),
+                "aprovacoes": vereditos.get("APPROVE", 0),
+                "reprovacoes": (vereditos.get("REQUEST_CHANGES", 0)
+                                + vereditos.get("REJECT", 0)),
+                "sem_avaliacao": vereditos.get("sem avaliação", 0),
+                "aprovada_na_chamada": aprovada_em,
+                "modelo_que_aprovou": modelo_aprovou,
+                "infra": infra,
+                "culpa_teste_plano": culpa,
+                "notas_culpa": notas,
+                "do_modelo": sum(c.values()) - infra - culpa,
                 "modelos": dict(Counter(
                     f"{l['model']}/{l['effort']}" for l in linhas_codex
                     if l["sprint_id"] == sprint and l["task_id"] == tid).most_common()),
@@ -108,6 +168,9 @@ def carrega() -> tuple[dict, dict, dict]:
     dados = {
         "total_codex": total,
         "degraus": degraus,
+        "chamadas_topo": sum(1 for l in linhas_codex if l["model"] == "gpt-6-astra"),
+        "chamadas_baratas": sum(1 for l in linhas_codex
+                                if l["model"] == "gpt-5.6-luna"),
         "chamadas_por_sprint_pacote": {s: {t: dict(c) for t, c in v.items()}
                                       for s, v in por_sprint.items()},
         "pacotes": resumo_pacotes,
@@ -286,15 +349,45 @@ def escreve_relatorio(dados: dict) -> Path:
             m = c.get(tid)
             if not m:
                 continue
+            p = next(x for x in d["pacotes"] if x["sprint"] == s and x["task"] == tid)
             tent = sorted(int(k) for k in m)
-            mods = ", ".join(sorted({mm for p in d["pacotes"]
-                                     if p["sprint"] == s and p["task"] == tid
-                                     for mm in p["modelos"]}))
+            mods = ", ".join(sorted(p["modelos"]))
             buraco = "" if tent == list(range(tent[0], tent[-1] + 1)) else " ⚠"
+            aprov = (f"{p['aprovada_na_chamada']}ª ({p['modelo_que_aprovou']})"
+                     if p["aprovada_na_chamada"] else "—")
             linhas_pacote.append(
                 f"| {s.split('-')[-1]} | {tid} | {sum(m.values())} | "
-                f"{tent[0]}ª–{tent[-1]}ª{buraco} | {mods} |")
+                f"{p['aprovacoes']}/{p['reprovacoes']}/{p['sem_avaliacao']} | "
+                f"{tent[0]}ª–{tent[-1]}ª{buraco} | {aprov} | "
+                f"{p['infra']} | {p['culpa_teste_plano']} | {p['do_modelo']} | "
+                f"{mods} |")
     tabela_pacotes = "\n".join(linhas_pacote)
+
+    # ---- desconto da culpa: o que NÃO era do modelo ---------------------------
+    tot_infra = sum(p["infra"] for p in d["pacotes"])
+    tot_culpa = sum(p["culpa_teste_plano"] for p in d["pacotes"])
+    tot_modelo = sum(p["do_modelo"] for p in d["pacotes"])
+    com_culpa = [p for p in d["pacotes"] if p["culpa_teste_plano"]]
+    linhas_desconto = []
+    for p in sorted(com_culpa, key=lambda x: -x["culpa_teste_plano"]):
+        notas = "; ".join(p["notas_culpa"])
+        linhas_desconto.append(
+            f"| {p['sprint'].split('-')[-1]} | {p['task']} | {p['chamadas']} | "
+            f"{p['culpa_teste_plano']} | {p['do_modelo']} | {notas} |")
+    tabela_desconto = "\n".join(linhas_desconto) or "| — | — | — | 0 | — | — |"
+
+    # ---- valor marginal da escada: em que chamada a aprovação veio ------------
+    faixas = [(1, 1, "1ª chamada"), (2, 3, "2ª–3ª"), (4, 5, "4ª–5ª"),
+              (6, 10, "6ª–10ª"), (11, 15, "11ª–15ª")]
+    linhas_marg = []
+    for a, b, rot in faixas:
+        grupo = [p for p in d["pacotes"]
+                 if p["aprovada_na_chamada"] and a <= p["aprovada_na_chamada"] <= b]
+        models = sorted({p["modelo_que_aprovou"] for p in grupo})
+        linhas_marg.append(f"| {rot} | {len(grupo)} | "
+                           f"{', '.join(p['task'] + ' (' + p['sprint'].split('-')[-1] + ')' for p in grupo) or '—'} | "
+                           f"{', '.join(models) or '—'} |")
+    tabela_marginal = "\n".join(linhas_marg)
 
     fora_escada = sorted({mm for p in d["pacotes"] for mm in p["modelos"]
                           if mm not in ("gpt-5.6-luna/low", "gpt-5.6-terra/low",
@@ -337,14 +430,22 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 4. **A sprint 004 está em andamento** ({sum(1 for t in d['chamadas_por_sprint_pacote'].get('DEVFACTORY-004', {}) if True)} de 4
    pacotes já com chamadas; a P03 está aguardando cota do Codex) — os números dela
    ainda vão mudar.
-5. **"Nª tentativa" não é o degrau da escada de modelos.** Falhas de infraestrutura
-   (`CODEX_QUOTA`, `NETWORK_ERROR`, `ENVIRONMENT_ERROR`, `DEPENDENCY_ERROR`,
-   `PERMISSION_REQUIRED`, `SECRET_REQUIRED`, `RED_ACTION_REQUIRED`) reprocessam **no
-   mesmo modelo** por decisão de política — por isso `luna/low` reaparece em degraus
-   altos. O degrau mede "quantas vezes tentou", não "quão forte era o modelo".
-6. **A partir da 5ª tentativa o modelo é sempre o mesmo** (`astra/low`, tier 4): o mapa
-   da escada satura em 5, então degraus 5 a 15 podem repetir o modelo do topo — e, nas
-   classes do aviso 5, repetir o do fundo.
+5. **"Nª tentativa" não é o degrau da escada de modelos — são dois contadores.** O número
+   nas tabelas é a **chamada** (`attempt`, sequência do banco, sempre `max+1`); o modelo vem
+   do **contador da task** (`tentativas`), pelo mapa `1ª→luna/low … 5ª+→astra/low`. Quando o
+   contador é reiniciado (rearme por dependência integrada, reabertura por defeito de
+   contrato) ele **volta ao degrau barato** enquanto a numeração da chamada continua — é por
+   isso que existe `luna/low` numa 7ª chamada. O degrau mede "quantas vezes chamou", não
+   "quão forte era o modelo".
+   Nas falhas de infraestrutura (`CODEX_QUOTA`, `NETWORK_ERROR`, `ENVIRONMENT_ERROR`…), a
+   política declara `classes_sem_escalonamento` — mas **essa lista não chega à escolha do
+   modelo**: o orquestrador usa o mapa do contador e ignora o tier da decisão. Na prática,
+   espera de cota escalona como qualquer falha. É um defeito de fiação, não uma intenção.
+6. **A partir da 5ª chamada o mapa satura no topo** (`min(tentativa, 5)` → `astra/low`):
+   degraus 5 a 15 repetem o mesmo modelo. No período isso **não** virou desperdício: são
+   {d['chamadas_topo']} chamadas no topo ({100.0 * d['chamadas_topo'] / d['total_codex']:.1f}%) contra
+   {d['chamadas_baratas']} no degrau mais barato ({100.0 * d['chamadas_baratas'] / d['total_codex']:.1f}%) — a
+   cauda é curta porque a maioria dos pacotes aprovou antes do 5º degrau (tabela 3).
 7. **{len(fora_escada)} combinação(ões) fora da escada declarada:** {', '.join(f'`{x}`' for x in fora_escada) or 'nenhuma'}.
    As chamadas `luna/medium` e `terra/medium` aconteceram em 27/09 entre 03:13 e 04:07,
    **antes** de a escada ser padronizada naquele mesmo dia — não são desvio de política.
@@ -372,6 +473,14 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 - **A cauda direita do gráfico 1 é o sintoma mais caro do período:** 5 chamadas em
   degraus 11 a 15, todas em pacotes que só destravaram quando o **defeito de motor** foi
   corrigido (D-19, D-24, D-25) — nenhuma delas é "o modelo errado tentando mais".
+- **{tot_culpa} das {total} chamadas ({100.0 * tot_culpa / total:.1f}%) foram gastas por defeito do
+  nosso teste/plano**, e {tot_infra} ({100.0 * tot_infra / total:.1f}%) por infraestrutura (cota/crash).
+  Descontadas, sobram **{tot_modelo} chamadas ({100.0 * tot_modelo / total:.1f}%)** atribuíveis ao
+  trabalho do modelo — o denominador honesto para comparar modelos (seção "Descontando").
+- **Onde a escada se paga (tabela 3):** {sum(1 for p in d['pacotes'] if p['aprovada_na_chamada'] and p['aprovada_na_chamada'] <= 3)} pacote(s) aprovaram até a 3ª
+  chamada; {sum(1 for p in d['pacotes'] if p['aprovada_na_chamada'] and 4 <= p['aprovada_na_chamada'] <= 5)} na 4ª–5ª; {sum(1 for p in d['pacotes'] if p['aprovada_na_chamada'] and p['aprovada_na_chamada'] >= 6)} da 6ª em diante.
+  O degrau caro (`astra/low`) assinou {sum(1 for p in d['pacotes'] if p['modelo_que_aprovou'].startswith('gpt-6-astra'))} aprovação(ões) —
+  sempre em pacote que carregava, junto, defeito de contrato nosso.
 
 ## Gráfico 1 — chamadas por pacote, empilhadas pela tentativa
 
@@ -383,9 +492,41 @@ escada). Total: {total} chamadas.
 
 ## Tabela 1 — por pacote
 
-| sprint | pacote | chamadas | tentativas (1ª–última) | modelos usados |
-|---|---:|---:|---|---|
+`chamadas` é o custo; `aprov./reprov./s/aval.` são as **avaliações do modelo aprovador**
+naquele pacote (aprovado / reprovado / chamadas que nem chegaram a ser avaliadas);
+`aprovada na` diz **em que chamada** (e com que modelo) a aprovação saiu; `infra` e
+`culpa teste/plano` separam o que **não era do modelo** (cota/crash e defeito de
+teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
+
+| sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | modelos usados |
+|---|---:|---:|---|---|---:|---:|---:|---:|---|
 {tabela_pacotes}
+
+## Tabela 3 — em que chamada a aprovação veio
+
+O valor marginal da escada: onde os pacotes **efetivamente** destravaram. É esta tabela
+que decide se a 4ª/5ª posição da escada se paga.
+
+| aprovada na | pacotes | quais | modelo que aprovou |
+|---|---:|---|---|
+{tabela_marginal}
+
+## Descontando o que não era do modelo
+
+A classe da falha o motor grava; **de quem era a culpa, não**. As janelas abaixo foram
+atribuídas à mão, olhando os logs e as decisões — e por isso aparecem em coluna separada,
+nunca no lugar do dado bruto. Sem esse desconto, qualquer comparação entre modelos cobra
+do agente o defeito do nosso teste.
+
+| sprint | pacote | chamadas | culpa teste/plano | do modelo | decisão que descreve |
+|---|---:|---:|---:|---:|---|
+{tabela_desconto}
+
+No total: **{tot_culpa} chamadas ({100.0 * tot_culpa / total:.1f}%)** foram gastas por defeito do
+nosso teste/plano e **{tot_infra} ({100.0 * tot_infra / total:.1f}%) por infraestrutura** (cota, crash).
+Sobram **{tot_modelo} chamadas ({100.0 * tot_modelo / total:.1f}%)** atribuíveis ao trabalho do modelo —
+esse é o único denominador honesto para comparar modelos.
+
 
 ## Gráfico 2 — distribuição por número de tentativa
 
@@ -404,13 +545,24 @@ Escada de implementação no `models.yaml` (tentativa → modelo): 1ª `luna/low
 
 O que a base mostra é diferente em pontos importantes, e por motivos conhecidos:
 
-1. **Reuso do mesmo modelo em falha de infraestrutura** (aviso 5) — a maior parte da
-   diferença. Espera de cota e erro de ambiente não gastam escalonamento.
-2. **Saturação depois da 5ª** (aviso 6): o mapa de escalonamento tem 5 entradas, então
-   qualquer tentativa a partir da 5ª usa `astra/low`.
-3. **Buracos e reinícios na numeração** (aviso 8) fazem o mesmo degrau aparecer com
-   modelos diferentes conforme o momento do pacote — não é troca de política.
-4. **5 chamadas anteriores à padronização** da própria escada (aviso 7).
+1. **Contador da task ≠ número da chamada** (aviso 5) — a explicação principal. O contador
+   reinicia no rearme/reabertura e volta ao degrau barato enquanto a chamada continua sendo
+   numerada. Isso é **desejado**: nos rearames de 28/09 a P01 e a P04 voltaram ao degrau 1 e
+   subiram de novo — gastaram barato até acertar, em vez de continuar no topo.
+2. **Falha de infraestrutura hoje ESCALONA** (aviso 5): a lista
+   `classes_sem_escalonamento` existe na política, mas o orquestrador escolhe o modelo pelo
+   contador e ignora o tier da decisão. A intenção declarada ("espera de cota não gasta
+   degrau") **não está fiada no código** — defeito registrado como pendência.
+3. **Saturação depois da 5ª** (aviso 6): o mapa tem 5 entradas, então degraus ≥5 usam
+   `astra/low`. No período o topo aparece em {d['chamadas_topo']} das {total} chamadas.
+4. **Buracos na numeração** (aviso 8) e **5 chamadas anteriores à padronização** da própria
+   escada (aviso 7).
+
+**A pergunta de política que fica:** escalonar por **número** (é o que existe) ou por
+**causa** — só escalar quando o teste do código falhar ou o revisor reprovar, e reiniciar no
+degrau barato quando a falha foi de infraestrutura/harness. A tabela 3 dá a medida de que
+lado pesa: os pacotes que aprovaram até a 3ª chamada mostram quanto trabalho se resolve sem
+sair do degrau mais barato.
 
 ## Arquivos gerados e proveniência
 

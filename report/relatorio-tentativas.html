@@ -144,7 +144,7 @@ Codex no Coding_Machine</h1>
 gastou por pacote do backlog, em que tentativa cada uma aconteceu e com
 que modelo. <strong>Fonte:</strong> <code>.autodev/state.db</code>,
 tabela <code>attempts</code> (o próprio motor grava uma linha por
-invocação). <strong>Janela:</strong> 27/09/2026 02:03 a 28/09/2026 17:42
+invocação). <strong>Janela:</strong> 27/09/2026 02:03 a 28/09/2026 18:37
 — DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 <strong>Data do relatório:</strong> 28/09/2026. <strong>Total no
 período:</strong> <strong>92 chamadas do Codex</strong>, 47 delas
@@ -165,18 +165,28 @@ planejados, nenhum executado.</li>
 <li><strong>A sprint 004 está em andamento</strong> (4 de 4 pacotes já
 com chamadas; a P03 está aguardando cota do Codex) — os números dela
 ainda vão mudar.</li>
-<li><strong>“Nª tentativa” não é o degrau da escada de modelos.</strong>
-Falhas de infraestrutura (<code>CODEX_QUOTA</code>,
-<code>NETWORK_ERROR</code>, <code>ENVIRONMENT_ERROR</code>,
-<code>DEPENDENCY_ERROR</code>, <code>PERMISSION_REQUIRED</code>,
-<code>SECRET_REQUIRED</code>, <code>RED_ACTION_REQUIRED</code>)
-reprocessam <strong>no mesmo modelo</strong> por decisão de política —
-por isso <code>luna/low</code> reaparece em degraus altos. O degrau mede
-“quantas vezes tentou”, não “quão forte era o modelo”.</li>
-<li><strong>A partir da 5ª tentativa o modelo é sempre o mesmo</strong>
-(<code>astra/low</code>, tier 4): o mapa da escada satura em 5, então
-degraus 5 a 15 podem repetir o modelo do topo — e, nas classes do aviso
-5, repetir o do fundo.</li>
+<li><strong>“Nª tentativa” não é o degrau da escada de modelos — são
+dois contadores.</strong> O número nas tabelas é a
+<strong>chamada</strong> (<code>attempt</code>, sequência do banco,
+sempre <code>max+1</code>); o modelo vem do <strong>contador da
+task</strong> (<code>tentativas</code>), pelo mapa
+<code>1ª→luna/low … 5ª+→astra/low</code>. Quando o contador é reiniciado
+(rearme por dependência integrada, reabertura por defeito de contrato)
+ele <strong>volta ao degrau barato</strong> enquanto a numeração da
+chamada continua — é por isso que existe <code>luna/low</code> numa 7ª
+chamada. O degrau mede “quantas vezes chamou”, não “quão forte era o
+modelo”. Nas falhas de infraestrutura (<code>CODEX_QUOTA</code>,
+<code>NETWORK_ERROR</code>, <code>ENVIRONMENT_ERROR</code>…), a política
+declara <code>classes_sem_escalonamento</code> — mas <strong>essa lista
+não chega à escolha do modelo</strong>: o orquestrador usa o mapa do
+contador e ignora o tier da decisão. Na prática, espera de cota escalona
+como qualquer falha. É um defeito de fiação, não uma intenção.</li>
+<li><strong>A partir da 5ª chamada o mapa satura no topo</strong>
+(<code>min(tentativa, 5)</code> → <code>astra/low</code>): degraus 5 a
+15 repetem o mesmo modelo. No período isso <strong>não</strong> virou
+desperdício: são 8 chamadas no topo (8.7%) contra 45 no degrau mais
+barato (48.9%) — a cauda é curta porque a maioria dos pacotes aprovou
+antes do 5º degrau (tabela 3).</li>
 <li><strong>3 combinação(ões) fora da escada declarada:</strong>
 <code>(nenhum)/(nenhum)</code>, <code>gpt-5.6-luna/medium</code>,
 <code>gpt-5.6-terra/medium</code>. As chamadas <code>luna/medium</code>
@@ -212,6 +222,15 @@ período:</strong> 5 chamadas em degraus 11 a 15, todas em pacotes que só
 destravaram quando o <strong>defeito de motor</strong> foi corrigido
 (D-19, D-24, D-25) — nenhuma delas é “o modelo errado tentando
 mais”.</li>
+<li><strong>27 das 92 chamadas (29.3%) foram gastas por defeito do nosso
+teste/plano</strong>, e 8 (8.7%) por infraestrutura (cota/crash).
+Descontadas, sobram <strong>57 chamadas (62.0%)</strong> atribuíveis ao
+trabalho do modelo — o denominador honesto para comparar modelos (seção
+“Descontando”).</li>
+<li><strong>Onde a escada se paga (tabela 3):</strong> 2 pacote(s)
+aprovaram até a 3ª chamada; 2 na 4ª–5ª; 9 da 6ª em diante. O degrau caro
+(<code>astra/low</code>) assinou 4 aprovação(ões) — sempre em pacote que
+carregava, junto, defeito de contrato nosso.</li>
 </ul>
 <h2 id="gráfico-1-chamadas-por-pacote-empilhadas-pela-tentativa">Gráfico
 1 — chamadas por pacote, empilhadas pela tentativa</h2>
@@ -225,20 +244,38 @@ nele; a cor diz <strong>em que altura da escada</strong> a chamada
 aconteceu (verde = cedo, vermelho = fim da escada). Total: 92
 chamadas.</p>
 <h2 id="tabela-1-por-pacote">Tabela 1 — por pacote</h2>
+<p><code>chamadas</code> é o custo; <code>aprov./reprov./s/aval.</code>
+são as <strong>avaliações do modelo aprovador</strong> naquele pacote
+(aprovado / reprovado / chamadas que nem chegaram a ser avaliadas);
+<code>aprovada na</code> diz <strong>em que chamada</strong> (e com que
+modelo) a aprovação saiu; <code>infra</code> e
+<code>culpa teste/plano</code> separam o que <strong>não era do
+modelo</strong> (cota/crash e defeito de teste/plano, atribuição curada
+descrita abaixo); <code>do modelo</code> é o que sobra.</p>
 <table>
 <colgroup>
-<col style="width: 17%" />
-<col style="width: 23%" />
-<col style="width: 23%" />
-<col style="width: 17%" />
-<col style="width: 17%" />
+<col style="width: 8%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 8%" />
+<col style="width: 8%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 8%" />
 </colgroup>
 <thead>
 <tr>
 <th>sprint</th>
 <th style="text-align: right;">pacote</th>
 <th style="text-align: right;">chamadas</th>
-<th>tentativas (1ª–última)</th>
+<th>aprov./reprov./s/aval.</th>
+<th>chamadas (1ª–última)</th>
+<th style="text-align: right;">aprovada na</th>
+<th style="text-align: right;">infra</th>
+<th style="text-align: right;">culpa teste/plano</th>
+<th style="text-align: right;">do modelo</th>
 <th>modelos usados</th>
 </tr>
 </thead>
@@ -247,21 +284,36 @@ chamadas.</p>
 <td>001</td>
 <td style="text-align: right;">T15</td>
 <td style="text-align: right;">1</td>
+<td>0/0/1</td>
 <td>1ª–1ª</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
 <td>(nenhum)/(nenhum)</td>
 </tr>
 <tr>
 <td>002</td>
 <td style="text-align: right;">P01</td>
 <td style="text-align: right;">1</td>
+<td>1/0/0</td>
 <td>1ª–1ª</td>
+<td style="text-align: right;">1ª (gpt-5.6-luna/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
 <td>gpt-5.6-luna/low</td>
 </tr>
 <tr>
 <td>002</td>
 <td style="text-align: right;">P02</td>
 <td style="text-align: right;">14</td>
+<td>5/5/4</td>
 <td>1ª–15ª ⚠</td>
+<td style="text-align: right;">14ª (gpt-5.6-sol/low)</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">6</td>
 <td>gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low,
 gpt-5.6-sol/medium, gpt-6-astra/low</td>
 </tr>
@@ -269,14 +321,24 @@ gpt-5.6-sol/medium, gpt-6-astra/low</td>
 <td>002</td>
 <td style="text-align: right;">P03</td>
 <td style="text-align: right;">9</td>
+<td>6/2/1</td>
 <td>1ª–10ª ⚠</td>
+<td style="text-align: right;">9ª (gpt-5.6-sol/medium)</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">3</td>
 <td>gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium</td>
 </tr>
 <tr>
 <td>002</td>
 <td style="text-align: right;">P04</td>
 <td style="text-align: right;">9</td>
+<td>6/2/1</td>
 <td>1ª–9ª</td>
+<td style="text-align: right;">9ª (gpt-6-astra/low)</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
 <td>gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low,
 gpt-5.6-sol/medium, gpt-6-astra/low</td>
 </tr>
@@ -284,7 +346,12 @@ gpt-5.6-sol/medium, gpt-6-astra/low</td>
 <td>002</td>
 <td style="text-align: right;">P05</td>
 <td style="text-align: right;">6</td>
+<td>4/2/0</td>
 <td>1ª–6ª</td>
+<td style="text-align: right;">6ª (gpt-5.6-sol/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">6</td>
 <td>gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low,
 gpt-5.6-terra/medium</td>
 </tr>
@@ -292,7 +359,12 @@ gpt-5.6-terra/medium</td>
 <td>002</td>
 <td style="text-align: right;">P06</td>
 <td style="text-align: right;">7</td>
+<td>5/1/1</td>
 <td>1ª–7ª</td>
+<td style="text-align: right;">7ª (gpt-6-astra/low)</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">6</td>
 <td>gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium,
 gpt-6-astra/low</td>
 </tr>
@@ -300,7 +372,12 @@ gpt-6-astra/low</td>
 <td>002</td>
 <td style="text-align: right;">P07</td>
 <td style="text-align: right;">6</td>
+<td>4/1/1</td>
 <td>1ª–6ª</td>
+<td style="text-align: right;">6ª (gpt-5.6-sol/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">6</td>
 <td>gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low,
 gpt-5.6-terra/medium</td>
 </tr>
@@ -308,14 +385,24 @@ gpt-5.6-terra/medium</td>
 <td>002</td>
 <td style="text-align: right;">P08</td>
 <td style="text-align: right;">4</td>
+<td>4/0/0</td>
 <td>1ª–4ª</td>
+<td style="text-align: right;">4ª (gpt-5.6-sol/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
 <td>gpt-5.6-luna/low, gpt-5.6-sol/low</td>
 </tr>
 <tr>
 <td>002</td>
 <td style="text-align: right;">P09</td>
 <td style="text-align: right;">9</td>
+<td>4/3/2</td>
 <td>1ª–10ª ⚠</td>
+<td style="text-align: right;">9ª (gpt-6-astra/low)</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1</td>
 <td>gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium,
 gpt-6-astra/low</td>
 </tr>
@@ -323,14 +410,24 @@ gpt-6-astra/low</td>
 <td>002</td>
 <td style="text-align: right;">P10</td>
 <td style="text-align: right;">5</td>
+<td>4/1/0</td>
 <td>1ª–5ª</td>
+<td style="text-align: right;">5ª (gpt-5.6-sol/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">5</td>
 <td>gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low</td>
 </tr>
 <tr>
 <td>004</td>
 <td style="text-align: right;">P01</td>
 <td style="text-align: right;">8</td>
+<td>1/2/5</td>
 <td>1ª–9ª ⚠</td>
+<td style="text-align: right;">8ª (gpt-5.6-sol/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">3</td>
 <td>gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium,
 gpt-5.6-terra/low, gpt-6-astra/low</td>
 </tr>
@@ -338,26 +435,170 @@ gpt-5.6-terra/low, gpt-6-astra/low</td>
 <td>004</td>
 <td style="text-align: right;">P02</td>
 <td style="text-align: right;">1</td>
+<td>1/0/0</td>
 <td>1ª–1ª</td>
+<td style="text-align: right;">1ª (gpt-5.6-luna/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
 <td>gpt-5.6-luna/low</td>
 </tr>
 <tr>
 <td>004</td>
 <td style="text-align: right;">P03</td>
 <td style="text-align: right;">2</td>
+<td>0/1/1</td>
 <td>1ª–2ª</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
 <td>gpt-5.6-luna/low, gpt-5.6-terra/low</td>
 </tr>
 <tr>
 <td>004</td>
 <td style="text-align: right;">P04</td>
 <td style="text-align: right;">10</td>
+<td>1/3/6</td>
 <td>1ª–10ª</td>
+<td style="text-align: right;">10ª (gpt-6-astra/low)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">5</td>
 <td>gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium,
 gpt-5.6-terra/low, gpt-6-astra/low</td>
 </tr>
 </tbody>
 </table>
+<h2 id="tabela-3-em-que-chamada-a-aprovação-veio">Tabela 3 — em que
+chamada a aprovação veio</h2>
+<p>O valor marginal da escada: onde os pacotes
+<strong>efetivamente</strong> destravaram. É esta tabela que decide se a
+4ª/5ª posição da escada se paga.</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 30%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr>
+<th>aprovada na</th>
+<th style="text-align: right;">pacotes</th>
+<th>quais</th>
+<th>modelo que aprovou</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1ª chamada</td>
+<td style="text-align: right;">2</td>
+<td>P01 (002), P02 (004)</td>
+<td>gpt-5.6-luna/low</td>
+</tr>
+<tr>
+<td>2ª–3ª</td>
+<td style="text-align: right;">0</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4ª–5ª</td>
+<td style="text-align: right;">2</td>
+<td>P08 (002), P10 (002)</td>
+<td>gpt-5.6-sol/low</td>
+</tr>
+<tr>
+<td>6ª–10ª</td>
+<td style="text-align: right;">8</td>
+<td>P03 (002), P04 (002), P05 (002), P06 (002), P07 (002), P09 (002),
+P01 (004), P04 (004)</td>
+<td>gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low</td>
+</tr>
+<tr>
+<td>11ª–15ª</td>
+<td style="text-align: right;">1</td>
+<td>P02 (002)</td>
+<td>gpt-5.6-sol/low</td>
+</tr>
+</tbody>
+</table>
+<h2 id="descontando-o-que-não-era-do-modelo">Descontando o que não era
+do modelo</h2>
+<p>A classe da falha o motor grava; <strong>de quem era a culpa,
+não</strong>. As janelas abaixo foram atribuídas à mão, olhando os logs
+e as decisões — e por isso aparecem em coluna separada, nunca no lugar
+do dado bruto. Sem esse desconto, qualquer comparação entre modelos
+cobra do agente o defeito do nosso teste.</p>
+<table>
+<colgroup>
+<col style="width: 13%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 13%" />
+</colgroup>
+<thead>
+<tr>
+<th>sprint</th>
+<th style="text-align: right;">pacote</th>
+<th style="text-align: right;">chamadas</th>
+<th style="text-align: right;">culpa teste/plano</th>
+<th style="text-align: right;">do modelo</th>
+<th>decisão que descreve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>002</td>
+<td style="text-align: right;">P09</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1</td>
+<td>D-16: idem (aprovado e refeito no laço de integração) (chamadas
+1–3); D-19: contrato de preservação impossível (chamadas 4–8)</td>
+</tr>
+<tr>
+<td>002</td>
+<td style="text-align: right;">P02</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">6</td>
+<td>D-16: duas tasks donas do mesmo arquivo de teste (chamadas 1–5)</td>
+</tr>
+<tr>
+<td>002</td>
+<td style="text-align: right;">P03</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">3</td>
+<td>D-16: idem (chamadas 1–5)</td>
+</tr>
+<tr>
+<td>004</td>
+<td style="text-align: right;">P01</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">3</td>
+<td>D-23: critério mandava .venv dentro do worktree (chamadas 1–6)</td>
+</tr>
+<tr>
+<td>004</td>
+<td style="text-align: right;">P04</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">5</td>
+<td>D-23: idem (chamadas 1–5)</td>
+</tr>
+</tbody>
+</table>
+<p>No total: <strong>27 chamadas (29.3%)</strong> foram gastas por
+defeito do nosso teste/plano e <strong>8 (8.7%) por
+infraestrutura</strong> (cota, crash). Sobram <strong>57 chamadas
+(62.0%)</strong> atribuíveis ao trabalho do modelo — esse é o único
+denominador honesto para comparar modelos.</p>
 <h2 id="gráfico-2-distribuição-por-número-de-tentativa">Gráfico 2 —
 distribuição por número de tentativa</h2>
 <figure>
@@ -526,18 +767,30 @@ modelo): 1ª <code>luna/low</code> · 2ª <code>terra/low</code> · 3ª
 <p>O que a base mostra é diferente em pontos importantes, e por motivos
 conhecidos:</p>
 <ol type="1">
-<li><strong>Reuso do mesmo modelo em falha de infraestrutura</strong>
-(aviso 5) — a maior parte da diferença. Espera de cota e erro de
-ambiente não gastam escalonamento.</li>
-<li><strong>Saturação depois da 5ª</strong> (aviso 6): o mapa de
-escalonamento tem 5 entradas, então qualquer tentativa a partir da 5ª
-usa <code>astra/low</code>.</li>
-<li><strong>Buracos e reinícios na numeração</strong> (aviso 8) fazem o
-mesmo degrau aparecer com modelos diferentes conforme o momento do
-pacote — não é troca de política.</li>
-<li><strong>5 chamadas anteriores à padronização</strong> da própria
-escada (aviso 7).</li>
+<li><strong>Contador da task ≠ número da chamada</strong> (aviso 5) — a
+explicação principal. O contador reinicia no rearme/reabertura e volta
+ao degrau barato enquanto a chamada continua sendo numerada. Isso é
+<strong>desejado</strong>: nos rearames de 28/09 a P01 e a P04 voltaram
+ao degrau 1 e subiram de novo — gastaram barato até acertar, em vez de
+continuar no topo.</li>
+<li><strong>Falha de infraestrutura hoje ESCALONA</strong> (aviso 5): a
+lista <code>classes_sem_escalonamento</code> existe na política, mas o
+orquestrador escolhe o modelo pelo contador e ignora o tier da decisão.
+A intenção declarada (“espera de cota não gasta degrau”) <strong>não
+está fiada no código</strong> — defeito registrado como pendência.</li>
+<li><strong>Saturação depois da 5ª</strong> (aviso 6): o mapa tem 5
+entradas, então degraus ≥5 usam <code>astra/low</code>. No período o
+topo aparece em 8 das 92 chamadas.</li>
+<li><strong>Buracos na numeração</strong> (aviso 8) e <strong>5 chamadas
+anteriores à padronização</strong> da própria escada (aviso 7).</li>
 </ol>
+<p><strong>A pergunta de política que fica:</strong> escalonar por
+<strong>número</strong> (é o que existe) ou por <strong>causa</strong> —
+só escalar quando o teste do código falhar ou o revisor reprovar, e
+reiniciar no degrau barato quando a falha foi de infraestrutura/harness.
+A tabela 3 dá a medida de que lado pesa: os pacotes que aprovaram até a
+3ª chamada mostram quanto trabalho se resolve sem sair do degrau mais
+barato.</p>
 <h2 id="arquivos-gerados-e-proveniência">Arquivos gerados e
 proveniência</h2>
 <table>

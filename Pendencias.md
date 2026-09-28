@@ -119,6 +119,54 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
   (mesmo padrão: trava de sobreposição via `.autodev/scripts/rodada_em_andamento.py` e
   silêncio quando nada muda).
 
+### P-09 · Escalonamento de modelo não respeita `classes_sem_escalonamento` — **agente**
+- **O que é:** a política declara que falhas de infraestrutura (cota, rede, ambiente,
+  dependência, permissão, segredo, ação vermelha) **não** gastam degrau de modelo. Mas o
+  orquestrador escolhe o modelo pelo **contador da task** (`modelo_para_tentativa(n_tent+1)`)
+  e **ignora** o tier da decisão (`d.tier`) — na prática, espera de cota escalona como
+  qualquer falha. A intenção está escrita; a fiação não existe.
+- **Por que importa:** é dinheiro — o degrau caro é pago por um problema que não era do
+  modelo. Aparece na base: 8 chamadas de `astra/low` no período (ver relatório de tentativas).
+- **Caminhos:** `autodev/orchestrator.py` (≈linhas 336–412, escolha de `modelo_info`),
+  `autodev/retry.py` (`classes_sem_escalonamento`, `decidir`), `autodev/config.py`
+  (`modelo_para_tentativa`).
+- **Verificação:** `.venv/bin/python -m pytest .autodev/tests -q` com um teste novo que
+  prove: falha `CODEX_QUOTA` na 5ª chamada **não** muda o modelo da 6ª.
+- **Pronto quando:** existe teste que falha hoje e passa depois; e o relatório de tentativas
+  mostra o degrau barato repetido nas classes de infraestrutura.
+- **Relacionado:** decisão de política discutida em 28/09 — escalonar por **causa**
+  (teste do código falhou / revisor reprovou) em vez de por **número** de tentativa.
+
+### P-10 · Instrumentar tokens e custo por tentativa — **agente**
+- **O que é:** a tabela `attempts` não guarda tokens. O CLI do Codex **já imprime**
+  `tokens used` + um total ao fim de cada execução (ver `logs/*-codex.log`), então dá para
+  preencher `tokens_total` (e separar entrada/saída só se a fonte separar — hoje não separa:
+  registrar como total, nunca inventar o split).
+- **Caminhos:** `autodev/agents.py` (onde a saída do CLI é capturada),
+  `autodev/state.py` (`iniciar_tentativa`/`finalizar_tentativa`),
+  `.autodev/config/models.yaml` (preço por modelo), `report/gerar_relatorio_tentativas.py`
+  (coluna de custo).
+- **Verificação:** `sqlite3 .autodev/state.db "select count(*) from attempts where tokens_total is not null"`
+  e um relatório que some custo por pacote.
+- **Pronto quando:** toda tentativa nova grava tokens e o relatório mostra custo por pacote
+  aceito (não só chamadas).
+- **Contexto:** pedido do autor em 28/09 para o próximo estudo — comparar modelos por
+  qualidade, custo e tempo, não só por número de chamadas.
+
+### P-11 · Estudo A/B de modelos (espelho) nos pacotes limpos — **autor (aprova o gasto)**
+- **O que é:** rodar o mesmo pacote, do mesmo commit-base, com o mesmo revisor, em N≥3
+  repetições por braço (degraus da escada atual × 1–2 APIs externas de código),
+  medindo aceite, chamadas, tokens, custo e tempo.
+- **Candidatos sugeridos pelos dados** (sem defeito de teste, teste determinístico, sem
+  dependência entre pacotes): **P08 (sprint 002, 4 chamadas, 4/0/0 e aprovada na 4ª)** e
+  **P05/P07 (sprint 002, 6 chamadas cada)**. Evitar P02/P03/P09 (002), P01/P04 (004) — todos
+  dentro de janela de culpa de teste/plano (ver "Descontando" no relatório).
+- **Caminhos:** `.autodev/sprints/DEVFACTORY-002/dag.json` (critérios dos pacotes),
+  `.autodev/config/models.yaml` (escada), `report/gerar_relatorio_tentativas.py`.
+- **Pronto quando:** tabela por braço com aceite/custo/tempo e um veredito que nomeie o
+  perdedor e a condição que inverte a decisão.
+- **Método:** skill `llm-coding-efficiency` (fases 1–6) + `capability-ab-test` (protocolo).
+
 ---
 
 ## Relatórios e produtos por sprint
