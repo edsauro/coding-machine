@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import yaml
 
-from . import config
+from . import agents, config
+from .plan_prompt import montar_prompt_plano
 
 
 PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
@@ -52,6 +54,50 @@ class PlanoInvalido(ValueError):
 
 class SprintJaExiste(FileExistsError):
     """Indica que o diretório de destino do sprint já existe."""
+
+
+class CotaEsgotada(RuntimeError):
+    """Indica que o agente não pôde planejar por falta de cota."""
+
+
+def planejar(raiz: str | Path, prompt_usuario: str, agente: str) -> Plano:
+    """Solicita um plano somente-leitura ao agente e converte sua resposta."""
+    raiz = Path(raiz)
+    sprints = raiz / ".autodev" / "sprints"
+    candidatos = sorted(
+        caminho
+        for caminho in sprints.glob("DEVFACTORY-[0-9]*")
+        if caminho.is_dir() and re.fullmatch(r"DEVFACTORY-\d+", caminho.name)
+    )
+    if not candidatos:
+        raise PlanoInvalido("nenhum sprint encontrado para registrar o planejamento")
+
+    prompt = montar_prompt_plano(prompt_usuario)
+    log_path = candidatos[-1] / "logs" / f"plano-{agente}.log"
+    resultado = agents.invocar(
+        agents.Invocacao(
+            agente=agente,
+            prompt=prompt,
+            worktree=str(raiz),
+            edita=False,
+            timeout=int(os.environ.get("AUTODEV_AGENT_TIMEOUT", "900")),
+            log_path=str(log_path),
+            fake_script=os.environ.get("AUTODEV_FAKE_SPEC") or None,
+        ),
+        config.Config.carregar(),
+    )
+
+    if resultado.failure_class == "CODEX_QUOTA":
+        raise CotaEsgotada("cota do Codex esgotada durante o planejamento")
+
+    resposta = resultado.stdout or resultado.stderr
+    try:
+        plano = parsear_plano(resposta)
+    except PlanoInvalido as erro:
+        trecho = resposta[:160].replace("\n", " ")
+        raise PlanoInvalido(f"{erro}; início da resposta: {trecho!r}") from erro
+    plano.prompt_original = prompt_usuario
+    return plano
 
 
 def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
@@ -136,8 +182,9 @@ def parsear_plano(texto: str) -> Plano:
             tasks = [_construir_task(task) for task in tasks_brutas]
             campos = {
                 nome: dados[nome]
-                for nome in ("titulo", "objetivo", "repositorio", "prompt_original")
+                for nome in ("titulo", "objetivo", "repositorio")
             }
+            campos["prompt_original"] = dados.get("prompt_original", "")
             for nome, valor in campos.items():
                 if not isinstance(valor, str):
                     raise TypeError(f"{nome} deve ser uma string")
