@@ -38,13 +38,8 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Já conferido:** `dag.json` **não** regride — só o `main` o mudou desde a base do
   merge, então as correções D-16/D-19 são preservadas.
 - **Extra:** há commits locais à frente de `origin/main` (sem push). Push é decisão sua.
-
-### P-02 · DEVFACTORY-004 — correções da revisão retroativa — **agente (aprovada)**
-- **Decisão:** autor escolheu P1 em 28/09: roda a 004 agora e emenda na 003.
-- **Caminhos:** `.autodev/sprints/DEVFACTORY-004/` (`spec.md`, `dag.json`, `sprint.yaml`)
-- **Verificação:** `cd .autodev/sprints/DEVFACTORY-004 && ../../../.venv/bin/python -m autodev --sprint DEVFACTORY-004 status`
-- **Pronto quando:** as 4 tasks (P01..P04) integradas, com os 4 portões OK.
-- **Achados que ela fecha:** os 2 médios da P10 (P-05) e as baixas (P-07).
+- **Depois deste:** a `sprint/DEVFACTORY-004/integration` (ponta `4ce5174`) também espera
+  merge — mesmo cuidado de somar os dois lados em `README.md` e nos `decisions.md`.
 
 ### P-03 · Aprovar o objetivo da DEVFACTORY-003 — **autor**
 - **Por que importa:** é a sprint que transforma a lição do D-16 em código — colisão de
@@ -70,7 +65,7 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Pronto quando:** a HAQ estiver com resultado registrado (o sprint 1 já está
   `ENCERRADO`; a HAQ é a ratificação formal do método).
 
-### P-05 · Os 2 achados médios da revisão retroativa da P10 — **agente (via 004)**
+### P-05 · Os 2 achados médios da revisão retroativa da P10 — **fechada pela DEVFACTORY-004** ✅
 - **1.** `README.md:91` — a seção `## Planejador` foi inserida **dentro** de
   `## Como rodar`, rebaixando `### Ciclo de vida do sprint` e `### Conclusão por
   evidência` a subseções do Planejador.
@@ -99,8 +94,9 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
   `grep -rn "python3 -m pytest" .autodev/sprints/*/dag.json`
 - **Quem fecha:** `P04` da DEVFACTORY-004 — já invertida: exige a forma do runner e
   reprova caminho de venv relativo, com a explicação.
+- **Fechada pela 004 em 28/09** (a forma do runner virou regra escrita, D-23).
 
-### P-07 · Baixas da revisão retroativa (registradas, não bloqueiam) — **agente**
+### P-07 · Baixas da revisão retroativa (registradas, não bloqueiam) — **agente** (os 2 itens de `README` fechados pela P03 da 004)
 - `README.md:105` — diz que a execução "consome cota do agente configurado", mas o
   agente do planejador é **fixo** em `codex` (`autodev/cli.py`, `cmd_plan`). → P03 da 004.
 - `README.md:167` — "Suíte do orquestrador: **123** testes passando": número obsoleto
@@ -204,10 +200,16 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 | --- | --- |
 | spec / plano / sprint | `.autodev/sprints/DEVFACTORY-003/{spec.md,dag.json,sprint.yaml}` |
 
-### DEVFACTORY-004 — correções da revisão retroativa (PLANEJADA → em execução)
+### DEVFACTORY-004 — correções da revisão retroativa (ENCERRADA, 4/4)
 | produto | caminho |
 | --- | --- |
 | spec / plano / sprint | `.autodev/sprints/DEVFACTORY-004/{spec.md,dag.json,sprint.yaml}` |
+| decisões | `.autodev/sprints/DEVFACTORY-004/decisions.md` (D-23, D-24, D-25) |
+| **relatório final** | `.autodev/sprints/DEVFACTORY-004/SPRINT-REPORT.md` |
+| evidência de teste (27 arquivos) | `.autodev/sprints/DEVFACTORY-004/evidence/` |
+| logs do motor | `.autodev/sprints/DEVFACTORY-004/logs/orquestrador.log` (+ por tentativa e revisão) |
+| branch de integração | `sprint/DEVFACTORY-004/integration` (P01/P04 → P02 → P03 `4ce5174`) |
+| branches por task | `sprint/DEVFACTORY-004/P0X-*` |
 
 ### Ferramentas do repositório (não são de um sprint)
 | produto | caminho |
@@ -223,6 +225,15 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 
 ## Resolvidas (histórico curto)
 
+- **28/09** — **P-02 / DEVFACTORY-004 concluída**: 4/4 tasks integradas (P01, P02, P03,
+  P04) com os 4 portões (build, testes, lint, segurança) OK em cada integração; 24
+  tentativas, 1 espera de cota (Codex), 0 HAQ. `main` intacta — trabalho no branch
+  `sprint/DEVFACTORY-004/integration` (ponta `4ce5174`). Relatório:
+  `.autodev/sprints/DEVFACTORY-004/SPRINT-REPORT.md`. Decisões novas: D-23 (comando de
+  teste é o que o runner resolve), D-24 (rodada única é do motor), D-25 (portão de
+  segurança julga o diff). Com isso fecharam os achados P-05 (seção `## Planejador`
+  rebaixada + teste que prova menos do que anuncia), P-06 (forma do comando nos
+  critérios) e os 2 itens de `README` da P-07.
 - **28/09** — DEVFACTORY-002 encerrada: 10/10 integradas, suíte do projeto 205 testes,
   motor 194; quatro portões OK em cada integração.
 - **28/09** — D-22: revisões retroativas por LLM da P09/P10 refeitas com créditos

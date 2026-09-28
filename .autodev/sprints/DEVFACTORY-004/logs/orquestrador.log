@@ -105,3 +105,32 @@ autodev.state.TransicaoInvalida: P04: BLOCKED -> DONE não permitido
 [15:43:50]   portao lint: OK
 [15:43:50]   portao seguranca: OK
 [15:43:50] branch atual do repo: c23573ab (main intacta — merge automatico proibido)
+[19:31:06] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[19:31:06] rodada dona: pid 2871944 — rodada única garantida pelo motor
+[19:31:06] P03: cota esgotada — aguardando 52s (1 min) antes de tentar de novo
+[19:31:22] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[19:31:22] rodada dona: pid 2872907 — rodada única garantida pelo motor
+[19:31:22] P03: cota esgotada — aguardando 36s (1 min) antes de tentar de novo
+[19:32:45] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[19:32:45] recuperacao: {'stale': [], 'requeued': [], 'resource': ['P03']}
+[19:32:45] rodada dona: pid 2875467 — rodada única garantida pelo motor
+[19:32:45] P03: worktree realinhado para a integracao atual (base antiga a09277f1) — a task estava nascendo sem o codigo das dependencias ja integradas (D-18)
+[19:32:45] P03 tentativa 3: codex gpt-5.6-sol/low
+[19:35:56] P03 t3: 37,099 tokens (codex-cli:rodape)
+[19:35:57] P03: testes exit=0 passed=2 failed=0 (configurado)
+[19:43:09] P03: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> REQUEST_CHANGES (6 findings)
+[19:43:09] P03: agy FORA desta rodada (cota esgotada)
+[19:43:09] P03: agy esta fora desta rodada (cota) — seguindo com codex
+[19:43:09] P03 tentativa 4: codex gpt-5.6-sol/medium
+[19:48:31] P03 t4: 64,991 tokens (codex-cli:rodape)
+[19:48:32] P03: testes exit=0 passed=2 failed=0 (configurado)
+[19:53:28] P03: revisao por hermes [escada (tentativa 4)] -> APPROVE (6 findings)
+[19:53:28] P03: DONE em 4 tentativa(s) — commit 852344d1
+[19:53:28] integrando 1 task(s) da onda 1
+[19:53:53]   portao build: OK
+[19:53:53]   portao testes: OK
+[19:53:53]   portao lint: OK
+[19:53:53]   portao seguranca: OK
+[19:53:53] branch atual do repo: 078139e7 (main intacta — merge automatico proibido)
+[19:54:11] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[19:54:11] rodada dona: pid 2938636 — rodada única garantida pelo motor

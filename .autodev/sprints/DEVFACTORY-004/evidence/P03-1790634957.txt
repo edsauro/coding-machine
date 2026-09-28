@@ -1,0 +1,5 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/test_readme_afirmacoes.py -q
+exit=0 (0.7s)
+
+..                                                                       [100%]
+2 passed in 0.04s

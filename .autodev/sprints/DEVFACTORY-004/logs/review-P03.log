@@ -1,4 +1,4 @@
-# exit_code=0 duracao=180.3s modelo=deepseek-flash effort=(default) failure_class=None
+# exit_code=0 duracao=295.9s modelo=deepseek-flash effort=(default) failure_class=None tokens=nao medido(-)
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -14,7 +14,7 @@ Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
 ## Task
 P03: Tirar do README o que nao bate com o codigo
 
-## Diff a revisar (base 6a09d822542609ba9fda9e93975d868c98731c9c -> HEAD)
+## Diff a revisar (base bf572aa3deb1e384545471b9e380f333f91d5d6c -> HEAD)
 ```diff
 diff --git a/.autodev/fixtures/readme_estrutura/planejador.md b/.autodev/fixtures/readme_estrutura/planejador.md
 index dd7ac15..83187c7 100644
@@ -31,36 +31,112 @@ index dd7ac15..83187c7 100644
  do pedido ou os critérios de aceitação estejam corretos.
  
 diff --git a/.autodev/sprints/DEVFACTORY-004/decisions.md b/.autodev/sprints/DEVFACTORY-004/decisions.md
-index 7ba0d25..730fd30 100644
+index 0b15b3d..f19bc66 100644
 --- a/.autodev/sprints/DEVFACTORY-004/decisions.md
 +++ b/.autodev/sprints/DEVFACTORY-004/decisions.md
-@@ -14,6 +14,15 @@ anterior foi substituído por verificações estritamente mais fortes (árvore i
+@@ -14,6 +14,35 @@ anterior foi substituído por verificações estritamente mais fortes (árvore i
  e igualdade do corpo integral com fixtures). A contagem da suíte sobe de 194 para
  197; o arquivo da task mantém 3 casos, com verificações estritamente mais fortes.
  
-+## D-26 — 2026-09-28 — P03 remove afirmações instáveis do README
++## D-27 — 2026-09-28 — P03 remove afirmações instáveis do README
 +
-+O README deixa de afirmar que o planejador consome cota do agente configurado,
-+porque essa formulação não corresponde ao contrato fixo de `cmd_plan` e a base
-+atual não contém essa implementação. A contagem fixa de testes foi substituída
-+pelo comando `python3 -m pytest .autodev/tests/ -q`. O novo teste verifica as duas
-+afirmações contra o texto e, quando o comando existe, contra a chamada real do
-+planejador; nenhum teste anterior foi removido ou enfraquecido.
++O README deixa de afirmar que o planejador consome cota do agente configurado.
++O teste lê por AST a assinatura e o corpo reais de `cmd_plan` em `autodev/cli.py`:
++a frase só pode existir quando o valor entregue a `planner.planejar` deriva de um
++parâmetro `agent`/`agente` (inclusive `args.agent`/`args.agente`). Um parâmetro
++decorativo não libera a frase se o call site continuar passando o literal
++`"codex"`. Assim, a regra cobre esta base (sem `cmd_plan`) e a implementação
++conhecida na qual o agente do planejador é fixo em `codex`.
++
++A contagem fixa foi substituída pelo comando
++`python3 -m pytest .autodev/tests/ -q`, contextualizado como comando resolvido pelo
++runner para o interpretador do projeto. Para o terminal, o README indica
++explicitamente `.venv/bin/python -m pytest .autodev/tests/ -q`. O teste guarda a
++regra mais ampla: em `Estado atual`, o comando do runner deve existir e nenhuma
++contagem numérica seguida de `teste(s)`, `test(s)`, `passed`, `verdes` ou `nós` é
++permitida. Por isso a contagem histórica da aceitação ponta a ponta também virou
++“todos os testes”.
++
++A fixture `readme_estrutura/planejador.md` foi ajustada somente para remover a
++frase obsoleta que ela espelhava. A partir desta decisão, essa fixture é um espelho
++deliberado da seção do README e qualquer alteração futura exige decisão datada; o
++teste P01 ainda compara o corpo integral e nenhum caso foi removido ou
++enfraquecido. O caso herdado de P02 mantém as verificações de agente, revisão
++humana e segurança e continua rejeitando a frase incorreta. A base `6a09d82`
++coletava 224 nós; esta entrega coleta e executa 231, todos passando, portanto não
++houve queda de cobertura por casos. A saída integral está em
++`evidence/P03-suite-completa.txt`.
 +
  ## D-25 — 2026-09-28 — P01 fixa a árvore completa do README
  
  A revisão da tentativa 8 demonstrou que validar apenas a janela entre `## Como
+diff --git a/.autodev/sprints/DEVFACTORY-004/evidence/P03-suite-completa.txt b/.autodev/sprints/DEVFACTORY-004/evidence/P03-suite-completa.txt
+new file mode 100644
+index 0000000..71b5040
+--- /dev/null
++++ b/.autodev/sprints/DEVFACTORY-004/evidence/P03-suite-completa.txt
+@@ -0,0 +1,25 @@
++DEVFACTORY-004 / P03 — evidência de verificação em 2026-09-28
++
++Comando obrigatório solicitado:
++
++  python3 -m pytest .autodev/tests/ -q
++
++Resultado neste shell:
++
++  /home/saurus/.hermes/hermes-agent/venv/bin/python3: No module named pytest
++
++O `python3` disponível originalmente no shell não é o interpretador do projeto.
++Após resolver o virtualenv do projeto no `PATH`, o comando exigido foi executado:
++
++  PATH=/home/saurus/Code/Coding_Machine/.venv/bin:$PATH python3 -m pytest .autodev/tests/ -q
++
++Saída completa:
++
++  ........................................................................ [ 31%]
++  ........................................................................ [ 62%]
++  ........................................................................ [ 93%]
++  ...............                                                          [100%]
++  231 passed in 45.04s
++
++Coleta da base integrada `6a09d82`, já registrada em D-27: 224 nós.
++Coleta desta entrega: 231 nós. Nenhum caso anterior foi removido.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index efb7b4e..be308a9 100644
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -35,11 +35,11 @@ def test_readme_documenta_comando_plan_e_efeito_no_disco():
+     assert ".autodev/sprints/" in secao
+ 
+ 
+-def test_readme_alerta_sobre_agente_cota_e_revisao_humana():
++def test_readme_alerta_sobre_agente_e_revisao_humana_sem_cota_incorreta():
+     secao = _secao_planejador().lower()
+ 
+     assert "agente" in secao
+-    assert "consome cota" in secao
++    assert "consome cota do agente configurado" not in secao
+     assert "revisão humana" in secao
+     assert "sempre" in secao
+     assert "antes de rodar" in secao
 diff --git a/.autodev/tests/test_readme_afirmacoes.py b/.autodev/tests/test_readme_afirmacoes.py
 new file mode 100644
-index 0000000..055e04f
+index 0000000..05932b7
 --- /dev/null
 +++ b/.autodev/tests/test_readme_afirmacoes.py
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,84 @@
 +import ast
++import re
 +from pathlib import Path
 +
 +
 +ROOT = Path(__file__).parents[2]
++AFIRMACAO_COTA_CONFIGURADA = re.compile(
++    r"consom\w*\s+(?:a\s+)?cota\s+do\s+agente\s+configurado", re.IGNORECASE
++)
++CONTAGEM_FIXA_DE_TESTES = re.compile(
++    r"\b\d+\s*(?:testes?|tests?|passed|verdes|n[oó]s)\b", re.IGNORECASE
++)
 +
 +
 +def _cmd_plan_source():
@@ -69,29 +145,72 @@ index 0000000..055e04f
 +                 and n.name == "cmd_plan"), None)
 +
 +
-+def test_readme_nao_afirma_agente_configurado_e_contagem_fixa():
-+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-+    assert "consome cota do agente configurado" not in readme
-+    assert "Suíte do orquestrador: 123 testes passando" not in readme
-+    assert "python3 -m pytest .autodev/tests/ -q" in readme
++def _cmd_plan_repassa_agente_recebido(cmd_plan: ast.FunctionDef | None) -> bool:
++    """Distingue parâmetro efetivo de um parâmetro decorativo na assinatura."""
++    if cmd_plan is None:
++        return False
++
++    parametros = {
++        argumento.arg
++        for argumento in (
++            *cmd_plan.args.posonlyargs,
++            *cmd_plan.args.args,
++            *cmd_plan.args.kwonlyargs,
++        )
++    }
++
++    def vem_de_parametro(expr: ast.expr) -> bool:
++        if isinstance(expr, ast.Name):
++            return expr.id in parametros and expr.id in {"agent", "agente"}
++        return (
++            isinstance(expr, ast.Attribute)
++            and isinstance(expr.value, ast.Name)
++            and expr.value.id in parametros
++            and expr.attr in {"agent", "agente"}
++        )
++
++    for chamada in ast.walk(cmd_plan):
++        if not isinstance(chamada, ast.Call):
++            continue
++        nome = chamada.func.attr if isinstance(chamada.func, ast.Attribute) else ""
++        if nome != "planejar":
++            continue
++        argumentos = list(chamada.args[2:3])
++        argumentos.extend(
++            palavra.value for palavra in chamada.keywords
++            if palavra.arg in {"agent", "agente"}
++        )
++        if any(vem_de_parametro(argumento) for argumento in argumentos):
++            return True
++    return False
 +
 +
-+def test_afirmacao_do_planejador_bate_com_o_codigo_real():
++def _corpo_da_secao(readme: str, titulo: str) -> str:
++    inicio = re.search(rf"^## {re.escape(titulo)}$", readme, re.MULTILINE)
++    assert inicio, f"README não contém a seção {titulo!r}"
++    fim = re.search(r"^## ", readme[inicio.end() :], re.MULTILINE)
++    return readme[inicio.start() : inicio.end() + (fim.start() if fim else len(readme))]
++
++
++def test_readme_nao_afirma_cota_configurada_sem_repassar_agente_recebido():
 +    readme = (ROOT / "README.md").read_text(encoding="utf-8")
 +    cmd_plan = _cmd_plan_source()
-+    if "agente `codex`" in readme:
-+        assert cmd_plan is not None, "README anuncia planejador, mas cmd_plan sumiu"
-+        assert any(
-+            isinstance(n, ast.Call)
-+            and isinstance(n.func, ast.Attribute)
-+            and n.func.attr == "planejar"
-+            and len(n.args) >= 3
-+            and isinstance(n.args[2], ast.Constant)
-+            and n.args[2].value == "codex"
-+            for n in ast.walk(cmd_plan)
-+        ), "README anuncia agente fixo codex, mas cmd_plan não o fixa"
++
++    if AFIRMACAO_COTA_CONFIGURADA.search(readme):
++        assert _cmd_plan_repassa_agente_recebido(cmd_plan), (
++            "README atribui a cota ao agente configurado, mas cmd_plan não repassa "
++            "um agente recebido para planner.planejar"
++        )
++
++
++def test_estado_atual_mede_suite_sem_contagem_fixa():
++    estado_atual = _corpo_da_secao(
++        (ROOT / "README.md").read_text(encoding="utf-8"), "Estado atual"
++    )
++    assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
++    assert not CONTAGEM_FIXA_DE_TESTES.search(estado_atual)
 diff --git a/README.md b/README.md
-index 8321a65..2bea8cf 100644
+index 8321a65..293f3be 100644
 --- a/README.md
 +++ b/README.md
 @@ -158,8 +158,7 @@ Por exemplo:
@@ -104,21 +223,33 @@ index 8321a65..2bea8cf 100644
  humana antes de rodar**: a validação estrutural não garante que a interpretação
  do pedido ou os critérios de aceitação estejam corretos.
  
-@@ -187,7 +186,7 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
+@@ -187,7 +186,10 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
  
  ## Estado atual
  
 -- **Suíte do orquestrador: 123 testes passando.**
-+- Para medir a suíte do orquestrador, rode `python3 -m pytest .autodev/tests/ -q`.
++- Para medir a suíte do orquestrador no terminal, rode
++  `.venv/bin/python -m pytest .autodev/tests/ -q`. Dentro do runner, que resolve
++  `python3` para o ambiente virtual, o comando equivalente é
++  `python3 -m pytest .autodev/tests/ -q`.
  - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
    ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
    `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
+@@ -199,7 +201,7 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
+   de verdade. O banco marca cada caso com `origem` e o relatório diz isso na
+   primeira seção.
+ - **Aceitação ponta a ponta com agentes reais: verde.** Executada em ~2,5 min:
+-  o Codex implementou o projeto-fixture, os 8 testes passaram, o **AGY revisou e
++  o Codex implementou o projeto-fixture, todos os testes passaram, o **AGY revisou e
+   aprovou** (1 apontamento), os portões de integração passaram e a `main` ficou
+   intacta (mesmo commit antes e depois).
+ - **Dois itens abertos no HAQ** (`.autodev/sprints/DEVFACTORY-001/HAQ.md`).
 ```
 
 ## Saida dos testes
 ```
 ..                                                                       [100%]
-2 passed in 0.01s
+2 passed in 0.04s
 
 ```
 
@@ -157,73 +288,80 @@ Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
 ===== STDOUT =====
 ```json
 {
-  "veredito": "REQUEST_CHANGES",
+  "veredito": "APPROVE",
   "confianca": 0.82,
   "criterios_atendidos": [
     {
-      "criterio": "1) O texto 'consome cota do agente configurado' passa a refletir o codigo (agente FIXO em 'codex' em autodev/cli.py cmd_plan, OU agente por parametro) — escolher UMA e provar com teste",
-      "atende": false,
-      "evidencia": "README.md:161 e .autodev/fixtures/readme_estrutura/planejador.md:15 apenas DELETAM a frase; nenhuma das duas opcoes foi implementada (autodev/cli.py do HEAD nao tem cmd_plan: grep 'def cmd_plan' em autodev/cli.py = 0 ocorrencias; o cmd_plan real so existe em sprint/DEVFACTORY-002/integration:268, chamando planner.planejar(RAIZ, pedido, \"codex\")). O teste que deveria provar a relacao com o codigo nunca executa essa verificacao (ver finding 1). Deletar a frase resolve a contradicao de superficie, mas nao 'prova com teste' o contrato do planejador."
-    },
-    {
-      "criterio": "2) A linha com numero fixo de testes deixa de envelhecer (sai do README ou passa a apontar o comando sem citar contagem)",
+      "criterio": "A afirmação 'consome cota do agente configurado' deixa de contradizer o código (agente fixo em codex) — uma das duas opções, provada com teste",
       "atende": true,
-      "evidencia": "README.md:189 agora diz 'Para medir a suite do orquestrador, rode `python3 -m pytest .autodev/tests/ -q`.'; a frase antiga sumiu do README e da fixture. Mutacao M2 (reintroduzir 'Suite do orquestrador: 123 testes passando') faz o teste FALHAR — rodado em copia scratch com .venv/bin/python: '1 failed, 1 passed'. Ressalva: o teste cobre so a string exata (finding 2)."
+      "evidencia": "README.md:158-161 (diff bf572aa..852344d) remove a frase; a fixture .autodev/fixtures/readme_estrutura/planejador.md sofre a remoção mínima correspondente (2 linhas -> 1) e continua byte-a-byte igual ao corpo da seção (verificado: 'igual a fixture: True'). A opção escolhida é a de adaptar o texto (o código mantém o agente fixo: cmd_plan real em sprint/DEVFACTORY-002/integration chama planner.planejar(RAIZ, pedido, \"codex\"), planner.py:63 tem assinatura (raiz, prompt_usuario, agente)). Provei por mutação, em memória, que o teste reprova a contradição: no README de bf572aa a frase existe e a regex AFIRMACAO_COTA_CONFIGURADA casa; como neste branch não existe cmd_plan, _cmd_plan_repassa_agente_recebido(None)=False e o assert falha. No README entregue a frase não existe (regex não casa). Contra a implementação conhecida: fonte real do cmd_plan com literal \"codex\" -> False; com parâmetro 'agente' efetivamente repassado -> True; com parâmetro decorativo (não usado no call site) -> False."
     },
     {
-      "criterio": "3) Testes em .autodev/tests/test_readme_afirmacoes.py, que falhem se qualquer afirmacao voltar a contradizer o codigo (leitura do README contra a assinatura real de cmd_plan)",
-      "atende": false,
-      "evidencia": "O arquivo existe no caminho exigido (34 linhas) e a metade 'texto' funciona (M1 reintroduzir 'consome cota do agente configurado' -> 1 failed; M2 -> 1 failed). A metade 'codigo' e codigo MORTO: a linha 24 faz `if \"agente `codex`\" in readme:` e essa string NAO existe no README do HEAD (grep -F 'agente `codex`' README.md = exit 1), entao `_cmd_plan_source()` e chamado e o resultado descartado. Prova: M3 (contagem fixa NOVA + comando presente, README de HEAD) => '2 passed'; M4 (README passa a afirmar 'agente `codex`' nesta base, sem cmd_plan) => '1 failed' — ou seja, o unico caminho que le o codigo e alcancavel apenas quando o README anuncia o agente, o que nunca acontece neste estado. M5/M6 (cmd_plan sintetico fixando 'codex' => passa; passando a aceitar agente por parametro => falha) mostram que a logica do assert esta correta, mas e inalcancavel: o teste passa por vacuidade, nao por provar a afirmacao."
-    },
-    {
-      "criterio": "4) Rodar com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q",
+      "criterio": "A linha com número fixo de testes deixa de envelhecer: sai do README ou passa a apontar o comando que mede, sem citar contagem",
       "atende": true,
-      "evidencia": "HEAD (3c561697d8a295ae215faf9f268bd5609143429f, same as diff): 226 collected / '226 passed in 21.18s' na worktree DEVFACTORY-004-P03-codex usando o interpretador do projeto (.venv/bin/python, pytest 9.1.1) — que e o que autodev/testrunner.py:_python() substitui por sys.executable. /usr/bin/python3 cru nao tem pytest ('No module named pytest'), como D-23 ja registrou."
+      "evidencia": "README.md, seção 'Estado atual': 'Suíte do orquestrador: 123 testes passando.' foi substituída por 'Para medir a suíte ... rode `.venv/bin/python -m pytest .autodev/tests/ -q`. Dentro do runner ... `python3 -m pytest .autodev/tests/ -q`'. O comando exigido aparece literal e nenhuma contagem restou nessa seção. Medido por mim na árvore revisada (852344d): _corpo_da_secao('Estado atual') -> CONTAGEM_FIXA_DE_TESTES.findall = [] (o texto antigo casa ['123 testes','8 testes'], logo o teste reprova o retrocesso). A afirmação nova sobre o runner é verdadeira: autodev/testrunner.py:119-125 troca o 'python3' simbólico por sys.executable (o interpretador do projeto)."
     },
     {
-      "criterio": "5) Preservacao com evolucao: nao remover/enfraquecer caso de teste anterior; ajuste minimo, decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prova de que a cobertura nao caiu",
-      "atende": false,
-      "evidencia": "Nenhum caso anterior removido (verificado por node-id: base 6a09d82 = 224 nodes, HEAD = 226; a diferenca sao exatamente os 2 casos novos; conjunto 'removidos' vazio) e a cobertura nao caiu (224 -> 226). Porem o ajuste exigido foi feito em DOIS artefatos e o registro cobre um so: alem do README, a fixture-oraculo .autodev/fixtures/readme_estrutura/planejador.md:15 foi editada na mesma commit (sem ela, test_readme_estrutura.py:70-77 falharia; com ela, o oraculo que D-25 declara ser 'snapshot historico do bloco da P10' passa a espelhar o texto atual). D-26 (decisions.md:17-24) nao menciona a fixture e nao traz nenhuma contagem antes/depois — a prova que o criterio exige. As contagens que existem no arquivo (D-24: '194 para 197') nao correspondem a suite real (224/226)."
+      "criterio": "Testes em .autodev/tests/test_readme_afirmacoes.py que falham se qualquer das duas afirmações voltar a contradizer o código (README x assinatura real de cmd_plan)",
+      "atende": true,
+      "evidencia": "Arquivo novo com 2 casos (git diff: A .autodev/tests/test_readme_afirmacoes.py). Caso 1 lê o README inteiro + faz AST de autodev/cli.py buscando cmd_plan e decidindo se o valor entregue a planner.planejar deriva de parâmetro agent/agente. Caso 2 recorta a seção 'Estado atual' e exige o comando + proíbe contagem. Falha por mutação comprovada in-memory: README antigo faz o caso 1 falhar (frase presente, sem cmd_plan -> False) e o caso 2 falhar (2 contagens fixas e comando ausente). O caso 1 não depende de o cmd_plan existir: ausente => False => a frase é proibida, que é o estado correto hoje."
+    },
+    {
+      "criterio": "Rodar com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q",
+      "atende": true,
+      "evidencia": "Reproduzi na árvore revisada: 'PYTHONDONTWRITEBYTECODE=1 /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q -p no:cacheprovider' -> 231 passed in 54.65s (mesma contagem do evidence/P03-suite-completa.txt: 231, 45.04s). O evidence é honesto sobre o atrito: confirmei que 'python3 -m pytest .autodev/tests/ -q' cru falha aqui com '/home/saurus/.hermes/hermes-agent/venv/bin/python3: No module named pytest' (é o venv do Hermes, não o do projeto), e que o contorno registrado (PYTHONPATH via PATH do .venv do projeto) executa o mesmo pytest do projeto. Nada fabricado."
+    },
+    {
+      "criterio": "Preservação com evolução: nada removido/enfraquecido sem ajuste mínimo, decisão datada em decisions.md e prova de que a cobertura não caiu",
+      "atende": true,
+      "evidencia": "D-27 em .autodev/sprints/DEVFACTORY-004/decisions.md (2026-09-28) justifica a troca da asserção e a edição da fixture. Contagem medida por mim, não aceita da mão do autor: coleta real em bf572aa (worktree de integração) = 229; em 852344d = 231. Contagem estática por arquivo (AST sobre git show) reproduz exatamente os números do pytest e mostra que nenhum arquivo perdeu caso: 6a09d82 = 224 (bate com o D-27), bf572aa = 229, 852344d = 231; test_plan_docs.py mantém 5 casos (só o nome/asserção de um caso mudou), e o delta +2 são os dois casos novos. Nenhum arquivo de teste removido no diff (git diff --name-status: 2 M, 2 A)."
     }
   ],
   "findings": [
     {
-      "severidade": "alta",
-      "arquivo": ".autodev/tests/test_readme_afirmacoes.py",
-      "linha": 24,
-      "descricao": "A verificacao contra o codigo real e inalcancavel: o `if \"agente `codex`\" in readme:` e sempre falso no README do HEAD, entao `test_afirmacao_do_planejador_bate_com_o_codigo_real` termina sem asserir nada sobre cmd_plan — passa por vacuidade. Mutacoes comprovam: com o README de HEAD + contagem fixa nova => 2 passed (nada e checado no codigo); reintroduzindo 'agente `codex`' no README => 1 failed (porque cmd_plan nao existe nesta base). Consequencia: o criterio 1 ('prove com teste') e o criterio 3 ('leitura do README contra a assinatura real de cmd_plan') ficam sem prova, e o registro D-26 afirma que o teste 'verifica ... contra a chamada real do planejador', o que nao acontece.",
-      "correcao_sugerida": "Tornar o ramo de codigo obrigatorio e explicito: ler cmd_plan sempre (sem guard condicionado ao texto) e exigir UM dos dois estados aceitos — (a) cmd_plan existe e a chamada fixa 'codex' como 3o argumento posicional, ou (b) cmd_plan ausente E o README nao faz nenhuma afirmacao de agente/cota do planejador (assert 'consome cota' not in readme and 'agente `codex`' not in readme). Se a base sem planejador e uma condicao legitima, declarar isso com pytest.skip(..., reason=...) DATADO em decisions.md, em vez de esconder a checagem atras de um `if` que nunca e verdadeiro."
+      "severidade": "media",
+      "arquivo": "README.md",
+      "linha": 157,
+      "descricao": "PRÉ-EXISTENTE e fora dos dois critérios, mas é a maior divergência README x código que sobrou na seção que a P03 mexe: o README ainda documenta `.venv/bin/python -m autodev plan \"...\"` e o diretório com spec.md/dag.json/sprint.yaml, e esse comando não existe nesta árvore. Prova: `python -m autodev plan teste` -> 'invalid choice: plan (choose from detect, init, status, run, ...)'; não há autodev/planner.py nem cmd_plan em autodev/cli.py em 852344d; o cmd_plan só existe em sprint/DEVFACTORY-002/integration (cli.py:254), que NÃO é ancestral de main nem de bf572aa (git merge-base --is-ancestor -> NOT-ANCESTOR). A spec da sprint 004 afirma que os arquivos tocados 'existem em main', o que não vale para planner.py. O novo guard não vê isso (ele só olha a frase de cota e a contagem).",
+      "correcao_sugerida": "Decidir como o autor quer tratar: ou registrar explicitamente no README que o `plan` está entregue na branch sprint/DEVFACTORY-002/integration aguardando merge em main, ou só documentar a seção Planejador depois do merge. Se ficar como está, o autor deve saber que `autodev plan` não roda na main."
     },
     {
-      "severidade": "media",
+      "severidade": "baixa",
       "arquivo": ".autodev/tests/test_readme_afirmacoes.py",
-      "linha": 17,
-      "descricao": "O criterio 2 e 'a linha deixa de envelhecer ... sem citar contagem', mas o teste so proibe a string exata antiga. Mutacao M3 (README volta a citar '**Suite do orquestrador: 226 testes passando.**' mantendo o comando) resulta em '2 passed': uma contagem fixa nova (exatamente o defeito que o sprint existe para matar) passa pelo teste.",
-      "correcao_sugerida": "Guardar a regra, nao a ocorrencia: assertar que o bloco '## Estado atual' nao casa re.search(r'\\d+\\s+testes passando', corpo_da_secao('Estado atual')) e que o comando 'python3 -m pytest .autodev/tests/ -q' esta presente ali. Mutacao a vencer: citar qualquer contagem numerica nova em 'Estado atual' deve falhar."
+      "linha": 72,
+      "descricao": "No estado entregue o caso 1 é uma asserção condicional: como a frase não existe no README, o corpo só executa a busca da regex e toda a lógica AST (_cmd_plan_repassa_agente_recebido, linhas 21-58) nunca roda. Ou seja, o caminho positivo do guard não tem caso que o exercite: um erro de heurística só apareceria no dia da regressão (e se ele retornasse True indevidamente, o guard falharia silenciosamente).",
+      "correcao_sugerida": "Adicionar um caso que alimente a função com o fonte do cmd_plan real (string inline, sem tocar o repo): fonte com literal \"codex\" -> False; fonte com `def cmd_plan(args, agente)` e `planejar(RAIZ, pedido, agente)` -> True; parâmetro decorativo -> False. Isso transforma o guard em prova de comportamento, não só em ausência de frase."
     },
     {
-      "severidade": "media",
-      "arquivo": ".autodev/sprints/DEVFACTORY-004/decisions.md",
-      "linha": 17,
-      "descricao": "D-26 nao registra o ajuste de oraculo que a task exigiu: a fixture .autodev/fixtures/readme_estrutura/planejador.md foi reescrita junto com o README (a P01 tem no test_readme_estrutura.py:70-77 igualdade integral de corpo '', e D-25 declara a fixture como snapshot historico). Sem essa nota, o registro diz 'nenhum teste anterior foi removido ou enfraquecido' sem informar que a referencia de comparacao de um teste de task anterior foi editada no mesmo commit — e sem nenhuma contagem antes/depois, que o criterio 5 pede explicitamente.",
-      "correcao_sugerida": "Ampliar D-26 com: (i) o motivo do ajuste minimo da fixture (a frase removida fazia parte do oraculo; o resto do corpo permaneceu identico, preservando a forca da comparacao integral); (ii) a prova numerica medida — base 6a09d82: 224 nodes / 224 passed; HEAD: 226 nodes / 226 passed, nenhum node antigo removido (ja verificado na revisao); (iii) corrigir a frase 'o novo teste verifica ... contra a chamada real do planejador' para refletir que essa leitura e inalcancavel nesta base (ou, melhor, corrigir o teste como no finding 1 e manter a frase verdadeira)."
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_readme_afirmacoes.py",
+      "linha": 51,
+      "descricao": "A heurística fixa o agente no 3o argumento posicional (`chamada.args[2:3]`) e só aceita Name/Attribute simples. Hoje casa a assinatura conhecida (planner.planejar(raiz, prompt, agente)), mas uma reordenação legítima (`planejar(raiz, agente, pedido)`), um embrulho (`str(agente)`, `cfg.agente`) ou outro índice produziriam False => o README seria proibido de afirmar algo verdadeiro (falso positivo que trava uma mudança legítima).",
+      "correcao_sugerida": "Considerar todos os argumentos posicionais e keywords (não só args[2:3]) ao procurar derivação de parâmetro, ou comentar no teste que o contrato de ordem (raiz, prompt, agente) é premissa, ligando a asserção à assinatura de planner.planejar."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/fixtures/readme_estrutura/planejador.md",
+      "linha": 15,
+      "descricao": "A fixture de referência da P01 foi editada junto com o README. A partir daqui o teste de corpo integral (test_readme_estrutura.py:63-68) virou espelho: qualquer edição futura de conteúdo na seção Planejador que venha acompanhada da edição da fixture passa sem alarme — ele só detecta divergência entre os dois arquivos, não mudança de conteúdo. É o ajuste mínimo possível dado que a P03 tem de mudar o texto, está datado (D-27) e a contagem de casos não caiu, mas a garantia de 'mesmo texto de referência' perdeu parte do poder.",
+      "correcao_sugerida": "Reconhecer isso em D-27 (ou numa nota no topo da fixture) como o fez, e cobrir o conteúdo que importa com asserções explícitas próprias (como o novo test_readme_afirmacoes faz para cota/contagem), em vez de depender só da igualdade README<->fixture."
     },
     {
       "severidade": "baixa",
       "arquivo": "README.md",
-      "linha": 189,
-      "descricao": "A forma do comando veio literalmente do criterio, mas para um leitor humano ela nao roda nesta maquina: `python3 -m pytest .autodev/tests/ -q` falha com 'No module named pytest' (/usr/bin/python3 nao tem pytest; so o runner do motor troca python3 por sys.executable — testrunner.py:_python()). O proprio README, na secao 'Como rodar' (linha 92), continua mandando usar `.venv/bin/python -m pytest .autodev/tests/ -q`, entao o documento fica com dois comandos para a mesma coisa, um deles invalido fora do runner.",
-      "correcao_sugerida": "Deixar explicito o contexto: 'Para medir a suite do orquestrador, rode com o interpretador do projeto (o runner resolve `python3` para o venv): `python3 -m pytest .autodev/tests/ -q`' — ou apontar o comando .venv na mesma linha 189 e usar a forma `python3` apenas nos campos 'teste' dos criterios (que e onde o runner resolve). Isso nao contraria o criterio 2, que exige apenas que o comando que mede apareca sem contagem."
+      "linha": 158,
+      "descricao": "A remoção levou embora também a parte verdadeira do aviso: que cada execução do planejador gasta cota de agente (do codex, que é fixo). Nenhum critério exige esse aviso, mas o README deixa de dizer que planejar consome cota. Mesmo tipo de lacuna: o guard da regex é mais estreito que a classe de afirmações falsas (variações como 'consome a cota do agente escolhido' ou qualquer contagem de testes fora da seção 'Estado atual' — ex.: README.md:86 traz '8 testes' num exemplo — não são cobertas).",
+      "correcao_sugerida": "Se o aviso de custo é útil ao dono, reescrevê-lo apontando o agente fixo ('o planejador usa o codex; cada execução consome cota dele'), mantendo a decisão D-27 atualizada; e, se quiser fechar o flanco, estender a regex para a seção/arquivo inteiro."
     },
     {
       "severidade": "baixa",
-      "arquivo": ".autodev/tests/test_readme_afirmacoes.py",
-      "linha": 23,
-      "descricao": "Codigo morto no caminho vivo: `cmd_plan = _cmd_plan_source()` e sempre executado (parse do cli.py a cada teste) e seu resultado nunca e usado quando o guard da linha 24 e falso — que e o caso permanente no HEAD. Isso tambem mascara o estado real: a base nao tem planejador, mas o README continua documentando `.venv/bin/python -m autodev plan \"...\"` (README.md:156), a contradicao mais grave entre README e codigo, deixada intacta por uma task cujo titulo e 'Tirar do README o que nao bate com o codigo'.",
-      "correcao_sugerida": "Aproveitar a mesma leitura do codigo para cobrir esse caso: se `cmd_plan` nao existir, exigir que o README nao anuncie o subcomando `plan` (ou registrar em decisions.md, com data, que a secao Planejador e preservada como referencia historica por decisao D-24/D-25 — hoje isso esta so nas decisoes da task anterior e nao em nenhuma assercao)."
+      "arquivo": ".autodev/sprints/DEVFACTORY-004/evidence/P03-suite-completa.txt",
+      "linha": 9,
+      "descricao": "Caminhos absolutos da máquina do autor gravados em artefato versionado (/home/saurus/.hermes/hermes-agent/venv/bin/python3 e /home/saurus/Code/Coding_Machine/.venv/bin). Não é segredo nem fragilidade de execução (é evidência), mas quebra em qualquer outro clone/máquina e o D-23 já mostrou que a diferença entre os dois interpretadores confunde.",
+      "correcao_sugerida": "Registrar como comando relativo ('.venv/bin/python -m pytest .autodev/tests/ -q') e mencionar o erro do python3 sem o caminho absoluto do venv do Hermes."
     }
   ],
-  "resumo": "As duas edicoes de README estao corretas e a suite sobe de 224 para 226 sem perder nenhum caso, mas o teste que deveria atar o README ao codigo e vacuo (a metade que le cmd_plan nunca executa, provado por mutacao), o guard do numero de testes so pega a string exata antiga, e D-26 omite o ajuste da fixture-oraculo e a prova de cobertura exigida — por isso peco mudancas em vez de aprovar."
+  "resumo": "Os cinco critérios estão atendidos e verificados por medição própria (229 casos na base -> 231 na entrega, 231 passed com o interpretador do projeto; guard reprovado por mutação contra o README antigo e contra o cmd_plan real de codex fixo), sem teste anterior removido nem enfraquecido além do ajuste mínimo que o D-27 autoriza; as ressalvas são de escopo/robustez (a seção Planejador continua documentando `autodev plan`, que não existe nesta branch nem em main, e a heurística AST nunca é exercitada no estado atual)."
 }
 ```
 
