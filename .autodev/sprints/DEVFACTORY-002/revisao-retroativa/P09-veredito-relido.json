@@ -1,0 +1,45 @@
+{
+  "task_id": "P09",
+  "head": "1942b63efb84918e63f3d6c5f9f8b45d79dab3c2",
+  "base": "a9445a39405ba7cbef87a8c103ad9a2ed9104268",
+  "veredito": "REQUEST_CHANGES",
+  "confianca": 0.7,
+  "resumo": "O codigo esta correto e verificado ponta a ponta (prompt literal preservado em spec.md, dag.json e no Contexto do report; tolerancia a DAG ausente/invalido/ilegivel; 186 -> 201 coletados, 201 passed com .venv/bin/python; mutantes M1-M4 derrubam os testes novos), mas a autorizacao de P09 precisa voltar porque a prova obrigatoria de preservacao exigida pelo criterio do sprint nao esta registrada em decisions.md, que declara a verificacao pendente e a suite nao verde por um diagnostico de ambiente equivocado.",
+  "findings": [
+    {
+      "severidade": "alta",
+      "arquivo": ".autodev/sprints/DEVFACTORY-002/decisions.md",
+      "linha": 21,
+      "descricao": "A prova obrigatoria do criterio de preservacao com evolucao nao esta registrada. O documento admite que a contagem --collect-only antes/depois e a aprovacao da suite 'nao puderam ser comprovadas' e termina com 'nao se declara a suite verde'. Sem esse registro, o ajuste da assercao de test_plan_escrita.py:48 fica sem justificativa verificavel no artefato, o que o criterio do sprint manda reprovar explicitamente. A prova existe e eu a produzi neste ambiente: base a9445a39405ba7cbef87a8c103ad9a2ed9104268 -> '186 tests collected'; HEAD 1942b63 -> '201 tests collected' (+15, exatamente os 15 casos novos); '.venv/bin/python -m pytest .autodev/tests/ -q' -> '201 passed in 19.80s'.",
+      "correcao_sugerida": "Substituir a secao 'Evidencia e bloqueio de ambiente' por evidencia medida: commit base e HEAD com a saida de 'python3 -m pytest .autodev/tests/ --collect-only -q' (186 e 201) e a saida de '.venv/bin/python -m pytest .autodev/tests/ -q' (201 passed), declarando a suite verde e mantendo a decisao datada sobre o ajuste minimo em test_plan_escrita.py:48."
+    },
+    {
+      "severidade": "media",
+      "arquivo": ".autodev/sprints/DEVFACTORY-002/decisions.md",
+      "linha": 17,
+      "descricao": "Diagnostico de ambiente equivocado, que serviu de base para nao prover a prova. E verdade que o python3 do sistema (/usr/bin/python3, 3.14.7) nao tem pytest, mas o proprio README (secao 'Testes do proprio orquestrador') e este pacote de revisao usam '.venv/bin/python -m pytest', que existe neste host e roda a suite inteira (pytest 9.1.1, Python 3.11.16). Ou seja: a verificacao obrigatoria nao estava bloqueada; o autor nao localizou o interpretador correto. Consequencia: a unica evidencia de teste anexada (199 passed) contradiz o texto do proprio decisions.md, que afirma que a suite nao pode ser executada.",
+      "correcao_sugerida": "Trocar a alegacao de bloqueio por 'a suite nao roda com o python3 do sistema; usa-se .venv/bin/python (README)' e citar o comando/interpretador efetivamente usado na evidencia."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_rastreabilidade.py",
+      "linha": 1,
+      "descricao": "A leitura de testes anexada ao pacote ('199 passed, 0 failed') nao corresponde a arvore revisada. Medi coleta/execucao com o interpretador do projeto: base a9445a3 = 186, P09-codex 1eaf384 = 189, HEAD revisado 1942b63 = 201, integration e8ca2e0 = 205; nenhuma resulta em 199. A explicacao provavel e o resumo ter omitido os 2 skips (ha skipif de bwrap em test_git_sandbox.py), mas o numero nao fecha com o HEAD declarado.",
+      "correcao_sugerida": "Registrar a saida bruta (comando, interpretador, commit e linha de resumo completa, incluindo skips) no decisions.md ou no pacote de revisao, para que a evidencia seja reproduzivel."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/cli.py",
+      "linha": 138,
+      "descricao": "Mudanca de comportamento nao coberta pelos testes novos. Antes do patch, gerar() nao aceitava prompt_original, entao um report-extras.json com essa chave levantava TypeError (o relatorio quebrava); agora o valor vindo de extras e silenciosamente descartado, porque opcoes = {**extra, ..., 'prompt_original': prompt_original} sempre sobrescreve o extra (ainda que None). O teste existente cobre apenas 'DAG vence extras' (test_prompt_do_dag_prevalece_sobre_extras); nao ha caso para 'sprint antigo, sem prompt no DAG, mas com prompt em report-extras.json', onde a informacao e apagada sem aviso.",
+      "correcao_sugerida": "Acrescentar um caso negativo (dag sem prompt_original + report-extras.json com prompt_original, esperando 'nao informado' e nenhuma excecao) ou explicitar a precedencia no decisions.md como decisao consciente."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/sprints/DEVFACTORY-002/dag.json",
+      "linha": 164,
+      "descricao": "Divergencia de rastreabilidade: o criterio de P09 gravado no proprio DAG do sprint manda os testes para '.autodev/tests/test_planner.py e .autodev/tests/test_adapters.py', enquanto o criterio vigente da revisao exige '.autodev/tests/test_plan_rastreabilidade.py' (que foi o entregue). Nada no DAG/spec registra a mudanca de criterio.",
+      "correcao_sugerida": "Alinhar o criterio no dag.json/spec.md do sprint (ou registrar a atualizacao em decisions.md), para que a rastreabilidade pedido->criterio->teste nao fique ambigua."
+    }
+  ]
+}

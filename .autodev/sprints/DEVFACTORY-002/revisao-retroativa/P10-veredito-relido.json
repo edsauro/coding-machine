@@ -1,0 +1,52 @@
+{
+  "task_id": "P10",
+  "head": "785988df281bb6658778d5f40a4f67c2f8914a92",
+  "base": "fbdd0f73642de181a27ccb4462be90ac81235e77",
+  "veredito": "REQUEST_CHANGES",
+  "confianca": 0.65,
+  "resumo": "Os 8 critérios estão objetivamente atendidos e a suíte que rodei na árvore revisada dá 205 verdes com cobertura subindo de 201 para 205, mas peço mudanças porque a seção '## Planejador' foi inserida dentro de '## Como rodar' (rebaixando 'Ciclo de vida do sprint' e 'Conclusão por evidência' a subseções do Planejador) e, por consequência, o teste de documentação não isola a seção que diz provar ('sprint.yaml' é satisfeito por texto de outra subseção), além de 'consome cota do agente configurado' divergir do código, que fixa o Codex.",
+  "findings": [
+    {
+      "severidade": "media",
+      "arquivo": "README.md",
+      "linha": 91,
+      "descricao": "A seção '## Planejador' foi inserida no MEIO de '## Como rodar' (que abre na linha 67). Consequência: '### Ciclo de vida do sprint' (113) e '### Conclusão por evidência' (130) deixam de ser subseções de '## Como rodar' e passam a ser lidas como subseções do Planejador. Confirmado pelos cabeçalhos antes/depois: base fbdd0f7 = '## Como rodar'(67) -> '### Ciclo...'(91) -> '### Conclusão...'(108) -> '## Os agentes'(124); HEAD = '## Como rodar'(67) -> '## Planejador'(91) -> '### Ciclo...'(113) -> '### Conclusão...'(130) -> '## Os agentes'(146). 'Conclusão por evidência' (evidência retroativa do orquestrador) não tem relação com o planejador — a hierarquia da documentação regrediu.",
+      "correcao_sugerida": "Mover o bloco '## Planejador' para o FIM do '## Como rodar' (depois de '### Conclusão por evidência', antes do '---' que precede '## Os agentes'), ou promover '### Ciclo de vida do sprint' e '### Conclusão por evidência' a seções '##' próprias. Mantém o critério 1 e conserta a hierarquia."
+    },
+    {
+      "severidade": "media",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 13,
+      "descricao": "O helper _secao_planejador() corta a seção apenas no próximo '\\n## ', então a 'seção Planejador' que o teste examina inclui as subseções seguintes ('### Ciclo de vida do sprint', '### Conclusão por evidência'), que NÃO fazem parte do texto do Planejador. Prova concreta: o literal 'sprint.yaml' exigido em test_readme_explica_fluxo... casa com a linha 127 ('A fonte autoritativa é `state.db`. O `status:` do `sprint.yaml` é declaração de intenção'), que pertence a '### Ciclo de vida do sprint' — ou seja, ao menos uma asserção pode passar por texto de fora da seção que o teste afirma verificar. O teste é, portanto, mais fraco do que o critério 6 pede ('provando que as seções exigidas existem'), e herdou o defeito estrutural da finding 1.",
+      "correcao_sugerida": "Reposicionar a seção (finding 1) para que o corte em '\\n## ' devolva exatamente a seção; em complemento, cortar também em '\\n### ' quando a seção não tiver subseções próprias, ou asserir frases completas ('cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/`', 'materializa ... `spec.md`, `dag.json` e `sprint.yaml`') em vez de literais soltos que aparecem em outras partes do README."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "README.md",
+      "linha": 105,
+      "descricao": "O texto diz que a execução 'consome cota do agente configurado', mas o agente do planejador NÃO é configurável: cmd_plan chama planner.planejar(RAIZ, pedido, \"codex\") com o nome fixo no código (autodev/cli.py:268) e não existe chave de planejador em .autodev/config/*.yaml. Um usuário que configure o agy pode concluir que a cota consumida será a dele.",
+      "correcao_sugerida": "Trocar por 'consome cota do Codex, o agente fixo do comando plan' (ou parametrizar o agente do planejamento via config e manter o texto genérico)."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "README.md",
+      "linha": 167,
+      "descricao": "Em '## Estado atual' o README afirma 'Suíte do orquestrador: 123 testes passando', número obsoleto: a árvore revisada coleta 205 testes (medido por mim, --collect-only). A linha é pré-existente ao diff (não foi introduzida por este commit), mas a task é 'fechar a documentação' e o número contradiz a suíte atual — quem ler vai desconfiar do resto.",
+      "correcao_sugerida": "Atualizar o número (ou trocar por uma frase sem contagem) para não deixar dado falso no README."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/",
+      "linha": 0,
+      "descricao": "A evidência de teste anexada ('203 passed, 0 failed' com /home/saurus/Code/Coding_Machine/.venv/bin/python) não reproduz em nenhuma árvore do repo: medi 205 passando na árvore revisada (785988d e o commit de integração e8ca2e0), 201 coletados na base fbdd0f7 e 194 em main. Nenhuma árvore/worktree existente dá 203. A diferença de 2 sugere skips, mas na minha execução não houve nenhum skip (bwrap presente, models_cache.json presente). O número não é reprodutível como está, o que enfraquece a evidência — embora o critério em si esteja cumprido (205 verdes, medidos por mim).",
+      "correcao_sugerida": "Registrar na evidência a árvore exata (worktree/commit) e o comando literal usado; se houver skips, reportar '205 coletados: 203 passed, 2 skipped' com o motivo."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 1,
+      "descricao": "O comando do critério 7 e do campo 'teste' da task ('python3 -m pytest .autodev/tests/ -q') não roda nesta máquina: '/usr/bin/python3: No module named pytest' (python3.14 do sistema, sem pip). Só funciona com .venv/bin/python. Como o README já documenta .venv/bin/python, é desalinhamento entre critério e ambiente, não defeito do código — mas significa que o critério, ao pé da letra, não é verificável.",
+      "correcao_sugerida": "Alinhar o comando declarado da task/critério ao do README (.venv/bin/python -m pytest .autodev/tests/ -q) ou documentar o requisito de venv no próprio critério."
+    }
+  ]
+}

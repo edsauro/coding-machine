@@ -1,0 +1,242 @@
+# exit_code=0 duracao=181.8s modelo=deepseek-flash effort=(default) failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- o README.md ganha uma secao Planejador explicando o fluxo do prompt ao sprint executavel
+- a secao documenta autodev plan com o exemplo de uso e o efeito no disco
+- a secao declara explicitamente que o planejador usa um agente e por isso consome cota
+- a secao registra a limitacao de que o plano gerado sempre precisa de revisao humana antes de rodar
+- o README menciona que o comando plan nao faz merge nem push
+- os testes ficam em .autodev/tests/test_plan_docs.py provando que as secoes exigidas existem no README
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca de comportamento EXIGIDA por esta task invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-002/decisions.md e prove que a cobertura nao caiu (a contagem do comando python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes da mudanca); o revisor confere a justificativa e reprova autorizacao sem essa prova
+
+## Task
+P10: Documentar o planejador e fechar a documentacao
+
+## Diff a revisar (base fbdd0f73642de181a27ccb4462be90ac81235e77 -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+new file mode 100644
+index 0000000..6cc61b2
+--- /dev/null
++++ b/.autodev/tests/test_plan_docs.py
+@@ -0,0 +1,47 @@
++"""Contrato da documentacao publica do planejador."""
++
++from pathlib import Path
++
++
++README = Path(__file__).parents[2] / "README.md"
++
++
++def _secao_planejador() -> str:
++    texto = README.read_text(encoding="utf-8")
++    marcador = "## Planejador"
++    assert marcador in texto
++    secao = texto.split(marcador, maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
++    return " ".join(secao.split())
++
++
++def test_readme_explica_fluxo_do_prompt_ao_sprint_executavel():
++    secao = _secao_planejador().lower()
++
++    assert "prompt" in secao
++    assert "spec.md" in secao
++    assert "dag.json" in secao
++    assert "sprint.yaml" in secao
++    assert "sprint executável" in secao
++
++
++def test_readme_documenta_comando_plan_e_efeito_no_disco():
++    secao = _secao_planejador()
++
++    assert 'autodev plan "' in secao
++    assert ".autodev/sprints/" in secao
++
++
++def test_readme_alerta_sobre_agente_cota_e_revisao_humana():
++    secao = _secao_planejador().lower()
++
++    assert "agente" in secao
++    assert "consome cota" in secao
++    assert "revisão humana" in secao
++    assert "sempre" in secao
++    assert "antes de rodar" in secao
++
++
++def test_readme_declara_que_plan_nao_faz_merge_nem_push():
++    secao = _secao_planejador().lower()
++
++    assert "não faz merge nem push" in secao
+diff --git a/README.md b/README.md
+index fe564ee..d561d99 100644
+--- a/README.md
++++ b/README.md
+@@ -88,6 +88,28 @@ Testes do próprio orquestrador:
+ .venv/bin/python -m pytest .autodev/tests/ -q
+ ```
+ 
++## Planejador
++
++O planejador transforma um prompt em texto livre em um sprint executável. Ele
++envia o pedido a um agente, interpreta e valida o plano devolvido, ordena as
++tarefas por dependência e materializa os arquivos que o orquestrador consome:
++`spec.md`, `dag.json` e `sprint.yaml`.
++
++Por exemplo:
++
++```bash
++.venv/bin/python -m autodev plan "Adicionar autenticação à API"
++```
++
++O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
++contendo os três arquivos acima. Como o planejador usa um agente, cada execução
++consome cota do agente configurado. O plano gerado **sempre precisa de revisão
++humana antes de rodar**: a validação estrutural não garante que a interpretação
++do pedido ou os critérios de aceitação estejam corretos.
++
++`plan` somente prepara os arquivos locais do sprint; ele **não faz merge nem
++push**.
++
+ ### Ciclo de vida do sprint
+ 
+ Tarefas têm 12 estados; o **sprint** tem os seus:
+```
+
+## Saida dos testes
+```
+203 passed, 0 failed (/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q)
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+{
+  "veredito": "REQUEST_CHANGES",
+  "confianca": 0.65,
+  "criterios_atendidos": [
+    {
+      "criterio": "README.md ganha uma seção Planejador explicando o fluxo do prompt ao sprint executável",
+      "atende": true,
+      "evidencia": "README.md linha 91 '## Planejador' (blob d561d99) descreve: prompt em texto livre -> envia o pedido a um agente -> interpreta/valida -> ordena por dependência -> materializa spec.md, dag.json, sprint.yaml. Confere com autodev/planner.py:63-88 (planejar) e 114-159 (escrever_sprint)."
+    },
+    {
+      "criterio": "A seção documenta autodev plan com o exemplo de uso e o efeito no disco",
+      "atende": true,
+      "evidencia": "README.md:100-104 traz o exemplo '.venv/bin/python -m autodev plan \"Adicionar autenticação à API\"' e o efeito real: planner.escrever_sprint cria .autodev/sprints/DEVFACTORY-NNN/ com dag.json, sprint.yaml e spec.md (planner.py:114-159) — bate com o texto, incluindo a numeração sequencial e 'nenhum diretório é reescrito' (SprintJaExiste)."
+    },
+    {
+      "criterio": "A seção declara explicitamente que o planejador usa um agente e por isso consome cota",
+      "atende": true,
+      "evidencia": "README.md:105-106: 'Como o planejador usa um agente, cada execução consome cota do agente configurado.' (ressalva de precisão na finding 3)."
+    },
+    {
+      "criterio": "A seção registra a limitação de revisão humana obrigatória antes de rodar",
+      "atende": true,
+      "evidencia": "README.md:106-108: 'O plano gerado **sempre precisa de revisão humana antes de rodar**: a validação estrutural não garante que a interpretação do pedido ou os critérios de aceitação estejam corretos.' — é exatamente a limitação exigida, com a razão declarada."
+    },
+    {
+      "criterio": "O README menciona que o comando plan não faz merge nem push",
+      "atende": true,
+      "evidencia": "README.md:110-111: '`plan` somente prepara os arquivos locais do sprint; ele **não faz merge nem push**.' Verifiquei no código: cmd_plan (cli.py:254-285) não toca em git — nenhuma menção a merge/push/commit; o sprint.yaml sai com merge_em_main: False (planner.py:146)."
+    },
+    {
+      "criterio": "Os testes ficam em .autodev/tests/test_plan_docs.py provando que as seções exigidas existem no README",
+      "atende": true,
+      "evidencia": "Arquivo criado no caminho exato (47 linhas, 4 testes) e rodado por mim: '.autodev/tests/test_plan_docs.py .... 4 passed'. Cobertura parcial por causa do corte de seção (finding 2), mas todos os literais exigidos existem de fato no README (grep linhas 93-111)."
+    },
+    {
+      "criterio": "A suíte inteira continua verde (python3 -m pytest .autodev/tests/ -q)",
+      "atende": true,
+      "evidencia": "Rodado por mim na árvore revisada (worktree em 785988d/P10 e no commit de integração e8ca2e0): '205 passed, 0 failed' em 19s. A evidência anexada ('203 passed') não reproduz — findings 4 e 5."
+    },
+    {
+      "criterio": "Preservação com evolução: nenhum caso de teste anterior removido/enfraquecido; cobertura não caiu; decisão datada só se uma asserção existente fosse invalidada",
+      "atende": true,
+      "evidencia": "git diff --stat fbdd0f7..785988d = 2 arquivos, 69 inserções, 0 remoções: README.md (modificado, só inserção) e .autodev/tests/test_plan_docs.py (novo). Nenhum test_plan_*.py existente foi tocado, então não havia asserção a ajustar e nenhum registro em decisions.md era exigido. Cobertura medida: base fbdd0f7 = 201 coletados (worktree P09-agy = mesmo commit) vs. revisado = 205 coletados — subiu 4, não caiu."
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "media",
+      "arquivo": "README.md",
+      "linha": 91,
+      "descricao": "A seção '## Planejador' foi inserida no MEIO de '## Como rodar' (que abre na linha 67). Consequência: '### Ciclo de vida do sprint' (113) e '### Conclusão por evidência' (130) deixam de ser subseções de '## Como rodar' e passam a ser lidas como subseções do Planejador. Confirmado pelos cabeçalhos antes/depois: base fbdd0f7 = '## Como rodar'(67) -> '### Ciclo...'(91) -> '### Conclusão...'(108) -> '## Os agentes'(124); HEAD = '## Como rodar'(67) -> '## Planejador'(91) -> '### Ciclo...'(113) -> '### Conclusão...'(130) -> '## Os agentes'(146). 'Conclusão por evidência' (evidência retroativa do orquestrador) não tem relação com o planejador — a hierarquia da documentação regrediu.",
+      "correcao_sugerida": "Mover o bloco '## Planejador' para o FIM do '## Como rodar' (depois de '### Conclusão por evidência', antes do '---' que precede '## Os agentes'), ou promover '### Ciclo de vida do sprint' e '### Conclusão por evidência' a seções '##' próprias. Mantém o critério 1 e conserta a hierarquia."
+    },
+    {
+      "severidade": "media",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 13,
+      "descricao": "O helper _secao_planejador() corta a seção apenas no próximo '\\n## ', então a 'seção Planejador' que o teste examina inclui as subseções seguintes ('### Ciclo de vida do sprint', '### Conclusão por evidência'), que NÃO fazem parte do texto do Planejador. Prova concreta: o literal 'sprint.yaml' exigido em test_readme_explica_fluxo... casa com a linha 127 ('A fonte autoritativa é `state.db`. O `status:` do `sprint.yaml` é declaração de intenção'), que pertence a '### Ciclo de vida do sprint' — ou seja, ao menos uma asserção pode passar por texto de fora da seção que o teste afirma verificar. O teste é, portanto, mais fraco do que o critério 6 pede ('provando que as seções exigidas existem'), e herdou o defeito estrutural da finding 1.",
+      "correcao_sugerida": "Reposicionar a seção (finding 1) para que o corte em '\\n## ' devolva exatamente a seção; em complemento, cortar também em '\\n### ' quando a seção não tiver subseções próprias, ou asserir frases completas ('cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/`', 'materializa ... `spec.md`, `dag.json` e `sprint.yaml`') em vez de literais soltos que aparecem em outras partes do README."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "README.md",
+      "linha": 105,
+      "descricao": "O texto diz que a execução 'consome cota do agente configurado', mas o agente do planejador NÃO é configurável: cmd_plan chama planner.planejar(RAIZ, pedido, \"codex\") com o nome fixo no código (autodev/cli.py:268) e não existe chave de planejador em .autodev/config/*.yaml. Um usuário que configure o agy pode concluir que a cota consumida será a dele.",
+      "correcao_sugerida": "Trocar por 'consome cota do Codex, o agente fixo do comando plan' (ou parametrizar o agente do planejamento via config e manter o texto genérico)."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "README.md",
+      "linha": 167,
+      "descricao": "Em '## Estado atual' o README afirma 'Suíte do orquestrador: 123 testes passando', número obsoleto: a árvore revisada coleta 205 testes (medido por mim, --collect-only). A linha é pré-existente ao diff (não foi introduzida por este commit), mas a task é 'fechar a documentação' e o número contradiz a suíte atual — quem ler vai desconfiar do resto.",
+      "correcao_sugerida": "Atualizar o número (ou trocar por uma frase sem contagem) para não deixar dado falso no README."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/",
+      "linha": 0,
+      "descricao": "A evidência de teste anexada ('203 passed, 0 failed' com /home/saurus/Code/Coding_Machine/.venv/bin/python) não reproduz em nenhuma árvore do repo: medi 205 passando na árvore revisada (785988d e o commit de integração e8ca2e0), 201 coletados na base fbdd0f7 e 194 em main. Nenhuma árvore/worktree existente dá 203. A diferença de 2 sugere skips, mas na minha execução não houve nenhum skip (bwrap presente, models_cache.json presente). O número não é reprodutível como está, o que enfraquece a evidência — embora o critério em si esteja cumprido (205 verdes, medidos por mim).",
+      "correcao_sugerida": "Registrar na evidência a árvore exata (worktree/commit) e o comando literal usado; se houver skips, reportar '205 coletados: 203 passed, 2 skipped' com o motivo."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 1,
+      "descricao": "O comando do critério 7 e do campo 'teste' da task ('python3 -m pytest .autodev/tests/ -q') não roda nesta máquina: '/usr/bin/python3: No module named pytest' (python3.14 do sistema, sem pip). Só funciona com .venv/bin/python. Como o README já documenta .venv/bin/python, é desalinhamento entre critério e ambiente, não defeito do código — mas significa que o critério, ao pé da letra, não é verificável.",
+      "correcao_sugerida": "Alinhar o comando declarado da task/critério ao do README (.venv/bin/python -m pytest .autodev/tests/ -q) ou documentar o requisito de venv no próprio critério."
+    }
+  ],
+  "resumo": "Os 8 critérios estão objetivamente atendidos e a suíte que rodei na árvore revisada dá 205 verdes com cobertura subindo de 201 para 205, mas peço mudanças porque a seção '## Planejador' foi inserida dentro de '## Como rodar' (rebaixando 'Ciclo de vida do sprint' e 'Conclusão por evidência' a subseções do Planejador) e, por consequência, o teste de documentação não isola a seção que diz provar ('sprint.yaml' é satisfeito por texto de outra subseção), além de 'consome cota do agente configurado' divergir do código, que fixa o Codex."
+}
+
+
+===== STDERR =====
+

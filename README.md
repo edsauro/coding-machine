@@ -13,6 +13,10 @@ SPEC → PLAN → DAG DE TAREFAS → WORKTREE → AGENTE DE CÓDIGO → TESTE
 
 Uma tarefa aprovada roda de ponta a ponta sem intervenção humana.
 
+> **Pendências e mapa dos produtos:** [`Pendencias.md`](Pendencias.md) — o que está
+> pendente, quem decide, os caminhos exatos para resolver e onde ficam os relatórios e
+> produtos de cada sprint.
+
 ---
 
 ## Por que não é só "chamar o Codex num loop"
