@@ -45,7 +45,7 @@ def test_escreve_sprint_completo_no_proximo_id(tmp_path):
     }
 
     dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
-    assert set(dag) == {"sprint_id", "versao", "tasks"}
+    assert set(dag) == {"sprint_id", "versao", "tasks", "prompt_original"}
     assert dag["sprint_id"] == "DEVFACTORY-003"
     assert dag["versao"] == 1
     assert dag["tasks"] == [

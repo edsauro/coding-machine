@@ -123,13 +123,22 @@ def cmd_report(args) -> int:
     from .worktree import commit_atual
     d = RAIZ / ".autodev" / "sprints" / args.sprint
     sp = carrega_sprint(d / "sprint.yaml")
+    # O DAG acrescenta contexto; sua ausência ou corrupção não impede o report.
+    try:
+        valor = json.loads((d / "dag.json").read_text(encoding="utf-8")).get(
+            "prompt_original")
+    except (OSError, ValueError, AttributeError):
+        valor = None
+    prompt_original = valor if isinstance(valor, str) else None
     with _store(RAIZ) as st:
         extra = {}
         f = d / "report-extras.json"
         if f.exists():
             extra = json.loads(f.read_text())
-        txt = rp.gerar(st, args.sprint, objetivo=sp.get("objetivo", ""),
-                       git_commit=commit_atual(RAIZ), **extra)
+        opcoes = {**extra, "objetivo": sp.get("objetivo", ""),
+                  "git_commit": commit_atual(RAIZ),
+                  "prompt_original": prompt_original}
+        txt = rp.gerar(st, args.sprint, **opcoes)
     destino = d / "SPRINT-REPORT.md"
     rp.escrever(txt, destino)
     print(f"relatorio escrito em {destino} ({len(txt)} chars)")
