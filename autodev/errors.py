@@ -20,6 +20,11 @@ class FailureClass(str, Enum):
     PERMISSION_REQUIRED = "PERMISSION_REQUIRED"
     SECRET_REQUIRED = "SECRET_REQUIRED"
     RED_ACTION_REQUIRED = "RED_ACTION_REQUIRED"
+    # O agente respondeu sem entregar NADA: pergunta de design, pedido de
+    # aprovação, plano — e nenhuma alteração no worktree. Achado real: em modo
+    # headless não há humano para responder, então a tentativa é perdida; e a
+    # suíte pré-existente continua verde, o que faria a revisão parecer "ok".
+    SEM_ENTREGA = "SEM_ENTREGA"
     UNKNOWN = "UNKNOWN"
 
 
@@ -45,6 +50,7 @@ CLASSES_QUE_CONSUMEM_TENTATIVA = {
     FailureClass.TEST_FAILURE,
     FailureClass.REVIEW_FAILURE,
     FailureClass.AGENT_CRASH,
+    FailureClass.SEM_ENTREGA,
     FailureClass.UNKNOWN,
 }
 

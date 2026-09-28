@@ -409,3 +409,36 @@ preservação verificável por comando) e a revisão continua reprovando regress
 **Reabertura:** P02–P10 voltaram ao 3º degrau (sol/low) com os worktrees recriados
 do zero a partir da integração da P01 (`b963e0e`) — as tentativas antigas ficaram
 arquivadas nos branches `arquivo/DEVFACTORY-002/P0X-antes-D16`, para auditoria.
+
+## D-17 — Entrega vazia não é entrega: pergunta de design em modo headless
+
+**Achado (tentativa 13 da P02, 22:13→22:19):** o agente terminou com
+*"Você aprova esse design para eu implementar?"* e **nenhum arquivo alterado**. O
+motor tratou como sucesso (exit 0 + stdout com texto), rodou a suíte — que passou,
+porque ela já passava antes — e gastou **5min de revisor** para o Hermes descobrir
+o óbvio: "nenhum commit foi feito".
+
+**Causa:** o motor só sabia julgar a tentativa por `exit_code`, texto de erro e
+testes. Agente que **conversa** em vez de entregar cai no vão entre os dois: a
+suíte pre-existente verde faz a tentativa parecer saudável.
+
+**Correção (três pontas):**
+1. **prompt**: `PROMPT_TASK` ganhou a seção *Modo headless* — "Você roda SEM HUMANO
+   disponível", "não peça aprovação de design", "entregar só um plano conta como
+   FALHA da task";
+2. **portão**: nova classe `SEM_ENTREGA` (consuma tentativa, escala modelo como as
+   demais). Se o agente não alterou **nenhum** arquivo e a suíte está **verde**, a
+   tentativa falha na hora, sem gastar revisão, e o prompt de retry carrega a
+   resposta do próprio agente com instrução explícita ("não há humano para
+   responder: implemente agora"). Fica **depois** dos testes de propósito: suíte
+   vermelha é `TEST_FAILURE`, que explica melhor;
+3. **ruído**: `arquivos_alterados()` descarta bytecode/cache
+   (`__pycache__`, `*.pyc`, `.pytest_cache`, `node_modules`, …). Achado do teste:
+   num projeto que **rastreia** `__pycache__`, rodar os testes "altera" os `.pyc` —
+   e a tentativa sem entrega passaria por entregue (a onda chegou a ser integrada
+   por `.pyc` no fixture). No repo real isso não acontece (0 arquivos rastreados),
+   mas a proteção não pode depender da higiene de cada projeto.
+
+**Testes:** `test_prompt_de_task_proibe_perguntar_em_headless` e
+`test_entrega_vazia_falha_a_tentativa_sem_gastar_revisao` (base verde + agente que
+só pergunta → `SEM_ENTREGA`, zero revisão).

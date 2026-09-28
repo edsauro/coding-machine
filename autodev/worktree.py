@@ -39,15 +39,30 @@ def esta_limpo(repo: str | Path) -> bool:
     return git("status", "--porcelain", cwd=repo) == ""
 
 
+# Ruído de execução NUNCA é entrega. Achado real: num projeto que rastreia
+# __pycache__, rodar os testes "altera" os .pyc — e a tentativa que não entregou
+# NADA passaria por entregue (e a onda, por integrada). O repo real não rastreia
+# bytecode; o filtro é a proteção que não depende da higiene de cada projeto.
+RUIDO_ENTREGA = ("__pycache__/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/",
+                 ".tox/", ".nox/", "node_modules/")
+SUFIXOS_RUIDO = (".pyc", ".pyo", ".pyd")
+
+
+def e_ruido(caminho: str) -> bool:
+    """Bytecode/cache de ferramenta: não conta como mudança entregue."""
+    c = caminho.strip().lstrip("./")
+    return c.endswith(SUFIXOS_RUIDO) or any(r in c for r in RUIDO_ENTREGA)
+
+
 def arquivos_alterados(repo: str | Path, base: str | None = None) -> list[str]:
-    """Arquivos alterados vs base (ou vs HEAD se base vazio)."""
+    """Arquivos alterados vs base (ou vs HEAD se base vazio), sem ruído de execução."""
     if base:
         out = git("diff", "--name-only", base, cwd=repo)
         out += "\n" + git("ls-files", "--others", "--exclude-standard", cwd=repo)
     else:
         out = git("status", "--porcelain", cwd=repo)
-        return [l[3:].strip() for l in out.splitlines() if l.strip()]
-    return sorted({l.strip() for l in out.splitlines() if l.strip()})
+        return [l[3:].strip() for l in out.splitlines() if l.strip() and not e_ruido(l[3:])]
+    return sorted({l.strip() for l in out.splitlines() if l.strip() and not e_ruido(l)})
 
 
 @dataclass

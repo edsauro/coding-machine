@@ -291,6 +291,49 @@ def test_desbloquear_recusa_contador_no_teto(cfg):
 
 
 # ------------------------------------------------------------------ HAQ-001
+def test_prompt_de_task_proibe_perguntar_em_headless():
+    """Sem humano do outro lado, pergunta de design não é entrega: o prompt diz isso."""
+    from autodev.orchestrator import PROMPT_TASK
+    assert "SEM HUMANO" in PROMPT_TASK
+    assert "posso implementar" in PROMPT_TASK
+    assert "FALHA da task" in PROMPT_TASK
+
+
+def test_entrega_vazia_falha_a_tentativa_sem_gastar_revisao(tmp_path, monkeypatch):
+    """Agente que responde e não altera arquivo: SEM_ENTREGA, e a revisão não roda.
+
+    Caso real: o codex devolveu 'Voce aprova esse design para eu implementar?' e o
+    motor tratou como sucesso (exit 0, stdout com texto). A suite pre-existente
+    seguia verde, então a revisão foi gasta para descobrir que não havia entrega.
+    """
+    from autodev.orchestrator import Orquestrador
+    from conftest import TASK_FIXTURE, criar_fixture, escreve_fake_spec, scaffold_sprint
+    from test_acceptance import STATS_CORRIGIDO
+
+    fx = criar_fixture(tmp_path / "fixture")
+    # base VERDE: o cenario e "suite passa e mesmo assim nada foi entregue"
+    (fx / "src" / "stats.py").write_text(STATS_CORRIGIDO, encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(fx), capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "base verde"], cwd=str(fx), capture_output=True)
+
+    scaffold_sprint(fx, SPRINT, [TASK_FIXTURE], objetivo="entrega vazia")
+    spec = escreve_fake_spec(tmp_path / "fake.json", {
+        "acao": "echo",
+        "texto": "Você aprova esse design para eu implementar?",
+    })
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
+
+    o = Orquestrador(fx, SPRINT, modo_teste=True)
+    o.rodar()
+
+    tent = o.store.tentativas(SPRINT, "T01")
+    assert tent, "a tentativa precisa ficar registrada"
+    assert tent[0]["failure_class"] == "SEM_ENTREGA"
+    assert all(t["review_result"] is None for t in tent), \
+        "entrega vazia não pode consumir revisão"
+
+
 def test_cota_do_agente_secundario_nao_estaciona_a_task(tmp_path, monkeypatch):
     """Regra "não parar": cota do agy devolve a tentativa e o codex reassume.
 

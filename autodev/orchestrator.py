@@ -42,6 +42,12 @@ PROMPT_TASK = """Voce e o agente de implementacao de uma task de um Sprint auton
 - Se houver testes, eles devem passar ao final.
 - Simplicidade primeiro. Sem infraestrutura que a task nao exige.
 
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
 ## O que entregar
 1. Implemente a task de forma minima e completa.
 2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
@@ -492,6 +498,30 @@ class Orquestrador:
                                   "arquivos": alterados, "fingerprint": fp,
                                   "motivo": "testes falharam"})
                 fps.append(fp)
+                continue
+
+            # ---- entrega VAZIA: descoberta AQUI, não na revisão ------------------
+            # Agente que responde com pergunta de design/pedido de aprovacao nao
+            # entregou nada: o worktree fica igual ao base e a suite pre-existente
+            # continua VERDE — o que faria a revisão parecer saudavel e queimaria
+            # minutos de revisor para descobrir o obvio. Fica DEPOIS dos testes de
+            # proposito: se a suite esta vermelha, TEST_FAILURE explica melhor.
+            if not alterados and not res.failure_class and res.exit_code == 0:
+                fp = retry.fingerprint(task_id, "SEM_ENTREGA", (res.stdout or "")[-200:], [])
+                self.store.finalizar_tentativa(
+                    self.sprint, task_id, att, status="FAILED", exit_code=0,
+                    changed_files=[], failure_class="SEM_ENTREGA", fingerprint=fp,
+                    test_result=rt.to_dict())
+                historico.append({
+                    "attempt": att, "failure_class": "SEM_ENTREGA", "exit_code": 0,
+                    "saida": "A tentativa anterior NAO alterou nenhum arquivo. "
+                             "Resposta final do agente:\n" + (res.stdout or "")[-1500:],
+                    "arquivos": [], "fingerprint": fp, "motivo": "entrega vazia"})
+                fps.append(fp)
+                self.store.transicionar(self.sprint, task_id, "RETRY", "entrega vazia")
+                self.log(f"{task_id}: SEM ENTREGA — nenhum arquivo alterado e suite "
+                         f"verde; resposta final do agente: "
+                         f"\"{(res.stdout or '').strip()[:120]}\"")
                 continue
 
             # ---- revisão independente -------------------------------------------

@@ -161,6 +161,17 @@ def montar_prompt_retry(prompt_original: str, *, decisao: Decisao,
         f"  - tentativa {t.get('attempt')}: {t.get('failure_class')} "
         f"(exit {t.get('exit_code')}) — {str(t.get('resumo',''))[:150]}"
         for t in tentativas_anteriores[-3:]) or "  (nenhuma)"
+    # Falha explícita e dirigida para a tentativa que não entregou NADA: pedir
+    # de novo o mesmo trabalho, sem reconhecer a pergunta, faz o agente repetir
+    # a pergunta. Achado real (ver SEM_ENTREGA em errors.py).
+    instrucao_extra = ""
+    if getattr(decisao, "failure_class", "") == "SEM_ENTREGA":
+        instrucao_extra = (
+            "\nATENCAO: a tentativa anterior NAO alterou nenhum arquivo — o agente\n"
+            "respondeu com uma pergunta de design/pedido de aprovacao. NAO ha humano\n"
+            "disponivel para responder: perguntar conta como falha. Implemente agora,\n"
+            "decida sozinho com o que a task pede, e deixe as mudancas no worktree.\n"
+        )
     return f"""{prompt_original}
 
 ---
@@ -179,7 +190,7 @@ def montar_prompt_retry(prompt_original: str, *, decisao: Decisao,
 Esta e a tentativa #{decisao.tentativa_proxima}.
 Estrategia decidida: {decisao.estrategia.value}.
 Motivo: {decisao.motivo}
-
+{instrucao_extra}
 NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
 falhou e adote uma abordagem diferente baseada na evidencia acima.
 Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso

@@ -239,3 +239,12 @@
 [22:08:32] P03 tentativa 8: codex gpt-5.6-sol/low
 [22:09:24] P03: testes exit=0 passed=136 failed=0 (configurado)
 [22:10:28] sinal de parada recebido — finalizando com checkpoint
+[22:12:57] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[22:12:57] recuperacao: {'stale': ['P02#9'], 'requeued': [], 'resource': []}
+[22:12:57] P02 tentativa 13: codex gpt-5.6-sol/low
+[22:13:48] P02: testes exit=0 passed=136 failed=0 (configurado)
+[22:19:17] P02: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> REJECT (6 findings)
+[22:19:17] P02: agy FORA desta rodada (cota esgotada)
+[22:19:17] P02: agy esta fora desta rodada (cota) — seguindo com codex
+[22:19:17] P02 tentativa 14: codex gpt-5.6-sol/medium
+[22:19:52] sinal de parada recebido — finalizando com checkpoint
