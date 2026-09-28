@@ -14,6 +14,15 @@ anterior foi substituído por verificações estritamente mais fortes (árvore i
 e igualdade do corpo integral com fixtures). A contagem da suíte sobe de 194 para
 197; o arquivo da task mantém 3 casos, com verificações estritamente mais fortes.
 
+## D-26 — 2026-09-28 — P03 remove afirmações instáveis do README
+
+O README deixa de afirmar que o planejador consome cota do agente configurado,
+porque essa formulação não corresponde ao contrato fixo de `cmd_plan` e a base
+atual não contém essa implementação. A contagem fixa de testes foi substituída
+pelo comando `python3 -m pytest .autodev/tests/ -q`. O novo teste verifica as duas
+afirmações contra o texto e, quando o comando existe, contra a chamada real do
+planejador; nenhum teste anterior foi removido ou enfraquecido.
+
 ## D-25 — 2026-09-28 — P01 fixa a árvore completa do README
 
 A revisão da tentativa 8 demonstrou que validar apenas a janela entre `## Como

@@ -158,8 +158,7 @@ Por exemplo:
 ```
 
 O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
-contendo os três arquivos acima. Como o planejador usa um agente, cada execução
-consome cota do agente configurado. O plano gerado **sempre precisa de revisão
+contendo os três arquivos acima. O plano gerado **sempre precisa de revisão
 humana antes de rodar**: a validação estrutural não garante que a interpretação
 do pedido ou os critérios de aceitação estejam corretos.
 
@@ -187,7 +186,7 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 
 ## Estado atual
 
-- **Suíte do orquestrador: 123 testes passando.**
+- Para medir a suíte do orquestrador, rode `python3 -m pytest .autodev/tests/ -q`.
 - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
   ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.

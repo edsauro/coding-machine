@@ -12,8 +12,7 @@ Por exemplo:
 ```
 
 O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
-contendo os três arquivos acima. Como o planejador usa um agente, cada execução
-consome cota do agente configurado. O plano gerado **sempre precisa de revisão
+contendo os três arquivos acima. O plano gerado **sempre precisa de revisão
 humana antes de rodar**: a validação estrutural não garante que a interpretação
 do pedido ou os critérios de aceitação estejam corretos.
 
