@@ -1,0 +1,57 @@
+/* Estilo A4 impresso do relatório de tentativas do Coding_Machine.
+   Base: template da skill relatorio-para-pdf, com o bloco de avisos da lista numerada
+   (o relatório usa <ol> com avisos numerados e referenciados no corpo). */
+
+@page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+
+body {
+  font-family: "Source Sans 3", "DejaVu Sans", system-ui, sans-serif;
+  font-size: 10.5pt; line-height: 1.55; color: #1c1c1c;
+  max-width: 100%; margin: 0;
+}
+
+h1 { font-size: 19pt; color: #14395e; margin: 0 0 .2em; line-height: 1.25; }
+h2 {
+  font-size: 13pt; color: #14395e; margin: 1.5em 0 .5em;
+  border-bottom: 2px solid #d8e2ee; padding-bottom: .2em;
+  page-break-after: avoid;
+}
+h3 { font-size: 11.5pt; color: #2c5382; margin: 1.2em 0 .4em; page-break-after: avoid; }
+p, li { orphans: 3; widows: 3; }
+ul, ol { padding-left: 1.3em; }
+li { margin-bottom: .25em; }
+
+/* Avisos: aviso enterrado no meio do texto não protege ninguém — o bloco fica no topo
+   com fundo próprio, e o corpo cita "ver aviso N". */
+h2 + ol {
+  background: #fdf3f2; border-left: 4px solid #c0392b;
+  padding: .8em 1em .8em 2.2em; border-radius: 0 4px 4px 0;
+  page-break-inside: auto;
+}
+h2 + ol > li { margin-bottom: .5em; }
+
+table {
+  border-collapse: collapse; width: 100%; margin: .9em 0;
+  font-size: 9.8pt; page-break-inside: avoid;
+}
+th { background: #eef3f9; color: #14395e; text-align: left; }
+th, td { border: 1px solid #c9d6e4; padding: .38em .6em; }
+tbody tr:nth-child(even) { background: #f8fafc; }
+
+code {
+  background: #f1f3f6; padding: .1em .35em; border-radius: 3px;
+  font-family: "DejaVu Sans Mono", monospace; font-size: 9.4pt;
+}
+pre {
+  background: #f6f8fa; border: 1px solid #dde3ea; border-radius: 4px;
+  padding: .7em .9em; overflow-x: auto; font-size: 9pt;
+  page-break-inside: avoid;
+}
+pre code { background: none; padding: 0; }
+
+img { max-width: 100%; height: auto; display: block; margin: 1em auto; }
+
+hr { border: none; border-top: 1px solid #dde3ea; margin: 1.6em 0; }
+
+strong { color: #0f2a45; }
+a { color: #1f5fa8; text-decoration: none; }

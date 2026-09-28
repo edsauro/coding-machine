@@ -1,0 +1,544 @@
+{
+ "total_codex": 92,
+ "degraus": [
+  {
+   "degrau": 1,
+   "chamadas": 15,
+   "pct_chamadas": 16.304347826086957,
+   "modelos": {
+    "gpt-5.6-luna/low": 14,
+    "(nenhum)/(nenhum)": 1
+   },
+   "status": {
+    "OK": 7,
+    "FAILED": 8
+   },
+   "ok": 7
+  },
+  {
+   "degrau": 2,
+   "chamadas": 12,
+   "pct_chamadas": 13.043478260869565,
+   "modelos": {
+    "gpt-5.6-luna/medium": 5,
+    "gpt-5.6-luna/low": 4,
+    "gpt-5.6-terra/low": 3
+   },
+   "status": {
+    "OK": 7,
+    "FAILED": 4,
+    "WAITING_RESOURCE": 1
+   },
+   "ok": 7
+  },
+  {
+   "degrau": 3,
+   "chamadas": 11,
+   "pct_chamadas": 11.956521739130435,
+   "modelos": {
+    "gpt-5.6-luna/low": 7,
+    "gpt-5.6-terra/medium": 2,
+    "gpt-5.6-sol/low": 2
+   },
+   "status": {
+    "OK": 9,
+    "FAILED": 2
+   },
+   "ok": 9
+  },
+  {
+   "degrau": 4,
+   "chamadas": 10,
+   "pct_chamadas": 10.869565217391305,
+   "modelos": {
+    "gpt-5.6-luna/low": 7,
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-sol/medium": 1
+   },
+   "status": {
+    "OK": 8,
+    "FAILED": 2
+   },
+   "ok": 8
+  },
+  {
+   "degrau": 5,
+   "chamadas": 10,
+   "pct_chamadas": 10.869565217391305,
+   "modelos": {
+    "gpt-5.6-luna/low": 5,
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-sol/medium": 2,
+    "gpt-6-astra/low": 1
+   },
+   "status": {
+    "OK": 6,
+    "FAILED": 4
+   },
+   "ok": 6
+  },
+  {
+   "degrau": 6,
+   "chamadas": 9,
+   "pct_chamadas": 9.782608695652174,
+   "modelos": {
+    "gpt-5.6-sol/low": 4,
+    "gpt-5.6-luna/low": 2,
+    "gpt-6-astra/low": 2,
+    "gpt-5.6-sol/medium": 1
+   },
+   "status": {
+    "STALE": 1,
+    "FAILED": 5,
+    "OK": 2,
+    "WAITING_RESOURCE": 1
+   },
+   "ok": 2
+  },
+  {
+   "degrau": 7,
+   "chamadas": 6,
+   "pct_chamadas": 6.521739130434782,
+   "modelos": {
+    "gpt-5.6-sol/low": 3,
+    "gpt-6-astra/low": 1,
+    "gpt-5.6-luna/low": 1,
+    "gpt-5.6-terra/low": 1
+   },
+   "status": {
+    "FAILED": 4,
+    "OK": 1,
+    "WAITING_RESOURCE": 1
+   },
+   "ok": 1
+  },
+  {
+   "degrau": 8,
+   "chamadas": 5,
+   "pct_chamadas": 5.434782608695652,
+   "modelos": {
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-sol/medium": 2,
+    "gpt-5.6-terra/low": 1
+   },
+   "status": {
+    "STALE": 1,
+    "OK": 1,
+    "FAILED": 3
+   },
+   "ok": 1
+  },
+  {
+   "degrau": 9,
+   "chamadas": 5,
+   "pct_chamadas": 5.434782608695652,
+   "modelos": {
+    "gpt-5.6-sol/low": 3,
+    "gpt-6-astra/low": 1,
+    "gpt-5.6-sol/medium": 1
+   },
+   "status": {
+    "STALE": 1,
+    "FAILED": 2,
+    "OK": 2
+   },
+   "ok": 2
+  },
+  {
+   "degrau": 10,
+   "chamadas": 4,
+   "pct_chamadas": 4.3478260869565215,
+   "modelos": {
+    "gpt-6-astra/low": 2,
+    "gpt-5.6-sol/low": 1,
+    "gpt-5.6-sol/medium": 1
+   },
+   "status": {
+    "FAILED": 1,
+    "OK": 3
+   },
+   "ok": 3
+  },
+  {
+   "degrau": 11,
+   "chamadas": 1,
+   "pct_chamadas": 1.0869565217391304,
+   "modelos": {
+    "gpt-5.6-sol/medium": 1
+   },
+   "status": {
+    "FAILED": 1
+   },
+   "ok": 0
+  },
+  {
+   "degrau": 12,
+   "chamadas": 1,
+   "pct_chamadas": 1.0869565217391304,
+   "modelos": {
+    "gpt-6-astra/low": 1
+   },
+   "status": {
+    "FAILED": 1
+   },
+   "ok": 0
+  },
+  {
+   "degrau": 13,
+   "chamadas": 1,
+   "pct_chamadas": 1.0869565217391304,
+   "modelos": {
+    "gpt-5.6-sol/low": 1
+   },
+   "status": {
+    "FAILED": 1
+   },
+   "ok": 0
+  },
+  {
+   "degrau": 14,
+   "chamadas": 1,
+   "pct_chamadas": 1.0869565217391304,
+   "modelos": {
+    "gpt-5.6-sol/medium": 1
+   },
+   "status": {
+    "FAILED": 1
+   },
+   "ok": 0
+  },
+  {
+   "degrau": 15,
+   "chamadas": 1,
+   "pct_chamadas": 1.0869565217391304,
+   "modelos": {
+    "gpt-5.6-sol/low": 1
+   },
+   "status": {
+    "OK": 1
+   },
+   "ok": 1
+  }
+ ],
+ "chamadas_por_sprint_pacote": {
+  "DEVFACTORY-001": {
+   "T15": {
+    "1": 1
+   }
+  },
+  "DEVFACTORY-002": {
+   "P01": {
+    "1": 1
+   },
+   "P02": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1,
+    "9": 1,
+    "10": 1,
+    "11": 1,
+    "12": 1,
+    "13": 1,
+    "14": 1,
+    "15": 1
+   },
+   "P03": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "8": 1,
+    "9": 1,
+    "10": 1
+   },
+   "P04": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1,
+    "8": 1,
+    "9": 1
+   },
+   "P05": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1
+   },
+   "P06": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1
+   },
+   "P07": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1
+   },
+   "P08": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1
+   },
+   "P09": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1,
+    "8": 1,
+    "10": 1
+   },
+   "P10": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1
+   }
+  },
+  "DEVFACTORY-004": {
+   "P01": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1,
+    "8": 1,
+    "9": 1
+   },
+   "P02": {
+    "1": 1
+   },
+   "P03": {
+    "1": 1,
+    "2": 1
+   },
+   "P04": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1,
+    "8": 1,
+    "9": 1,
+    "10": 1
+   }
+  }
+ },
+ "pacotes": [
+  {
+   "sprint": "DEVFACTORY-001",
+   "task": "T15",
+   "chamadas": 1,
+   "max_tentativa": 1,
+   "titulo": "Executar teste de aceitacao autonomo",
+   "modelos": {
+    "(nenhum)/(nenhum)": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P01",
+   "chamadas": 1,
+   "max_tentativa": 1,
+   "titulo": "Restaurar a hierarquia de secoes do README",
+   "modelos": {
+    "gpt-5.6-luna/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P02",
+   "chamadas": 14,
+   "max_tentativa": 15,
+   "titulo": "Fazer o teste de documentacao isolar a secao do Planejador",
+   "modelos": {
+    "gpt-5.6-luna/low": 5,
+    "gpt-5.6-sol/low": 5,
+    "gpt-5.6-sol/medium": 2,
+    "gpt-5.6-luna/medium": 1,
+    "gpt-6-astra/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P03",
+   "chamadas": 9,
+   "max_tentativa": 10,
+   "titulo": "Tirar do README o que nao bate com o codigo",
+   "modelos": {
+    "gpt-5.6-luna/low": 5,
+    "gpt-5.6-sol/low": 3,
+    "gpt-5.6-sol/medium": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P04",
+   "chamadas": 9,
+   "max_tentativa": 9,
+   "titulo": "Comando de teste nos criterios tem de rodar nesta maquina",
+   "modelos": {
+    "gpt-5.6-luna/low": 4,
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-luna/medium": 1,
+    "gpt-5.6-sol/medium": 1,
+    "gpt-6-astra/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P05",
+   "chamadas": 6,
+   "max_tentativa": 6,
+   "titulo": "Escrever o sprint planejado em disco",
+   "modelos": {
+    "gpt-5.6-luna/low": 3,
+    "gpt-5.6-luna/medium": 1,
+    "gpt-5.6-terra/medium": 1,
+    "gpt-5.6-sol/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P06",
+   "chamadas": 7,
+   "max_tentativa": 7,
+   "titulo": "Invocar o agente em modo planejamento",
+   "modelos": {
+    "gpt-5.6-luna/low": 4,
+    "gpt-5.6-sol/low": 1,
+    "gpt-5.6-sol/medium": 1,
+    "gpt-6-astra/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P07",
+   "chamadas": 6,
+   "max_tentativa": 6,
+   "titulo": "Adicionar o comando autodev plan na CLI",
+   "modelos": {
+    "gpt-5.6-luna/low": 3,
+    "gpt-5.6-luna/medium": 1,
+    "gpt-5.6-terra/medium": 1,
+    "gpt-5.6-sol/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P08",
+   "chamadas": 4,
+   "max_tentativa": 4,
+   "titulo": "Provar a aceitacao: do prompt ao sprint executavel",
+   "modelos": {
+    "gpt-5.6-luna/low": 3,
+    "gpt-5.6-sol/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P09",
+   "chamadas": 9,
+   "max_tentativa": 10,
+   "titulo": "Registrar a rastreabilidade do prompt ao plano",
+   "modelos": {
+    "gpt-5.6-luna/low": 3,
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-sol/medium": 2,
+    "gpt-6-astra/low": 2
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-002",
+   "task": "P10",
+   "chamadas": 5,
+   "max_tentativa": 5,
+   "titulo": "Documentar o planejador e fechar a documentacao",
+   "modelos": {
+    "gpt-5.6-luna/low": 3,
+    "gpt-5.6-luna/medium": 1,
+    "gpt-5.6-sol/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-004",
+   "task": "P01",
+   "chamadas": 8,
+   "max_tentativa": 9,
+   "titulo": "Restaurar a hierarquia de secoes do README",
+   "modelos": {
+    "gpt-5.6-luna/low": 2,
+    "gpt-5.6-terra/low": 2,
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-sol/medium": 1,
+    "gpt-6-astra/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-004",
+   "task": "P02",
+   "chamadas": 1,
+   "max_tentativa": 1,
+   "titulo": "Fazer o teste de documentacao isolar a secao do Planejador",
+   "modelos": {
+    "gpt-5.6-luna/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-004",
+   "task": "P03",
+   "chamadas": 2,
+   "max_tentativa": 2,
+   "titulo": "Tirar do README o que nao bate com o codigo",
+   "modelos": {
+    "gpt-5.6-luna/low": 1,
+    "gpt-5.6-terra/low": 1
+   }
+  },
+  {
+   "sprint": "DEVFACTORY-004",
+   "task": "P04",
+   "chamadas": 10,
+   "max_tentativa": 10,
+   "titulo": "Comando de teste nos criterios tem de rodar nesta maquina",
+   "modelos": {
+    "gpt-5.6-luna/low": 2,
+    "gpt-5.6-terra/low": 2,
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-sol/medium": 2,
+    "gpt-6-astra/low": 2
+   }
+  }
+ ],
+ "outros_agentes": {
+  "retroativo": 14,
+  "agy": 4
+ },
+ "maior_degrau": 15
+}
