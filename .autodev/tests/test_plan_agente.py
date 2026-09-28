@@ -1,0 +1,112 @@
+import json
+
+import pytest
+
+from autodev.planner import CotaEsgotada, PlanoInvalido, planejar
+
+
+def _preparar_sprint(raiz, sprint_id="DEVFACTORY-007"):
+    logs = raiz / ".autodev" / "sprints" / sprint_id / "logs"
+    logs.mkdir(parents=True)
+    return logs
+
+
+def _configurar_fake(monkeypatch, tmp_path, resposta):
+    spec = tmp_path / "agente.json"
+    spec.write_text(
+        json.dumps({"acao": "echo", "texto": resposta}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
+
+
+def _resposta_valida():
+    return json.dumps(
+        {
+            "titulo": "API planejada",
+            "objetivo": "Entregar uma API testada",
+            "repositorio": ".",
+            "tasks": [
+                {
+                    "id": "P01",
+                    "titulo": "Implementar API",
+                    "criterios": ["python3 -m pytest tests/test_api.py -q passa"],
+                    "deps": [],
+                    "agente": "codex",
+                    "teste": "python3 -m pytest tests/test_api.py -q",
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+
+def test_planejar_devolve_plano_usando_driver_falso(tmp_path, monkeypatch):
+    _preparar_sprint(tmp_path)
+    _configurar_fake(monkeypatch, tmp_path, _resposta_valida())
+
+    plano = planejar(tmp_path, "Planeje uma API", "codex")
+
+    assert plano.titulo == "API planejada"
+    assert plano.tasks[0].id == "P01"
+    assert plano.prompt_original == "Planeje uma API"
+
+
+def test_planejar_grava_cada_prompt_e_resposta_no_sprint_mais_recente(
+    tmp_path, monkeypatch
+):
+    logs_antigos = _preparar_sprint(tmp_path, "DEVFACTORY-999")
+    logs = _preparar_sprint(tmp_path, "DEVFACTORY-1000")
+    primeira_resposta = _resposta_valida()
+    _configurar_fake(monkeypatch, tmp_path, primeira_resposta)
+
+    planejar(tmp_path, "Primeiro pedido auditável", "agy")
+
+    segunda_resposta = primeira_resposta.replace("API planejada", "API revisada")
+    _configurar_fake(monkeypatch, tmp_path, segunda_resposta)
+    planejar(tmp_path, "Segundo pedido auditável", "agy")
+
+    auditoria = (logs / "plano-agy.log").read_text(encoding="utf-8")
+    assert "Primeiro pedido auditável" in auditoria
+    assert primeira_resposta in auditoria
+    assert "Segundo pedido auditável" in auditoria
+    assert segunda_resposta in auditoria
+    assert not (logs_antigos / "plano-agy.log").exists()
+
+
+def test_planejar_propaga_cota_esgotada(tmp_path, monkeypatch):
+    _preparar_sprint(tmp_path)
+    spec = tmp_path / "quota.json"
+    spec.write_text(json.dumps({"acao": "quota"}), encoding="utf-8")
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
+
+    with pytest.raises(CotaEsgotada):
+        planejar(tmp_path, "Planeje sem esconder a cota", "codex")
+
+
+def test_planejar_nao_converte_falha_do_agente_em_plano_invalido(
+    tmp_path, monkeypatch
+):
+    _preparar_sprint(tmp_path)
+    spec = tmp_path / "crash.json"
+    spec.write_text(json.dumps({"acao": "crash"}), encoding="utf-8")
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
+
+    with pytest.raises(RuntimeError, match=r"AGENT_CRASH.*exit_code=137"):
+        planejar(tmp_path, "Planeje", "codex")
+
+
+def test_planejar_cita_inicio_da_resposta_sem_json(tmp_path, monkeypatch):
+    _preparar_sprint(tmp_path)
+    resposta = "INICIO DA RESPOSTA " + ("x" * 200) + " MARCADOR NO FIM"
+    _configurar_fake(monkeypatch, tmp_path, resposta)
+
+    with pytest.raises(PlanoInvalido) as capturada:
+        planejar(tmp_path, "Planeje", "codex")
+
+    mensagem = str(capturada.value)
+    assert "INICIO DA RESPOSTA" in mensagem
+    assert "MARCADOR NO FIM" not in mensagem
