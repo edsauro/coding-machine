@@ -21,6 +21,9 @@ depende_de: DEVFACTORY-002
 # Comando de teste por task. Obrigatorio: o repositorio nao tem pyproject.toml
 # nem tests/ na raiz, entao a auto-deteccao devolveria "nenhum".
 aceitacao:
+  # 'python3 -m pytest' e a forma que o RUNNER resolve (ele roda com cwd dentro do
+  # worktree e o sandbox mapeia o interpretador do projeto). NAO troque por
+  # '.venv/bin/python': dentro do worktree esse venv nao existe util (D-23, 28/09).
   comando: "python3 -m pytest .autodev/tests/ -q"
   evidencia: ".autodev/sprints/DEVFACTORY-003/evidence/"
 

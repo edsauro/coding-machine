@@ -22,12 +22,12 @@ max_tentativas: 5          # espelha policies.yaml
 depende_de: DEVFACTORY-002
 
 # Comando de teste por task. Obrigatorio: o repositorio nao tem pyproject.toml nem
-# tests/ na raiz, entao a auto-deteccao devolveria "nenhum". Forma com o interpretador
-# do projeto: 'python3 -m pytest' so funciona dentro do runner do motor, que resolve o
-# interpretador — quem roda o comando literalmente falha nesta maquina (achado das duas
-# revisoes retroativas).
+# tests/ na raiz, entao a auto-deteccao devolveria "nenhum". A forma e a que o RUNNER
+# resolve ('python3 -m pytest'): o runner roda com cwd dentro do worktree e o sandbox
+# mapeia o interpretador do projeto. Nunca use '.venv/bin/python' aqui — dentro do
+# worktree esse venv nao existe util (queimou 12 tentativas em 28/09, ver D-23).
 aceitacao:
-  comando: ".venv/bin/python -m pytest .autodev/tests/ -q"
+  comando: "python3 -m pytest .autodev/tests/ -q"
   evidencia: ".autodev/sprints/DEVFACTORY-004/evidence/"
 
 # Politica de custo: comecar sempre no degrau mais barato (spec §9)

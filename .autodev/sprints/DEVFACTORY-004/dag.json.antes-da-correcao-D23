@@ -13,14 +13,14 @@
         "nenhum conteudo e removido: a secao da tela de eventos ('### Acompanhar ao vivo'), a secao do Planejador e as subsecoes de '## Como rodar' continuam presentes, com o mesmo texto",
         "a arvore de titulos fica coerente: nenhum '##' abre dentro de outro '##' sem fechar, e nenhuma subsecao de um assunto fica sob titulo de outro",
         "os testes ficam em .autodev/tests/test_readme_estrutura.py e provam a hierarquia (nivel e ordem dos titulos lidos do arquivo), inclusive que '### Ciclo de vida do sprint' vem depois de '## Como rodar' e antes do proximo '##'",
-        "rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q (nao use .venv/bin/python: dentro do worktree esse venv nao existe de verdade — em 28/09 isso queimou 12 tentativas, evidencia em .autodev/sprints/DEVFACTORY-004/evidence/, D-23)",
-        "preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa"
+        "rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q (a forma 'python3 -m pytest' so funciona dentro do runner do motor, que resolve o interpretador)",
+        "preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de .venv/bin/python -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa"
       ],
       "deps": [],
       "agente": "codex",
       "paralelizavel": true,
       "estimativa": "S",
-      "teste": "python3 -m pytest .autodev/tests/test_readme_estrutura.py -q"
+      "teste": ".venv/bin/python -m pytest .autodev/tests/test_readme_estrutura.py -q"
     },
     {
       "id": "P02",
@@ -28,54 +28,50 @@
       "criterios": [
         "_secao_planejador() em .autodev/tests/test_plan_docs.py para de cortar a secao apenas no proximo '\\n## ': a secao devolvida termina no proximo titulo de nivel igual ou superior (qualquer '## ' ou '# '), sem incluir subsecoes de outros assuntos",
         "o teste passa a provar o que anuncia: uma mutacao que devolva, junto com a secao do Planejador, a subsecao '### Ciclo de vida do sprint' faz o teste FALHAR",
-        "o arquivo pode ser alterado (esta task existe para isso), mas o numero de casos de teste nao pode diminuir: a contagem de python3 -m pytest .autodev/tests/test_plan_docs.py --collect-only -q nao pode ser menor que antes",
+        "o arquivo pode ser alterado (esta task existe para isso), mas o numero de casos de teste nao pode diminuir: a contagem de .venv/bin/python -m pytest .autodev/tests/test_plan_docs.py --collect-only -q nao pode ser menor que antes",
         "os testes novos ficam no proprio .autodev/tests/test_plan_docs.py (nenhum caso novo em outro arquivo)",
-        "rode com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q",
+        "rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q",
         "preservacao com evolucao: registre em .autodev/sprints/DEVFACTORY-004/decisions.md, com data, por que a assercao de isolamento foi trocada, e prove a contagem antes/depois; o revisor confere e reprova autorizacao sem essa prova"
       ],
-      "deps": [
-        "P01"
-      ],
+      "deps": ["P01"],
       "agente": "codex",
       "paralelizavel": true,
       "estimativa": "S",
-      "teste": "python3 -m pytest .autodev/tests/test_plan_docs.py -q"
+      "teste": ".venv/bin/python -m pytest .autodev/tests/test_plan_docs.py -q"
     },
     {
       "id": "P03",
       "titulo": "Tirar do README o que nao bate com o codigo",
       "criterios": [
         "o texto que afirma que a execucao do planejador 'consome cota do agente configurado' passa a refletir o codigo: o agente do planejador e FIXO em 'codex' (autodev/cli.py, cmd_plan), ou o codigo passa a aceitar o agente por parametro e o texto continua verdadeiro — escolha UMA e prove com teste",
-        "a linha com numero fixo de testes ('Suite do orquestrador: 123 testes passando') deixa de envelhecer: ou sai do README, ou passa a apontar o comando que mede (python3 -m pytest .autodev/tests/ -q) sem citar contagem",
+        "a linha com numero fixo de testes ('Suite do orquestrador: 123 testes passando') deixa de envelhecer: ou sai do README, ou passa a apontar o comando que mede (.venv/bin/python -m pytest .autodev/tests/ -q) sem citar contagem",
         "os testes ficam em .autodev/tests/test_readme_afirmacoes.py e falham se qualquer das duas afirmacoes voltar a contradizer o codigo (leitura do README contra a assinatura real de cmd_plan)",
-        "rode com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q",
+        "rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q",
         "preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; ajuste minimo, decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prova de que a cobertura nao caiu"
       ],
-      "deps": [
-        "P01"
-      ],
+      "deps": ["P01"],
       "agente": "codex",
       "paralelizavel": true,
       "estimativa": "S",
-      "teste": "python3 -m pytest .autodev/tests/test_readme_afirmacoes.py -q"
+      "teste": ".venv/bin/python -m pytest .autodev/tests/test_readme_afirmacoes.py -q"
     },
     {
       "id": "P04",
       "titulo": "Comando de teste nos criterios tem de rodar nesta maquina",
       "criterios": [
-        "o verificador de planos (.autodev/scripts/verificar_plano.py) aponta ERRO quando o campo 'teste' de uma task ou um criterio de teste usa caminho de venv relativo ('.venv/bin/python'), porque dentro do worktree esse venv nao existe util: em 28/09 isso queimou 12 tentativas (P01 e P04 desta sprint), com a evidencia 'No module named pytest'",
-        "o verificador passa a EXIGIR a forma que o runner do motor resolve: 'python3 -m pytest ...' — o runner roda com cwd no worktree e o sandbox resolve o interpretador do projeto (autodev/testrunner.py, funcao rodar; autodev/sandbox.py, resolucao do python3)",
-        "o prompt de planejamento (autodev/plan_prompt.py) passa a exigir 'python3 -m pytest ...' nos criterios e no campo 'teste', e a proibir caminho de venv relativo, explicando em uma linha por que (o worktree nao tem venv)",
-        "o verificador continua SOMENTE LEITURA: nao escreve em dag.json nem em nenhum arquivo do sprint",
-        "os testes ficam em .autodev/tests/test_plano_comando.py e cobrem os tres casos: DAG com 'python3 -m pytest' nao gera erro; DAG com 'python3 -m pytest' gera erro com a explicacao; o prompt de planejamento cita a forma correta",
-        "estende .autodev/scripts/verificar_plano.py e autodev/plan_prompt.py preservando as checagens existentes (colisao na mesma onda, arquivo de teste repetido, criterio sem arquivo, edicao sem preservacao) sem remover nem renomear nada",
-        "rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q"
+        "o verificador de planos (.autodev/scripts/verificar_plano.py) aponta AVISO quando o campo 'teste' de uma task ou um criterio de teste cita 'python3 -m pytest' sem o interpretador do projeto, sugerindo a forma '.venv/bin/python -m pytest'",
+        "o mesmo aviso explica por que: nesta maquina o python3 do sistema nao tem pytest (o runner do motor resolve o interpretador, mas quem roda o comando literalmente falha)",
+        "o prompt de planejamento (autodev/plan_prompt.py) passa a exigir a forma que roda nesta maquina (.venv/bin/python -m pytest ...) nos criterios e no campo 'teste'",
+        "o verificador continua somente leitura: nao escreve em dag.json nem em nenhum arquivo do sprint",
+        "os testes ficam em .autodev/tests/test_plano_comando.py e cobrem: um DAG com '.venv/bin/python -m pytest' nao gera aviso, um DAG com 'python3 -m pytest' gera aviso, e o prompt de planejamento cita a forma correta",
+        "estende .autodev/scripts/verificar_plano.py e autodev/plan_prompt.py preservando as funcoes existentes (checagens de colisao na mesma onda, arquivo de teste repetido, criterio sem arquivo, edicao sem preservacao) sem remover nem renomear nada",
+        "rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q"
       ],
       "deps": [],
       "agente": "codex",
       "paralelizavel": true,
       "estimativa": "M",
-      "teste": "python3 -m pytest .autodev/tests/test_plano_comando.py -q"
+      "teste": ".venv/bin/python -m pytest .autodev/tests/test_plano_comando.py -q"
     }
   ]
 }

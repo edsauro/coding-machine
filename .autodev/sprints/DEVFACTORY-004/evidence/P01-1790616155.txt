@@ -1,0 +1,5 @@
+$ .venv/bin/python -m pytest .autodev/tests/test_readme_estrutura.py -q
+exit=1 (0.0s)
+
+
+bwrap: execvp .venv/bin/python: No such file or directory

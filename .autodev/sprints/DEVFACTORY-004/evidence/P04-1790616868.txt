@@ -1,0 +1,5 @@
+$ .venv/bin/python -m pytest .autodev/tests/test_plano_comando.py -q
+exit=1 (0.0s)
+
+
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-004-P04-codex/.venv/bin/python: No module named pytest

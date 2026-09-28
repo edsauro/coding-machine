@@ -80,17 +80,25 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Quem fecha:** `P01` e `P02` da DEVFACTORY-004.
 - **Evidência:** `.autodev/sprints/DEVFACTORY-002/revisao-retroativa/P10-veredito-relido.json`
 
-### P-06 · Critérios que mandam `python3 -m pytest` — **agente**
-- **O que é:** nesta máquina o `python3` do sistema **não tem pytest**; o runner do
-  motor resolve o interpretador do projeto, mas quem roda o comando literalmente falha
-  (foi achado por dois revisores independentes). A forma que roda:
-  `.venv/bin/python -m pytest ...`.
-- **Caminhos:** `.autodev/sprints/DEVFACTORY-003/dag.json` (campo `teste` e critérios),
-  `.autodev/sprints/DEVFACTORY-003/sprint.yaml` (bloco `aceitacao`). O `dag.json` da 002
-  é histórico (já integrado) e não se mexe.
-- **Verificação:** `grep -rn "python3 -m pytest" .autodev/sprints/*/dag.json`
-- **Quem fecha:** `P04` da DEVFACTORY-004 (corrige o verificador de planos e o prompt de
-  planejamento); a **redação do DAG da 003** ainda precisa ser ajustada antes de ela rodar.
+### P-06 · Forma do comando de teste nos critérios — **agente**
+- **O que é:** o critério (`teste` e os comandos citados) é executado pelo **runner do
+  motor**, com `cwd` **dentro do worktree**. Ali o venv do projeto **não existe de forma
+  útil**, então `.venv/bin/python -m pytest` quebra o portão de testes. A forma
+  suportada é **`python3 -m pytest ...`** — o sandbox resolve o interpretador do
+  projeto. Rodar à mão é outra coisa: aí sim vale `.venv/bin/python -m pytest` (é o que
+  o README manda).
+- **Provado na prática em 28/09:** os critérios da DEVFACTORY-004 saíram com
+  `.venv/bin/python` e **12 tentativas** (P01 e P04) morreram com
+  `No module named pytest` — evidência em
+  `.autodev/sprints/DEVFACTORY-004/evidence/P04-*.txt` e decisão **D-23** em
+  `.autodev/sprints/DEVFACTORY-004/decisions.md`.
+- **Caminhos:** `.autodev/sprints/*/dag.json` (campo `teste` e critérios),
+  `.autodev/sprints/*/sprint.yaml` (bloco `aceitacao`), `autodev/plan_prompt.py`.
+- **Verificação:** `grep -rn "\.venv/bin/python" .autodev/sprints/*/dag.json` (só deve
+  aparecer onde o texto **proíbe** a forma) e
+  `grep -rn "python3 -m pytest" .autodev/sprints/*/dag.json`
+- **Quem fecha:** `P04` da DEVFACTORY-004 — já invertida: exige a forma do runner e
+  reprova caminho de venv relativo, com a explicação.
 
 ### P-07 · Baixas da revisão retroativa (registradas, não bloqueiam) — **agente**
 - `README.md:105` — diz que a execução "consome cota do agente configurado", mas o

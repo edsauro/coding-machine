@@ -108,3 +108,13 @@ enquanto a sprint 2 roda.
 3. **Deixar o planejador gerar e o autor revisar a mao.** E o estado atual
    (limitacao documentada na P10). Vira gargalo justamente quando o volume cresce,
    que e o motivo de existir o planejador.
+
+## Convenção do comando de teste
+
+Os critérios e o campo `teste` usam **`python3 -m pytest ...`** de propósito: é a forma
+que o **runner do motor** resolve — ele executa o comando com `cwd` dentro do worktree e
+o sandbox mapeia o interpretador do projeto. Escrever `.venv/bin/python -m pytest` nos
+critérios **quebra o portão de testes**, porque dentro do worktree o venv do projeto não
+existe de forma útil (aconteceu em 28/09 na DEVFACTORY-004: 12 tentativas perdidas com
+`No module named pytest` — decisão D-23). Para rodar a suíte **à mão**, fora do motor, o
+README manda `.venv/bin/python -m pytest`.

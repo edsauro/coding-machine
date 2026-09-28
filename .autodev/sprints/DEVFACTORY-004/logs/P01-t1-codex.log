@@ -1,0 +1,88 @@
+# exit_code=0 duracao=98.1s modelo=gpt-5.6-luna effort=low failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P01: Restaurar a hierarquia de secoes do README
+
+## Criterios de aceitacao (todos obrigatorios)
+- a secao '## Planejador' deixa de ficar dentro de '## Como rodar' (o README da sprint 2 a inseriu no meio dessa secao)
+- '### Ciclo de vida do sprint' e '### Conclusao por evidencia' voltam a ser subsecoes de '## Como rodar', na ordem em que estavam antes da P10 da sprint 2
+- nenhum conteudo e removido: a secao da tela de eventos ('### Acompanhar ao vivo'), a secao do Planejador e as subsecoes de '## Como rodar' continuam presentes, com o mesmo texto
+- a arvore de titulos fica coerente: nenhum '##' abre dentro de outro '##' sem fechar, e nenhuma subsecao de um assunto fica sob titulo de outro
+- os testes ficam em .autodev/tests/test_readme_estrutura.py e provam a hierarquia (nivel e ordem dos titulos lidos do arquivo), inclusive que '### Ciclo de vida do sprint' vem depois de '## Como rodar' e antes do proximo '##'
+- rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q (a forma 'python3 -m pytest' so funciona dentro do runner do motor, que resolve o interpretador)
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de .venv/bin/python -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa
+
+## Contexto do projeto
+# DEVFACTORY-004 — Correções apontadas pela revisão retroativa da sprint 2
+
+## Objetivo
+
+Corrigir, **com o mesmo processo** (task → agente → revisão → integração), os defeitos
+que a revisão retroativa por LLM encontrou na P10 da sprint 2 e as pendências de
+rastreabilidade que apareceram nas duas revisões. Nada foi corrigido à mão no trabalho
+já integrado: quem corrige é esta sprint.
+
+Fonte dos achados: `~/.hermes/cache/scratch/revisoes-p09-p10/{P09,P10}-veredito-relido.json`
+e o registro D-22 em `.autodev/sprints/DEVFACTORY-002/decisions.md`.
+
+## O que esta sprint entrega
+
+1. **README com hierarquia coerente** (P01) — a seção `## Planejador`, entregue pela P10
+   da sprint 2, foi inserida **dentro** de `## Como rodar`. Consequência: `### Ciclo de
+   vida do sprint` e `### Conclusão por evidência` passaram a ser subseções do
+   Planejador. Conteúdo fica, estrutura volta ao lugar.
+2. **Teste de documentação que prova o que anuncia** (P02) — `_secao_planejador()` corta
+   a seção no próximo `\n## `, então a "seção Planejador" que o teste examina inclui
+   subseções que não são dela. O teste passa a isolar de verdade, com mutação que
+   derruba o teste quando o vazamento volta.
+3. **README sem afirmação que não bate com o código** (P03) — "consome cota do agente
+   configurado" (o agente do planejador é fixo em `codex`) e o número fixo "Suíte do
+   orquestrador: 123 testes passando", que já nasceu velho.
+4. **Critério com comando que roda nesta máquina** (P04) — os critérios e o campo
+   `teste` mandavam `python3 -m pytest`, que **não roda aqui** fora do runner do motor
+   (o `python3` do sistema não tem pytest). O verificador de planos passa a avisar, e o
+   prompt de planejamento passa a exigir a forma que roda.
+
+## Por que isso é produto, e não faxina
+
+O motor exige que cada critério seja **verificável**. Um critério cujo comando não roda
+na máquina do dono é um critério que ninguém consegue conferir — foi exatamente o que
+dois revisores apontaram de forma independente. E um teste que prova menos do que
+anuncia é a mesma classe de defeito que reprovou a P09 duas vezes na sprint 2: parece
+cobertura, não é. As duas correções entram no verificador de planos (P04) para valer
+para os próximos DAGs, não só para este.
+
+## Dependências
+
+`DEVFACTORY-004` depende de `DEVFACTORY-002` estar integrada — e está (ENCERRADA,
+10/10). Os arquivos tocados (`README.md`, `.autodev/tests/test_plan_docs.py`,
+`.autodev/scripts/verificar_plano.py`, `autodev/plan_prompt.py`) existem
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-004-P01-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+===== STDOUT =====
+RESULTADO: hierarquia do README restaurada e teste estrutural adicionado | TESTES: `.venv/bin/python -m pytest .autodev/tests/ -q` não executou porque `.venv` não existe; validação direta dos 2 testes passou
+
+===== STDERR =====
+
