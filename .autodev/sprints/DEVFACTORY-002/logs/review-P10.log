@@ -1,4 +1,4 @@
-# exit_code=3 duracao=150.1s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+# exit_code=2 duracao=3.5s modelo=deepseek-v4-pro effort=(default) failure_class=CODEX_QUOTA
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -10,89 +10,109 @@ Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
 - a secao declara explicitamente que o planejador usa um agente e por isso consome cota
 - a secao registra a limitacao de que o plano gerado sempre precisa de revisao humana antes de rodar
 - o README menciona que o comando plan nao faz merge nem push
-- os testes ficam em .autodev/tests/test_planner.py provando que as secoes exigidas existem no README
+- os testes ficam em .autodev/tests/test_plan_docs.py provando que as secoes exigidas existem no README
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca de comportamento EXIGIDA por esta task invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-002/decisions.md e prove que a cobertura nao caiu (a contagem do comando python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes da mudanca); o revisor confere a justificativa e reprova autorizacao sem essa prova
 
 ## Task
 P10: Documentar o planejador e fechar a documentacao
 
-## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+## Diff a revisar (base fbdd0f73642de181a27ccb4462be90ac81235e77 -> HEAD)
 ```diff
-diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
 new file mode 100644
-index 0000000..a5e4c94
+index 0000000..6cc61b2
 --- /dev/null
-+++ b/.autodev/tests/test_planner.py
-@@ -0,0 +1,28 @@
++++ b/.autodev/tests/test_plan_docs.py
+@@ -0,0 +1,47 @@
++"""Contrato da documentacao publica do planejador."""
++
 +from pathlib import Path
 +
 +
 +README = Path(__file__).parents[2] / "README.md"
 +
 +
-+def test_readme_documenta_o_fluxo_do_planejador():
++def _secao_planejador() -> str:
 +    texto = README.read_text(encoding="utf-8")
-+
-+    assert "## Planejador" in texto
-+    assert "prompt" in texto.lower()
-+    assert "sprint executável" in texto.lower()
-+    assert "spec.md" in texto
-+    assert "dag.json" in texto
-+    assert "sprint.yaml" in texto
++    marcador = "## Planejador"
++    assert marcador in texto
++    secao = texto.split(marcador, maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
++    return " ".join(secao.split())
 +
 +
-+def test_readme_documenta_uso_efeitos_e_limites_do_plan():
-+    texto = README.read_text(encoding="utf-8")
-+    minusculo = texto.lower()
++def test_readme_explica_fluxo_do_prompt_ao_sprint_executavel():
++    secao = _secao_planejador().lower()
 +
-+    assert 'autodev plan "<pedido em texto livre>"' in texto
-+    assert "em disco" in minusculo
-+    assert "agente" in minusculo
-+    assert "cota" in minusculo
-+    assert "revisão humana" in minusculo
-+    assert "merge" in minusculo
-+    assert "push" in minusculo
++    assert "prompt" in secao
++    assert "spec.md" in secao
++    assert "dag.json" in secao
++    assert "sprint.yaml" in secao
++    assert "sprint executável" in secao
++
++
++def test_readme_documenta_comando_plan_e_efeito_no_disco():
++    secao = _secao_planejador()
++
++    assert 'autodev plan "' in secao
++    assert ".autodev/sprints/" in secao
++
++
++def test_readme_alerta_sobre_agente_cota_e_revisao_humana():
++    secao = _secao_planejador().lower()
++
++    assert "agente" in secao
++    assert "consome cota" in secao
++    assert "revisão humana" in secao
++    assert "sempre" in secao
++    assert "antes de rodar" in secao
++
++
++def test_readme_declara_que_plan_nao_faz_merge_nem_push():
++    secao = _secao_planejador().lower()
++
++    assert "não faz merge nem push" in secao
 diff --git a/README.md b/README.md
-index fe564ee..11558df 100644
+index fe564ee..d561d99 100644
 --- a/README.md
 +++ b/README.md
-@@ -15,6 +15,29 @@ Uma tarefa aprovada roda de ponta a ponta sem intervenção humana.
- 
- ---
+@@ -88,6 +88,28 @@ Testes do próprio orquestrador:
+ .venv/bin/python -m pytest .autodev/tests/ -q
+ ```
  
 +## Planejador
 +
-+O planejador transforma um pedido em texto livre em um sprint executável. O
-+fluxo é: o prompt do usuário é enviado a um agente, o agente produz o plano
-+com as tarefas e suas dependências, e o plano é validado pelas mesmas regras
-+do DAG usado pelo orquestrador. Depois, os artefatos são gravados em disco no
-+diretório `.autodev/sprints/<id>/`: `spec.md`, `dag.json` e `sprint.yaml`.
++O planejador transforma um prompt em texto livre em um sprint executável. Ele
++envia o pedido a um agente, interpreta e valida o plano devolvido, ordena as
++tarefas por dependência e materializa os arquivos que o orquestrador consome:
++`spec.md`, `dag.json` e `sprint.yaml`.
 +
-+Para usar:
++Por exemplo:
 +
 +```bash
-+autodev plan "<pedido em texto livre>"
++.venv/bin/python -m autodev plan "Adicionar autenticação à API"
 +```
 +
-+Esse comando cria o sprint planejado em disco, pronto para ser inspecionado e
-+então executado pelo fluxo normal. O planejador usa um agente para elaborar o
-+plano e, por isso, consome cota de agente/API. O plano gerado sempre precisa de
-+revisão humana antes de rodar: confira as tarefas, critérios e dependências
-+antes de iniciar o sprint. O comando `plan` não faz merge nem push; ele apenas
-+produz os arquivos do sprint.
++O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
++contendo os três arquivos acima. Como o planejador usa um agente, cada execução
++consome cota do agente configurado. O plano gerado **sempre precisa de revisão
++humana antes de rodar**: a validação estrutural não garante que a interpretação
++do pedido ou os critérios de aceitação estejam corretos.
 +
-+---
++`plan` somente prepara os arquivos locais do sprint; ele **não faz merge nem
++push**.
 +
- ## Por que não é só "chamar o Codex num loop"
+ ### Ciclo de vida do sprint
  
- Porque o valor está no que acontece **quando dá errado**. O projeto trata como
+ Tarefas têm 12 estados; o **sprint** tem os seus:
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 53%]
-..............................................ss..............           [100%]
-132 passed, 2 skipped in 7.30s
+........................................................................ [ 35%]
+..............................................ss........................ [ 70%]
+.............................................................            [100%]
+203 passed, 2 skipped in 8.87s
 
 ```
 
@@ -123,10 +143,24 @@ Responda com um unico bloco JSON, nada antes e nada depois:
 ```
 
 
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
 ===== STDOUT =====
+Billing or credits exhausted: HTTP 402: Insufficient Balance (request_id: 223644cf-7612-439d-b473-4f8b0c43cb9c)
+
+DeepSeek reported that billing, credits, or account entitlement is exhausted for deepseek-v4-pro.
+Add credits or update billing with that provider, then retry.
+DeepSeek billing: https://platform.deepseek.com/top_up
+You can switch providers temporarily with /model <model> --provider <provider>.
 
 
 ===== STDERR =====
-error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h17m54s.
-AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h17m54s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"b31fa376-66d1-49bf-a696-f0222cc3f20c-9"}
 

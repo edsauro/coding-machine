@@ -1,4 +1,4 @@
-# exit_code=0 duracao=45.0s modelo=gpt-5.6-luna effort=low failure_class=None
+# exit_code=0 duracao=97.7s modelo=gpt-5.6-sol effort=low failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -11,8 +11,9 @@ Voce e o agente de implementacao de uma task de um Sprint autonomo.
 - a secao declara explicitamente que o planejador usa um agente e por isso consome cota
 - a secao registra a limitacao de que o plano gerado sempre precisa de revisao humana antes de rodar
 - o README menciona que o comando plan nao faz merge nem push
-- os testes ficam em .autodev/tests/test_planner.py provando que as secoes exigidas existem no README
+- os testes ficam em .autodev/tests/test_plan_docs.py provando que as secoes exigidas existem no README
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca de comportamento EXIGIDA por esta task invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-002/decisions.md e prove que a cobertura nao caiu (a contagem do comando python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes da mudanca); o revisor confere a justificativa e reprova autorizacao sem essa prova
 
 ## Contexto do projeto
 # DEVFACTORY-002 — Planejador: do prompt ao plano executável
@@ -78,6 +79,12 @@ autodev/plan_prompt.py
 - Se houver testes, eles devem passar ao final.
 - Simplicidade primeiro. Sem infraestrutura que a task nao exige.
 
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
 ## O que entregar
 1. Implemente a task de forma minima e completa.
 2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
@@ -87,7 +94,7 @@ autodev/plan_prompt.py
 
 
 ===== STDOUT =====
-RESULTADO: P10 implementada no README e em `.autodev/tests/test_planner.py` | TESTES: `134 passed` com pytest do ambiente virtual; `python3 -m pytest` indisponível por falta do módulo pytest.
+RESULTADO: README documenta o Planejador e 4 testes validam os requisitos; coleta cresceu de 201 para 205 | TESTES: `python3 -m pytest .autodev/tests/ -q` — 205 passed em 17.13s
 
 ===== STDERR =====
 

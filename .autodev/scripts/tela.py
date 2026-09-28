@@ -238,14 +238,34 @@ def eventos(con: sqlite3.Connection, sprint: str, quantos: int,
 
 
 # ------------------------------------------------------------- cabeçalho
-def _rodada_viva(con: sqlite3.Connection) -> bool:
+def _rodada_viva(con: sqlite3.Connection, sprint: str) -> bool:
+    """Rodada viva = existe tentativa RUNNING deste sprint com heartbeat recente.
+
+    O `writer_lock` sozinho não serve: ele não é reescrito durante a tentativa (já
+    mostrou 'parada' com um agente rodando). A tentativa em si tem `last_heartbeat`,
+    atualizado pelo runner enquanto o agente trabalha — essa é a fonte confiável.
+    O lock entra como reserva, para o intervalo antes de a tentativa começar.
+
+    Filtrado por sprint: uma rodada de outro sprint não pode deixar esta tela dizendo
+    'rodada viva'.
+    """
     agora = time.time()
     try:
-        linhas = con.execute(
-            "SELECT pid, heartbeat FROM writer_lock").fetchall()
+        viva = con.execute(
+            "SELECT COUNT(*) n FROM attempts WHERE sprint_id=? AND status='RUNNING' "
+            "AND COALESCE(last_heartbeat, start_time, 0) > ?",
+            (sprint, agora - JANELA_RODADA_VIVA)).fetchone()["n"]
+        if viva:
+            return True
+    except sqlite3.OperationalError:
+        pass
+    try:
+        linhas = con.execute("SELECT worktree, pid, heartbeat FROM writer_lock").fetchall()
     except sqlite3.OperationalError:
         return False
     for linha in linhas:
+        if sprint not in (linha["worktree"] or ""):
+            continue
         pid, hb = linha["pid"] or 0, linha["heartbeat"] or 0
         if pid:
             try:
@@ -260,14 +280,15 @@ def _rodada_viva(con: sqlite3.Connection) -> bool:
 
 def cabecalho(con: sqlite3.Connection, sprint: str, largura: int) -> list[str]:
     tot = con.execute("SELECT COUNT(*) n FROM tasks WHERE sprint_id=?", (sprint,)).fetchone()["n"]
+    # tarefa concluída: INTEGRATED (escrita pelo laço) ou DONE (conclusão por evidência)
     feitas = con.execute(
-        "SELECT COUNT(*) n FROM tasks WHERE sprint_id=? AND estado='INTEGRATED'",
-        (sprint,)).fetchone()["n"]
+        "SELECT COUNT(*) n FROM tasks WHERE sprint_id=? "
+        "AND estado IN ('INTEGRATED','DONE')", (sprint,)).fetchone()["n"]
     sp = con.execute("SELECT estado FROM sprint_state WHERE sprint_id=?",
                      (sprint,)).fetchone()
     estado = sp["estado"] if sp else "?"
 
-    viva = _rodada_viva(con)
+    viva = _rodada_viva(con, sprint)
     espera = con.execute(
         "SELECT retry_after FROM resource_waits WHERE sprint_id=? AND resolvido=0 "
         "ORDER BY retry_after LIMIT 1", (sprint,)).fetchone()
@@ -278,16 +299,23 @@ def cabecalho(con: sqlite3.Connection, sprint: str, largura: int) -> list[str]:
         situacao = C("rodada viva", VERDE) if viva else C("parada", DIM)
 
     pct = f"{feitas}/{tot}"
-    l1 = (f" {C(sprint, NEG)}  {estado}  {C(pct + ' integradas', VERDE)}  {situacao}")
+    l1 = (f" {C(sprint, NEG)}  {estado}  {C(pct + ' concluídas', VERDE)}  {situacao}")
 
-    # quem está na frente agora
+    # quem está na frente agora — ordem de urgência e rótulo em português
+    ORDEM = ["RUNNING", "VERIFYING", "REVIEW", "RETRY", "WAITING_RESOURCE",
+             "BLOCKED", "QUEUED", "PLANNED", "NEW", "FAILED"]
+    ROTULO = {"RUNNING": "codificando", "VERIFYING": "testando", "REVIEW": "em revisão",
+              "RETRY": "retry", "WAITING_RESOURCE": "esperando cota",
+              "BLOCKED": "bloqueada", "QUEUED": "na fila", "PLANNED": "planejada",
+              "NEW": "nova", "FAILED": "falhou"}
+    marcas = ",".join("?" * len(ORDEM))
     frente = con.execute(
-        "SELECT task_id, estado, tentativas, tier_atual FROM tasks "
-        "WHERE sprint_id=? AND estado IN "
-        "('RUNNING','QUEUED','WAITING_RESOURCE','RETRY','BLOCKED') "
-        "ORDER BY CASE estado WHEN 'RUNNING' THEN 0 WHEN 'RETRY' THEN 1 "
-        "WHEN 'WAITING_RESOURCE' THEN 2 WHEN 'QUEUED' THEN 3 ELSE 4 END, task_id "
-        "LIMIT 3", (sprint,)).fetchall()
+        f"SELECT task_id, estado, tentativas FROM tasks WHERE sprint_id=? "
+        f"AND estado IN ({marcas})",
+        (sprint, *ORDEM)).fetchall()
+    ordem_idx = {e: i for i, e in enumerate(ORDEM)}
+    frente = sorted(frente, key=lambda f: (ordem_idx.get(f["estado"], 99),
+                                           f["task_id"]))[:3]
     pedacos = []
     for f in frente:
         att = con.execute(
@@ -298,7 +326,8 @@ def cabecalho(con: sqlite3.Connection, sprint: str, largura: int) -> list[str]:
         if att:
             modelo = " ".join(x for x in [att["agent"], att["model"], att["effort"]] if x)
         numero = f"t{att['attempt']}" if att else f"t{f['tentativas']}"
-        pedacos.append(f"{f['task_id']} {f['estado'].lower()}"
+        rotulo = ROTULO.get(f["estado"], f["estado"].lower())
+        pedacos.append(f"{f['task_id']} {rotulo}"
                        f" ({numero}{', ' + modelo if modelo else ''})")
     fila = " | ".join(pedacos) if pedacos else "nada na fila"
     l2 = " " + C(f"fila: {fila}  ·  degrau ate 5 tentativas por task", DIM)
@@ -353,8 +382,9 @@ def main(argv: list[str] | None = None) -> int:
             sprint = args.sprint or sprint_padrao(con)
             if not sprint:
                 return " nenhum sprint no banco ainda"
-            largura = max(60, shutil.get_terminal_size((100, 30)).columns)
-            altura = shutil.get_terminal_size((100, 30)).lines
+            colunas, altura = shutil.get_terminal_size((100, 30))
+            # sem tty (--once/pipe) não há risco de quebrar linha: não corta o cabeçalho
+            largura = colunas if sys.stdout.isatty() else max(120, colunas)
             linhas = args.linhas or max(5, altura - LINHAS_FIXAS)
             return quadro(con, sprint, linhas, args.tudo, largura)
         finally:

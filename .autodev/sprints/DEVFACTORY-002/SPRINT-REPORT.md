@@ -3,21 +3,21 @@
 **Objetivo:** Fechar a metade da frente do fluxo: hoje alguem precisa escrever spec.md e dag.json A MAO antes de o orquestrador fazer qualquer coisa. Esta sprint entrega o planejador, que recebe um pedido em texto livre e produz um sprint executavel (spec.md + dag.json + sprint.yaml) validado contra as mesmas regras que o autodev ja aplica na carga.
 Alem disso, esta sprint e o primeiro teste de ESCALA do motor: e a primeira vez que o orquestrador roda um backlog de varias tasks em varias ondas, em vez de uma unica task de fixture.
 
-**Gerado em:** 2026-09-27 23:27:33
+**Gerado em:** 2026-09-28 10:23:11
 **Duração total:** 0.0 min
-**Commit do repositório:** `2409f3113c65e98847f93cac641ea74583a15e97`
-**Estado do sprint:** `EM_EXECUCAO` — percurso: DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → FIM → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → FIM → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → FIM → DONE → DONE → DONE → DONE → DONE → DONE → BLOCKED → DONE → DONE → FIM → BLOCKED → DONE → DONE → BLOCKED → FIM → BLOCKED → FIM → EM_EXECUCAO → EM_EXECUCAO → WAITING_RESOURCE → WAITING_RESOURCE → EM_EXECUCAO → WAITING_RESOURCE → WAITING_RESOURCE → FIM → EM_EXECUCAO → BLOCKED → EM_EXECUCAO → FIM → EM_EXECUCAO → DONE → DONE → DONE → DONE → DONE → DONE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → WAITING_RESOURCE → WAITING_RESOURCE → FIM → EM_EXECUCAO
+**Commit do repositório:** `915528955273ccdd07c7ab6c861d244cb59e2c50`
+**Estado do sprint:** `EM_EXECUCAO` — percurso: DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → DONE → FIM → DONE → DONE → DONE → DONE → DONE → DONE → BLOCKED → DONE → DONE → FIM → BLOCKED → DONE → DONE → BLOCKED → FIM → BLOCKED → FIM → EM_EXECUCAO → EM_EXECUCAO → WAITING_RESOURCE → WAITING_RESOURCE → EM_EXECUCAO → WAITING_RESOURCE → WAITING_RESOURCE → FIM → EM_EXECUCAO → BLOCKED → EM_EXECUCAO → FIM → EM_EXECUCAO → DONE → DONE → DONE → DONE → DONE → DONE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → WAITING_RESOURCE → WAITING_RESOURCE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → BLOCKED → FIM → EM_EXECUCAO → FIM → EM_EXECUCAO → FIM → EM_EXECUCAO → FIM → EM_EXECUCAO → FIM → EM_EXECUCAO → WAITING_RESOURCE → WAITING_RESOURCE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → DONE → DONE → FIM → EM_EXECUCAO → FIM → EM_EXECUCAO
 **Fonte da verdade:** `state.db` + arquivos do Sprint + Git + evidências de teste
 
 ---
 
 ## 1. Resultado executivo
 
-- Tasks no Sprint: **10** — concluídas **5**, bloqueadas
-  **4**, falhadas **0**, aguardando recurso **1**
+- Tasks no Sprint: **10** — concluídas **10**, bloqueadas
+  **0**, falhadas **0**, aguardando recurso **0**
 - Origem das conclusões: **10** orquestrador
-- Tentativas registradas: **62** (executadas pelo orquestrador: **62**) — as demais são conclusões por evidência, registradas para auditoria
-- Esperas de cota do Codex: **3**
+- Tentativas registradas: **73** (executadas pelo orquestrador: **73**) — as demais são conclusões por evidência, registradas para auditoria
+- Esperas de cota do Codex: **4**
 - Itens de HAQ: **0** (abertos: **0**)
 - HAR (itens de HAQ / tasks úteis entregues): **0.0**
 
@@ -54,6 +54,11 @@ Módulos em `autodev/`:
 | P03 | INTEGRATED | codex | orquestrador | 4 | 0 | 3 |
 | P04 | INTEGRATED | codex | orquestrador | 5 | 0 | 4 |
 | P05 | INTEGRATED | codex | orquestrador | 3 | 0 | 2 |
+| P06 | INTEGRATED | codex | orquestrador | 5 | 1 | 4 |
+| P07 | INTEGRATED | codex | orquestrador | 3 | 0 | 2 |
+| P08 | INTEGRATED | codex | orquestrador | 3 | 0 | 2 |
+| P09 | INTEGRATED | codex | orquestrador | 5 | 1 | 4 |
+| P10 | INTEGRATED | codex | orquestrador | 3 | 0 | 2 |
 
 
 _(estado de todas as tasks abaixo)_
@@ -65,22 +70,17 @@ _(estado de todas as tasks abaixo)_
 | P03 | INTEGRATED | codex | 4 | 0 | 3 |
 | P04 | INTEGRATED | codex | 5 | 0 | 4 |
 | P05 | INTEGRATED | codex | 3 | 0 | 2 |
-| P06 | WAITING_RESOURCE | codex | 4 | 1 | 3 |
-| P07 | BLOCKED | codex | 2 | 0 | 2 |
-| P08 | BLOCKED | codex | 2 | 0 | 2 |
-| P09 | BLOCKED | codex | 2 | 0 | 2 |
-| P10 | BLOCKED | codex | 2 | 0 | 2 |
+| P06 | INTEGRATED | codex | 5 | 1 | 4 |
+| P07 | INTEGRATED | codex | 3 | 0 | 2 |
+| P08 | INTEGRATED | codex | 3 | 0 | 2 |
+| P09 | INTEGRATED | codex | 5 | 1 | 4 |
+| P10 | INTEGRATED | codex | 3 | 0 | 2 |
 
 ## 4. Tasks bloqueadas
 
-| task | motivo |
-|---|---|
-| P07 | depende de ['P05', 'P06'] |
-| P08 | depende de ['P07'] |
-| P09 | depende de ['P07', 'P08'] |
-| P10 | depende de ['P08', 'P09'] |
+_nenhum_
 
-Tasks em andamento / não iniciadas: **1**
+Tasks em andamento / não iniciadas: **0**
 
 ## 5. Evidência de teste
 
@@ -131,21 +131,32 @@ Tasks em andamento / não iniciadas: **1**
 | P06 | 4 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 133 | 0 | True |
 | P06 | 5 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 177 | 0 | True |
 | P06 | 6 | - | None | None | None | None |
+| P06 | 7 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 178 | 0 | True |
 | P07 | 1 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 130 | 0 | True |
 | P07 | 2 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 1 | 134 | 1 | False |
 | P07 | 3 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 135 | 0 | True |
 | P07 | 4 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 135 | 0 | True |
 | P07 | 5 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 135 | 0 | True |
+| P07 | 6 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 183 | 0 | True |
 | P08 | 1 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 131 | 0 | True |
 | P08 | 2 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 131 | 0 | True |
 | P08 | 3 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 131 | 0 | True |
+| P08 | 4 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 184 | 0 | True |
 | P09 | 1 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 134 | 0 | True |
 | P09 | 2 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 134 | 0 | True |
 | P09 | 3 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 134 | 0 | True |
+| P09 | 4 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 187 | 0 | True |
+| P09 | 5 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 191 | 0 | True |
+| P09 | 6 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 1 | 202 | 1 | False |
+| P09 | 7 | - | None | None | None | None |
+| P09 | 8 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 187 | 0 | True |
+| P09 | 9 | - | None | None | None | None |
+| P09 | 10 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 199 | 0 | True |
 | P10 | 1 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 130 | 0 | True |
 | P10 | 2 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 132 | 0 | True |
 | P10 | 3 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 132 | 0 | True |
 | P10 | 4 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 132 | 0 | True |
+| P10 | 5 | /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q | 0 | 203 | 0 | True |
 
 ## 6. Evidência do teste de aceitação
 
@@ -252,7 +263,36 @@ _nenhum_
 | P06 | hermes | baixa | autodev/planner.py | Duas coisas sem cobertura: (a) a atribuição plano.prompt_original = prompt_usuario não é a |
 | P06 | hermes | baixa | autodev/planner.py | candidatos = sorted(...) é ordenação LEXICOGRÁFICA sobre o nome. Com DEVFACTORY-999 e DEVF |
 | P06 | hermes | baixa | .autodev/tests/test_plan_agente.py | O teste do 'trecho inicial' não prova o 'inicial': a resposta usada tem 47 caracteres, ent |
+| P06 | hermes | baixa | autodev/planner.py | Ramificação 'nenhum sprint encontrado' (PlanoInvalido quando .autodev/sprints nao tem DEVF |
+| P06 | hermes | baixa | autodev/planner.py | parsear_plano foi alterado: prompt_original deixou de ser obrigatório (dados.get(..., '')) |
+| P06 | hermes | baixa | autodev/planner.py | Leitura de AUTODEV_AGENT_TIMEOUT (int(...)) nunca é exercitada por teste — valor inválido  |
+| P06 | hermes | baixa | autodev/planner.py | O log do novo plano é gravado no diretório do sprint EXISTENTE mais recente (candidatos[-1 |
 | P07 | hermes-deterministico | alta | (diff) | nenhuma alteracao encontrada no worktree |
+| P07 | hermes | media | autodev/cli.py | O try de cmd_plan so captura PlanoInvalido e SprintJaExiste. planner.planejar pode levanta |
+| P07 | hermes | baixa | .autodev/tests/test_plan_cli.py | As assercoes `assert "Traceback" not in saida` (l.85 e l.105) leem apenas `capsys.readoute |
+| P07 | hermes | baixa | .autodev/tests/test_plan_cli.py | O criterio 'sprint ja existente' e provado apenas por mock de planner.escrever_sprint. Na  |
+| P07 | hermes | baixa | autodev/cli.py | Codigo novo sem teste: o ramo `except OSError` de `--de` (cli.py:250-254) e o caso 'nenhum |
+| P07 | hermes | baixa | autodev/cli.py | Validacao duplicada: validar_plano (l.260) e, em seguida, validar_e_ordenar (l.265, que re |
+| P07 | hermes | baixa | autodev/cli.py | Agente fixo em 'codex' na chamada de planejar; a tentativa arquivada (branch arquivo/DEVFA |
+| P08 | hermes | baixa | .autodev/tests/test_plan_aceitacao.py | A fixture e' pre-esverdeada: o teste sobrescreve src/stats.py com STATS_CORRIGIDO e commit |
+| P08 | hermes | baixa | .autodev/tests/test_plan_aceitacao.py | O helper local _escrever_spec_fake duplica conftest.escreve_fake_spec (mesmo comportamento |
+| P08 | hermes | baixa | .autodev/tests/test_plan_aceitacao.py | String magica 'DEVFACTORY-001': o teste fabrica um diretorio de sprint vazio (so com logs/ |
+| P08 | hermes | baixa | .autodev/tests/test_plan_aceitacao.py | Importa STATS_CORRIGIDO de test_acceptance.py, arquivo entregue por outra task e protegido |
+| P09 | hermes | media | .autodev/tests/test_plan_escrita.py | Task P09 reescreveu um arquivo de teste entregue por task anterior (P05, cb302b4): a asser |
+| P09 | hermes | media | autodev/cli.py | Regressao funcional sem cobertura: 'autodev report' passou a LER dag.json incondicionalmen |
+| P09 | hermes | baixa | autodev/cli.py | Leitura crua com json.loads em vez de config.carrega_dag, contrariando a politica declarad |
+| P09 | hermes | baixa | autodev/cli.py | report-extras.json e expandido com **extra DEPOIS de prompt_original. Probe: extras = {'pr |
+| P09 | hermes | baixa | .autodev/tests/test_plan_rastreabilidade.py | O teste do fallback cobre apenas a chave AUSENTE. Nao ha caso para valor vazio/presente po |
+| P09 | hermes | alta | .autodev/tests/test_plan_escrita.py | P09 reescreveu o arquivo de teste de P05, o que o proprio criterio da task proibe ('nenhum |
+| P09 | hermes | alta | .autodev/sprints/DEVFACTORY-002/decisions.md | O arquivo foi criado pela propria task com 9 linhas que a autorizam a quebrar o criterio d |
+| P09 | hermes | media | autodev/cli.py | `dag = carrega_dag(caminho_dag) if caminho_dag.exists() else {}` introduz uma falha nova n |
+| P09 | hermes | baixa | .autodev/tests/test_plan_rastreabilidade.py | O criterio 'plano sem prompt_original e aceito' so e provado pela metade: os testes montam |
+| P09 | hermes | baixa | autodev/report.py | `{prompt_original or 'não informado'}` interpola cru qualquer tipo vindo do JSON: lista/di |
+| P09 | hermes | media | autodev/cli.py | A leitura `dag = json.loads((d / "dag.json").read_text(encoding="utf-8"))` e obrigatoria e |
+| P09 | hermes | baixa | autodev/cli.py | prompt_original agora e passado como keyword explicito junto de **extra (report-extras.jso |
+| P09 | hermes | baixa | .autodev/tests/test_plan_rastreabilidade.py | No teste do relatorio o prompt e de uma unica linha e sem espacos duplos ('Implemente rast |
+| P09 | hermes | baixa | .autodev/tests/test_plan_rastreabilidade.py | O criterio 'plano sem prompt_original e aceito' e provado so no caso em que o dag.json e e |
+| P09 | hermes | baixa | .autodev/sprints/DEVFACTORY-002/decisions.md | O arquivo entra como NOVO no branch, mas o caminho ja existe na linha principal (fba74fa:. |
 | P10 | hermes-deterministico | alta | (diff) | nenhuma alteracao encontrada no worktree |
 
 ## 8. Findings de segurança
@@ -267,21 +307,22 @@ Isolamento de sandbox verificado por execução real de `test -r` dentro do bwra
 |---|---|---|---|---|---|
 | 2026-09-27 21:42:11 | P02 | agy | 2026-09-28 02:52:11 | 310.0 | sim |
 | 2026-09-27 21:51:29 | P03 | agy | 2026-09-28 03:01:29 | 310.0 | sim |
-| 2026-09-27 23:27:13 | P06 | codex | 2026-09-28 04:37:13 | 310.0 | nao |
+| 2026-09-27 23:27:13 | P06 | codex | 2026-09-28 03:45:00 | 257.8 | sim |
+| 2026-09-28 08:39:01 | P09 | codex | 2026-09-28 09:10:00 | 31.0 | sim |
 
 ## 10. Uso de modelos e escalonamentos
 
 | agente/modelo/effort | chamadas |
 |---|---|
 | codex/gpt-5.6-luna/low | 34 |
-| codex/gpt-5.6-sol/low | 12 |
+| codex/gpt-5.6-sol/low | 17 |
+| codex/gpt-5.6-sol/medium | 7 |
 | codex/gpt-5.6-luna/medium | 5 |
-| codex/gpt-5.6-sol/medium | 5 |
-| agy/?/? | 2 |
-| codex/gpt-6-astra/low | 2 |
+| codex/gpt-6-astra/low | 5 |
+| agy/?/? | 3 |
 | codex/gpt-5.6-terra/medium | 2 |
 
-Tentativas acima da primeira (candidatas a escalonamento): **17**
+Tentativas acima da primeira (candidatas a escalonamento): **22**
 
 ## 11. Retries e falhas
 
@@ -334,21 +375,32 @@ Tentativas acima da primeira (candidatas a escalonamento): **17**
 | P06 | 4 | codex | gpt-5.6-luna | low | OK | 0 | - | 204.9 |
 | P06 | 5 | codex | gpt-5.6-sol | low | FAILED | 0 | REVIEW_FAILURE | 365.1 |
 | P06 | 6 | codex | gpt-5.6-sol | medium | WAITING_RESOURCE | 1 | CODEX_QUOTA | 94.9 |
+| P06 | 7 | codex | gpt-6-astra | low | OK | 0 | - | 376.6 |
 | P07 | 1 | codex | gpt-5.6-luna | low | FAILED | 0 | REVIEW_FAILURE | 180.5 |
 | P07 | 2 | codex | gpt-5.6-luna | medium | FAILED | 1 | TEST_FAILURE | 222.0 |
 | P07 | 3 | codex | gpt-5.6-terra | medium | OK | 0 | - | 189.8 |
 | P07 | 4 | codex | gpt-5.6-luna | low | OK | 0 | - | 189.1 |
 | P07 | 5 | codex | gpt-5.6-luna | low | OK | 0 | - | 171.0 |
+| P07 | 6 | codex | gpt-5.6-sol | low | OK | 0 | - | 432.0 |
 | P08 | 1 | codex | gpt-5.6-luna | low | OK | 0 | - | 288.7 |
 | P08 | 2 | codex | gpt-5.6-luna | low | OK | 0 | - | 205.3 |
 | P08 | 3 | codex | gpt-5.6-luna | low | OK | 0 | - | 178.8 |
+| P08 | 4 | codex | gpt-5.6-sol | low | OK | 0 | - | 300.8 |
 | P09 | 1 | codex | gpt-5.6-luna | low | OK | 0 | - | 241.0 |
 | P09 | 2 | codex | gpt-5.6-luna | low | OK | 0 | - | 180.6 |
 | P09 | 3 | codex | gpt-5.6-luna | low | OK | 0 | - | 172.7 |
+| P09 | 4 | codex | gpt-5.6-sol | low | FAILED | 0 | REVIEW_FAILURE | 298.6 |
+| P09 | 5 | codex | gpt-5.6-sol | medium | FAILED | 0 | REVIEW_FAILURE | 487.7 |
+| P09 | 6 | codex | gpt-6-astra | low | FAILED | 1 | TEST_FAILURE | 90.0 |
+| P09 | 7 | codex | gpt-5.6-sol | low | WAITING_RESOURCE | 1 | CODEX_QUOTA | 8.5 |
+| P09 | 8 | codex | gpt-5.6-sol | medium | FAILED | 0 | REVIEW_FAILURE | 785.4 |
+| P09 | 9 | agy | - | - | WAITING_RESOURCE | 3 | QUOTA_AGENTE | 155.6 |
+| P09 | 10 | codex | gpt-6-astra | low | OK | 0 | - | 249.7 |
 | P10 | 1 | codex | gpt-5.6-luna | low | FAILED | 0 | REVIEW_FAILURE | 171.1 |
 | P10 | 2 | codex | gpt-5.6-luna | medium | OK | 0 | - | 252.1 |
 | P10 | 3 | codex | gpt-5.6-luna | low | OK | 0 | - | 198.1 |
 | P10 | 4 | codex | gpt-5.6-luna | low | OK | 0 | - | 170.1 |
+| P10 | 5 | codex | gpt-5.6-sol | low | OK | 0 | - | 120.6 |
 
 ## 12. HAQ (Human Action Queue)
 
@@ -366,7 +418,7 @@ _nenhum_
 ## 15. Impacto esperado no HAR
 
 HAR = Human Attention Required / Useful Work Delivered.
-Neste Sprint: **0** item(ns) de HAQ para **5** task(s) entregue(s)
+Neste Sprint: **0** item(ns) de HAQ para **10** task(s) entregue(s)
 -> HAR = **0.0**.
 
 ## 16. Recomendação para o Sprint 2
@@ -379,43 +431,43 @@ _(ver decisões e recomendações no fim deste documento)_
 
 | quando | tipo | task | payload |
 |---|---|---|---|
-| 2026-09-27 23:27:13 | sprint_reaberto | - | {"de": "FIM", "para": "EM_EXECUCAO", "motivo": "passada 4 do run"} |
-| 2026-09-27 23:27:13 | transicao | P06 | {"de": "RUNNING", "para": "WAITING_RESOURCE", "motivo": "cota do Codex"} |
-| 2026-09-27 23:27:13 | espera_recurso | P06 | {"retry_after": 1790581033.005555, "motivo": "cota do Codex esgotada"} |
-| 2026-09-27 23:27:13 | tentativa_finalizada | P06 | {"attempt": 6, "status": "WAITING_RESOURCE", "failure_class": "CODEX_QUOTA"} |
-| 2026-09-27 23:25:38 | transicao | P06 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 6 com codex"} |
-| 2026-09-27 23:25:38 | estado_forcado | P06 | {"para": "QUEUED", "motivo": "reenfileirado (vindo de RETRY)"} |
-| 2026-09-27 23:25:38 | tentativa_iniciada | P06 | {"attempt": 6, "agent": "codex", "model": "gpt-5.6-sol", "effort": "medium"} |
-| 2026-09-27 23:25:38 | transicao | P06 | {"de": "REVIEW", "para": "RETRY", "motivo": "revisao: REQUEST_CHANGES"} |
-| 2026-09-27 23:25:38 | tentativa_finalizada | P06 | {"attempt": 5, "status": "FAILED", "failure_class": "REVIEW_FAILURE"} |
-| 2026-09-27 23:22:49 | transicao | P06 | {"de": "VERIFYING", "para": "REVIEW", "motivo": "revisao"} |
-| 2026-09-27 23:22:42 | transicao | P06 | {"de": "RUNNING", "para": "VERIFYING", "motivo": "verificando"} |
-| 2026-09-27 23:19:32 | transicao | P06 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 5 com codex"} |
-| 2026-09-27 23:19:32 | tentativa_iniciada | P06 | {"attempt": 5, "agent": "codex", "model": "gpt-5.6-sol", "effort": "low"} |
-| 2026-09-27 23:19:32 | worktree_realinhado | P06 | {"base_antiga": "b963e0eb0ca2559ca98b10bfac2ec0d5203a4e7e", "base_nova": "4e9f322fb841905c |
-| 2026-09-27 23:19:32 | dag_carregado | - | {"tasks": 10, "novas": 0} |
-| 2026-09-27 23:19:32 | rearmado_por_dependencia | P06 | {"deps_integradas": ["P03", "P04", "P05"]} |
-| 2026-09-27 23:19:32 | estado_forcado | P06 | {"para": "QUEUED", "motivo": "dependencia integrada: rearmada automaticamente"} |
-| 2026-09-27 23:19:32 | sprint_reaberto | - | {"de": "FIM", "para": "EM_EXECUCAO", "motivo": "passada 3 do run"} |
-| 2026-09-27 23:19:32 | integrado | P05 | {"task_id": "P05", "branch": "sprint/DEVFACTORY-002/P05-codex", "merge_ok": true, "commit" |
-| 2026-09-27 23:19:32 | transicao | P05 | {"de": "DONE", "para": "INTEGRATED", "motivo": "merge + portoes ok"} |
-| 2026-09-27 23:19:25 | transicao | P05 | {"de": "REVIEW", "para": "DONE", "motivo": "testes+revisao ok"} |
-| 2026-09-27 23:19:25 | tentativa_finalizada | P05 | {"attempt": 6, "status": "OK", "failure_class": null} |
-| 2026-09-27 23:13:55 | transicao | P05 | {"de": "VERIFYING", "para": "REVIEW", "motivo": "revisao"} |
-| 2026-09-27 23:13:47 | transicao | P05 | {"de": "RUNNING", "para": "VERIFYING", "motivo": "verificando"} |
-| 2026-09-27 23:11:34 | transicao | P05 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 6 com codex"} |
-| 2026-09-27 23:11:34 | tentativa_iniciada | P05 | {"attempt": 6, "agent": "codex", "model": "gpt-5.6-sol", "effort": "low"} |
-| 2026-09-27 23:11:34 | worktree_realinhado | P05 | {"base_antiga": "b963e0eb0ca2559ca98b10bfac2ec0d5203a4e7e", "base_nova": "0179cf91a72de66f |
-| 2026-09-27 23:11:34 | dag_carregado | - | {"tasks": 10, "novas": 0} |
-| 2026-09-27 23:11:34 | rearmado_por_dependencia | P05 | {"deps_integradas": ["P03", "P04"]} |
-| 2026-09-27 23:11:34 | estado_forcado | P05 | {"para": "QUEUED", "motivo": "dependencia integrada: rearmada automaticamente"} |
-| 2026-09-27 23:11:34 | sprint_reaberto | - | {"de": "FIM", "para": "EM_EXECUCAO", "motivo": "passada 2 do run"} |
-| 2026-09-27 23:11:34 | integrado | P04 | {"task_id": "P04", "branch": "sprint/DEVFACTORY-002/P04-codex", "merge_ok": true, "commit" |
-| 2026-09-27 23:11:34 | transicao | P04 | {"de": "DONE", "para": "INTEGRATED", "motivo": "merge + portoes ok"} |
-| 2026-09-27 23:11:26 | transicao | P04 | {"de": "REVIEW", "para": "DONE", "motivo": "testes+revisao ok"} |
-| 2026-09-27 23:11:26 | tentativa_finalizada | P04 | {"attempt": 9, "status": "OK", "failure_class": null} |
-| 2026-09-27 23:09:05 | transicao | P04 | {"de": "VERIFYING", "para": "REVIEW", "motivo": "revisao"} |
-| 2026-09-27 23:08:57 | transicao | P04 | {"de": "RUNNING", "para": "VERIFYING", "motivo": "verificando"} |
-| 2026-09-27 23:06:58 | transicao | P04 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 9 com codex"} |
-| 2026-09-27 23:06:58 | tentativa_iniciada | P04 | {"attempt": 9, "agent": "codex", "model": "gpt-6-astra", "effort": "low"} |
-| 2026-09-27 23:06:58 | worktree_realinhado | P04 | {"base_antiga": "890e3d61edccc014483ff5fb1fbb05f0929a61cc", "base_nova": "24eae62d27487e66 |
+| 2026-09-28 10:23:03 | sprint_reaberto | - | {"de": "FIM", "para": "EM_EXECUCAO", "motivo": "passada 2 do run"} |
+| 2026-09-28 10:23:03 | dag_carregado | - | {"tasks": 10, "novas": 0} |
+| 2026-09-28 09:54:27 | sprint_reaberto | - | {"de": "FIM", "para": "EM_EXECUCAO", "motivo": "passada 3 do run"} |
+| 2026-09-28 09:54:26 | integrado | P10 | {"task_id": "P10", "branch": "sprint/DEVFACTORY-002/P10-codex", "merge_ok": true, "commit" |
+| 2026-09-28 09:54:26 | transicao | P10 | {"de": "DONE", "para": "INTEGRATED", "motivo": "merge + portoes ok"} |
+| 2026-09-28 09:54:17 | transicao | P10 | {"de": "REVIEW", "para": "DONE", "motivo": "testes+revisao ok"} |
+| 2026-09-28 09:54:17 | tentativa_finalizada | P10 | {"attempt": 5, "status": "OK", "failure_class": null} |
+| 2026-09-28 09:54:03 | transicao | P10 | {"de": "VERIFYING", "para": "REVIEW", "motivo": "revisao"} |
+| 2026-09-28 09:53:54 | transicao | P10 | {"de": "RUNNING", "para": "VERIFYING", "motivo": "verificando"} |
+| 2026-09-28 09:52:17 | transicao | P10 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 5 com codex"} |
+| 2026-09-28 09:52:17 | tentativa_iniciada | P10 | {"attempt": 5, "agent": "codex", "model": "gpt-5.6-sol", "effort": "low"} |
+| 2026-09-28 09:52:17 | worktree_realinhado | P10 | {"base_antiga": "b963e0eb0ca2559ca98b10bfac2ec0d5203a4e7e", "base_nova": "fbdd0f73642de181 |
+| 2026-09-28 09:52:17 | dag_carregado | - | {"tasks": 10, "novas": 0} |
+| 2026-09-28 09:52:17 | rearmado_por_dependencia | P10 | {"deps_integradas": ["P08", "P09"]} |
+| 2026-09-28 09:52:17 | estado_forcado | P10 | {"para": "QUEUED", "motivo": "dependencia integrada: rearmada automaticamente"} |
+| 2026-09-28 09:52:17 | sprint_reaberto | - | {"de": "FIM", "para": "EM_EXECUCAO", "motivo": "passada 2 do run"} |
+| 2026-09-28 09:52:17 | integrado | P09 | {"task_id": "P09", "branch": "sprint/DEVFACTORY-002/P09-agy", "merge_ok": true, "commit":  |
+| 2026-09-28 09:52:17 | transicao | P09 | {"de": "DONE", "para": "INTEGRATED", "motivo": "merge + portoes ok"} |
+| 2026-09-28 09:52:07 | transicao | P09 | {"de": "REVIEW", "para": "DONE", "motivo": "testes+revisao ok"} |
+| 2026-09-28 09:52:07 | tentativa_finalizada | P09 | {"attempt": 10, "status": "OK", "failure_class": null} |
+| 2026-09-28 09:50:12 | transicao | P09 | {"de": "VERIFYING", "para": "REVIEW", "motivo": "revisao"} |
+| 2026-09-28 09:49:39 | transicao | P09 | {"de": "RUNNING", "para": "VERIFYING", "motivo": "verificando"} |
+| 2026-09-28 09:47:57 | transicao | P09 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 10 com codex"} |
+| 2026-09-28 09:47:57 | tentativa_iniciada | P09 | {"attempt": 10, "agent": "codex", "model": "gpt-6-astra", "effort": "low"} |
+| 2026-09-28 09:47:57 | tentativa_finalizada | P09 | {"attempt": 9, "status": "WAITING_RESOURCE", "failure_class": "QUOTA_AGENTE"} |
+| 2026-09-28 09:45:22 | transicao | P09 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 9 com agy"} |
+| 2026-09-28 09:45:22 | estado_forcado | P09 | {"para": "QUEUED", "motivo": "reenfileirado (vindo de RETRY)"} |
+| 2026-09-28 09:45:22 | tentativa_iniciada | P09 | {"attempt": 9, "agent": "agy", "model": "", "effort": ""} |
+| 2026-09-28 09:45:22 | transicao | P09 | {"de": "REVIEW", "para": "RETRY", "motivo": "revisao: REQUEST_CHANGES"} |
+| 2026-09-28 09:45:22 | tentativa_finalizada | P09 | {"attempt": 8, "status": "FAILED", "failure_class": "REVIEW_FAILURE"} |
+| 2026-09-28 09:40:11 | transicao | P09 | {"de": "VERIFYING", "para": "REVIEW", "motivo": "revisao"} |
+| 2026-09-28 09:39:48 | transicao | P09 | {"de": "RUNNING", "para": "VERIFYING", "motivo": "verificando"} |
+| 2026-09-28 09:32:16 | transicao | P09 | {"de": "QUEUED", "para": "RUNNING", "motivo": "tentativa 8 com codex"} |
+| 2026-09-28 09:32:16 | tentativa_iniciada | P09 | {"attempt": 8, "agent": "codex", "model": "gpt-5.6-sol", "effort": "medium"} |
+| 2026-09-28 09:31:42 | estado_forcado | P09 | {"para": "QUEUED", "motivo": "selecionado pelo orquestrador"} |
+| 2026-09-28 09:31:42 | dag_carregado | - | {"tasks": 10, "novas": 0} |
+| 2026-09-28 08:39:01 | sprint_reaberto | - | {"de": "FIM", "para": "EM_EXECUCAO", "motivo": "passada 2 do run"} |
+| 2026-09-28 08:39:01 | transicao | P09 | {"de": "RUNNING", "para": "WAITING_RESOURCE", "motivo": "cota do Codex"} |
+| 2026-09-28 08:39:01 | espera_recurso | P09 | {"retry_after": 1790614141.8464694, "motivo": "cota do Codex esgotada"} |
+| 2026-09-28 08:39:01 | tentativa_finalizada | P09 | {"attempt": 7, "status": "WAITING_RESOURCE", "failure_class": "CODEX_QUOTA"} |

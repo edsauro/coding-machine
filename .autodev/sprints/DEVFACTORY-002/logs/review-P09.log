@@ -1,4 +1,4 @@
-# exit_code=0 duracao=310.3s modelo=deepseek-flash effort=(default) failure_class=None
+# exit_code=2 duracao=3.4s modelo=deepseek-v4-pro effort=(default) failure_class=CODEX_QUOTA
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -20,30 +20,41 @@ P09: Registrar a rastreabilidade do prompt ao plano
 ```diff
 diff --git a/.autodev/sprints/DEVFACTORY-002/decisions.md b/.autodev/sprints/DEVFACTORY-002/decisions.md
 new file mode 100644
-index 0000000..138d6c2
+index 0000000..132b53a
 --- /dev/null
 +++ b/.autodev/sprints/DEVFACTORY-002/decisions.md
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,29 @@
 +# Decisões — DEVFACTORY-002
 +
-+## 2026-09-28 — O contrato persistido do DAG inclui o prompt original
++## 2026-09-28 — P09: rastreabilidade e compatibilidade
 +
-+**Contexto:** a P09 exige que `escrever_sprint` registre `prompt_original` no
-+`dag.json`. O teste anterior de escrita verificava o conjunto exato de chaves e,
-+corretamente, falhou quando o campo obrigatório foi acrescentado.
++O DAG passa a persistir `prompt_original`. A asserção de igualdade do conjunto
++de chaves em `test_escreve_sprint_completo_no_proximo_id` foi ampliada somente
++com essa chave, exigida por P09. Nenhum teste anterior foi removido, nem suas
++demais asserções alteradas. O novo arquivo `test_plan_rastreabilidade.py`
++acrescenta 15 casos, incluindo preservação literal na spec, DAG e relatório,
++plano sem prompt, DAG ausente, inválido ou ilegível e colisão com extras.
 +
-+**Decisão:** ampliar somente o conjunto esperado em
-+`test_escreve_sprint_completo_no_proximo_id`, de modo a incluir
-+`prompt_original`. Nenhuma asserção foi removida ou relaxada. O novo arquivo
-+`test_plan_rastreabilidade.py` também verifica o valor literal persistido e seu
-+uso pelo relatório.
++O relatório continua derivado do estado: problemas de leitura do DAG resultam
++em `nao informado`. O prompt do DAG prevalece sobre `report-extras.json`.
 +
-+**Prova de preservação:** antes da mudança havia 186 testes coletados por
-+`python3 -m pytest .autodev/tests/ --collect-only -q`. Após a mudança, o mesmo
-+comando coletou 189 testes, e `python3 -m pytest .autodev/tests/ -q` terminou
-+com `189 passed`.
++### Evidência e bloqueio de ambiente
++
++- Antes das alterações, `python3 -m pytest .autodev/tests/ --collect-only -q`
++  terminou com código 1: `No module named pytest`.
++- Após as alterações, o mesmo comando e
++  `python3 -m pytest .autodev/tests/ -q` terminaram com o mesmo erro.
++- Portanto, a contagem de coleta antes/depois e a aprovação da suíte **não
++  puderam ser comprovadas** neste ambiente. A verificação obrigatória permanece
++  pendente no runner com pytest disponível; não se declara a suíte verde.
++- Verificação direta com Python exercitou 15 cenários do fluxo real, todos
++  aprovados. A análise sintática dos arquivos alterados e `git diff --check`
++  passaram. Isso não substitui a execução da suíte ou sua coleta.
++
++Na integração, anexar esta entrada ao histórico existente de decisões, caso
++esse arquivo já exista na branch de destino, preservando as entradas anteriores.
 diff --git a/.autodev/tests/test_plan_escrita.py b/.autodev/tests/test_plan_escrita.py
-index db16260..efe910f 100644
+index db16260..ca53729 100644
 --- a/.autodev/tests/test_plan_escrita.py
 +++ b/.autodev/tests/test_plan_escrita.py
 @@ -45,7 +45,7 @@ def test_escreve_sprint_completo_no_proximo_id(tmp_path):
@@ -51,139 +62,138 @@ index db16260..efe910f 100644
  
      dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
 -    assert set(dag) == {"sprint_id", "versao", "tasks"}
-+    assert set(dag) == {"sprint_id", "versao", "prompt_original", "tasks"}
++    assert set(dag) == {"sprint_id", "versao", "tasks", "prompt_original"}
      assert dag["sprint_id"] == "DEVFACTORY-003"
      assert dag["versao"] == 1
      assert dag["tasks"] == [
 diff --git a/.autodev/tests/test_plan_rastreabilidade.py b/.autodev/tests/test_plan_rastreabilidade.py
 new file mode 100644
-index 0000000..a931b73
+index 0000000..63aa823
 --- /dev/null
 +++ b/.autodev/tests/test_plan_rastreabilidade.py
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,77 @@
++"""Rastreabilidade literal e compatibilidade do relatório com planos antigos."""
 +import json
 +
-+import yaml
++import pytest
 +
-+from autodev import cli, worktree
-+from autodev.planner import Plano, TaskPlano, escrever_sprint
-+
-+
-+def _plano(prompt_original: str) -> Plano:
-+    return Plano(
-+        titulo="Plano rastreável",
-+        objetivo="Preservar a origem do planejamento",
-+        repositorio="projeto",
-+        tasks=[
-+            TaskPlano(
-+                id="P01",
-+                titulo="Registrar prompt",
-+                criterios=["dag.json contém o prompt original"],
-+            )
-+        ],
-+        prompt_original=prompt_original,
-+    )
++from autodev import cli
++from autodev.planner import escrever_sprint, parsear_plano
 +
 +
-+def _preparar_sprint_para_relatorio(tmp_path, dag: dict) -> None:
-+    diretorio = tmp_path / ".autodev" / "sprints" / "S1"
-+    diretorio.mkdir(parents=True)
-+    (diretorio / "sprint.yaml").write_text(
-+        yaml.safe_dump({"sprint_id": "S1", "objetivo": "Rastrear o pedido"}),
-+        encoding="utf-8",
-+    )
-+    (diretorio / "dag.json").write_text(
-+        json.dumps(dag, ensure_ascii=False),
-+        encoding="utf-8",
-+    )
++PROMPT = '  Crie um plano  executável.\n\nPreserve "acentuação" e espaços.  \n'
 +
 +
-+def _gerar_relatorio_cli(tmp_path, monkeypatch) -> str:
-+    monkeypatch.setattr(cli, "RAIZ", tmp_path)
-+    monkeypatch.setattr(worktree, "commit_atual", lambda _raiz: "abc123")
++def _plano(**campos):
++    return parsear_plano(json.dumps({
++        "titulo": "Rastreabilidade",
++        "objetivo": "Registrar o pedido",
++        "repositorio": "projeto",
++        "tasks": [{"id": "P01", "titulo": "Registrar pedido",
++                   "criterios": ["spec.md contém o pedido"],
++                   "teste": "python3 -m pytest .autodev/tests/ -q"}],
++        **campos,
++    }))
 +
-+    assert cli.main(["--sprint", "S1", "report"]) == 0
-+    return (
-+        tmp_path / ".autodev" / "sprints" / "S1" / "SPRINT-REPORT.md"
-+    ).read_text(encoding="utf-8")
++
++def _contexto(repo, destino, monkeypatch):
++    monkeypatch.setattr(cli, "RAIZ", repo)
++    assert cli.main(["--sprint", destino.name, "report"]) == 0
++    texto = (destino / "SPRINT-REPORT.md").read_text(encoding="utf-8")
++    return texto.split("## Contexto\n", 1)[1].split("\n---", 1)[0]
 +
 +
-+def test_escrever_sprint_preserva_prompt_literal_na_spec_e_no_dag(tmp_path):
-+    prompt = "Crie uma API.\n\nNão normalize   estes espaços."
-+
-+    destino = escrever_sprint(tmp_path, _plano(prompt))
-+
-+    spec = (destino / "spec.md").read_text(encoding="utf-8")
++def test_preserva_prompt_literal_na_spec_dag_e_report(repo, monkeypatch):
++    destino = escrever_sprint(repo, _plano(prompt_original=PROMPT))
++    assert "# Prompt original\n\n" + PROMPT in (
++        destino / "spec.md").read_text(encoding="utf-8")
 +    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
-+    assert f"# Prompt original\n\n{prompt}\n\n" in spec
-+    assert dag["prompt_original"] == prompt
++    assert dag["prompt_original"] == PROMPT
++    contexto = _contexto(repo, destino, monkeypatch)
++    assert "Prompt original" in contexto
++    assert PROMPT in contexto
 +
 +
-+def test_comando_report_inclui_prompt_do_dag_na_secao_de_contexto(
-+    tmp_path, monkeypatch
-+):
-+    prompt = "Implemente rastreabilidade sem alterar o texto."
-+    _preparar_sprint_para_relatorio(
-+        tmp_path,
-+        {"sprint_id": "S1", "tasks": [], "prompt_original": prompt},
-+    )
-+
-+    relatorio = _gerar_relatorio_cli(tmp_path, monkeypatch)
-+
-+    contexto = relatorio.split("## Contexto do planejamento", 1)[1].split("## 1.", 1)[0]
-+    assert prompt in contexto
++def test_plano_sem_prompt_original_ponta_a_ponta(repo, monkeypatch):
++    destino = escrever_sprint(repo, _plano())
++    assert "nao informado" in _contexto(repo, destino, monkeypatch)
 +
 +
-+def test_comando_report_aceita_dag_sem_prompt_e_informa_ausencia(
-+    tmp_path, monkeypatch
-+):
-+    _preparar_sprint_para_relatorio(tmp_path, {"sprint_id": "S1", "tasks": []})
++@pytest.mark.parametrize("conteudo", [
++    None, b"{", b"[]", b"null", b"42", b'"texto"', b"\xff",
++    b"{}", b'{"prompt_original": null}', b'{"prompt_original": 123}',
++    b'{"prompt_original": []}',
++])
++def test_report_tolera_dag_ausente_ou_invalido(repo, monkeypatch, conteudo):
++    destino = escrever_sprint(repo, _plano())
++    dag = destino / "dag.json"
++    dag.unlink()
++    if conteudo is not None:
++        dag.write_bytes(conteudo)
++    assert "nao informado" in _contexto(repo, destino, monkeypatch)
 +
-+    relatorio = _gerar_relatorio_cli(tmp_path, monkeypatch)
 +
-+    contexto = relatorio.split("## Contexto do planejamento", 1)[1].split("## 1.", 1)[0]
-+    assert "não informado" in contexto
++def test_report_tolera_erro_de_leitura_do_dag(repo, monkeypatch):
++    destino = escrever_sprint(repo, _plano())
++    dag = destino / "dag.json"
++    dag.unlink()
++    dag.mkdir()  # IsADirectoryError é um OSError real, mesmo sob root.
++    assert "nao informado" in _contexto(repo, destino, monkeypatch)
++
++
++def test_prompt_do_dag_prevalece_sobre_extras(repo, monkeypatch):
++    destino = escrever_sprint(repo, _plano(prompt_original=PROMPT))
++    (destino / "report-extras.json").write_text(json.dumps({
++        "prompt_original": "pedido desatualizado",
++    }), encoding="utf-8")
++    contexto = _contexto(repo, destino, monkeypatch)
++    assert PROMPT in contexto
++    assert "pedido desatualizado" not in contexto
 diff --git a/autodev/cli.py b/autodev/cli.py
-index 9f2e348..f137457 100644
+index 9f2e348..08ef5f3 100644
 --- a/autodev/cli.py
 +++ b/autodev/cli.py
-@@ -123,13 +123,15 @@ def cmd_report(args) -> int:
+@@ -123,13 +123,22 @@ def cmd_report(args) -> int:
      from .worktree import commit_atual
      d = RAIZ / ".autodev" / "sprints" / args.sprint
      sp = carrega_sprint(d / "sprint.yaml")
-+    dag = json.loads((d / "dag.json").read_text(encoding="utf-8"))
++    # O DAG acrescenta contexto; sua ausência ou corrupção não impede o report.
++    try:
++        valor = json.loads((d / "dag.json").read_text(encoding="utf-8")).get(
++            "prompt_original")
++    except (OSError, ValueError, AttributeError):
++        valor = None
++    prompt_original = valor if isinstance(valor, str) else None
      with _store(RAIZ) as st:
          extra = {}
          f = d / "report-extras.json"
          if f.exists():
              extra = json.loads(f.read_text())
-         txt = rp.gerar(st, args.sprint, objetivo=sp.get("objetivo", ""),
+-        txt = rp.gerar(st, args.sprint, objetivo=sp.get("objetivo", ""),
 -                       git_commit=commit_atual(RAIZ), **extra)
-+                       git_commit=commit_atual(RAIZ),
-+                       prompt_original=dag.get("prompt_original"), **extra)
++        opcoes = {**extra, "objetivo": sp.get("objetivo", ""),
++                  "git_commit": commit_atual(RAIZ),
++                  "prompt_original": prompt_original}
++        txt = rp.gerar(st, args.sprint, **opcoes)
      destino = d / "SPRINT-REPORT.md"
      rp.escrever(txt, destino)
      print(f"relatorio escrito em {destino} ({len(txt)} chars)")
 diff --git a/autodev/planner.py b/autodev/planner.py
-index 5f74158..3e69c64 100644
+index 5f74158..f2015d4 100644
 --- a/autodev/planner.py
 +++ b/autodev/planner.py
-@@ -129,7 +129,12 @@ def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
+@@ -129,7 +129,8 @@ def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
          raise SprintJaExiste(f"sprint já existe: {sprint_id}") from erro
  
      tasks = [asdict(task) for task in plano.tasks]
 -    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks}
-+    dag = {
-+        "sprint_id": sprint_id,
-+        "versao": 1,
-+        "prompt_original": plano.prompt_original,
-+        "tasks": tasks,
-+    }
++    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks,
++           "prompt_original": plano.prompt_original}
      (destino / "dag.json").write_text(
          json.dumps(dag, ensure_ascii=False, indent=2) + "\n",
          encoding="utf-8",
 diff --git a/autodev/report.py b/autodev/report.py
-index ffdef68..b08f279 100644
+index ffdef68..b5108cd 100644
 --- a/autodev/report.py
 +++ b/autodev/report.py
 @@ -32,7 +32,7 @@ def _tabela(cabecalhos: list[str], linhas: list[list]) -> str:
@@ -195,36 +205,26 @@ index ffdef68..b08f279 100644
      m = store.metricas(sprint)
      tasks = store.tasks(sprint)
      haq = store.haq_listar(sprint)
-@@ -199,6 +199,14 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
+@@ -198,6 +198,12 @@ def gerar(store, sprint: str, *, objetivo: str = "", aceitacao: dict | None = No
+ **Estado do sprint:** `{estado_spr}` — percurso: {caminho_spr}
  **Fonte da verdade:** `state.db` + arquivos do Sprint + Git + evidências de teste
  
++## Contexto
++
++### Prompt original
++
++{prompt_original if prompt_original else 'nao informado'}
++
  ---
-+"""
-+
-+    contexto = f"""
-+## Contexto do planejamento
-+
-+**Prompt original:**
-+
-+{prompt_original or '_não informado_'}
  """
- 
-     s1 = f"""
-@@ -330,7 +338,7 @@ _(ver decisões e recomendações no fim deste documento)_
-         [[_fmt_ts(e["ts"]), e["tipo"], e["task_id"] or "-",
-           str(e["payload"])[:90]] for e in eventos[:40]])
- 
--    return (cab + s1 + s2 + s3 + s5 + s7 + s13 +
-+    return (cab + contexto + s1 + s2 + s3 + s5 + s7 + s13 +
-             "\n## Apêndice — últimos eventos do Sprint\n\n" + eventos_resumo)
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 38%]
-..............................................ss........................ [ 76%]
-.............................................                            [100%]
-187 passed, 2 skipped in 22.86s
+........................................................................ [ 35%]
+..............................................ss........................ [ 71%]
+.........................................................                [100%]
+199 passed, 2 skipped in 31.81s
 
 ```
 
@@ -260,88 +260,18 @@ Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
 Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
 
 
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
 ===== STDOUT =====
-```json
-{
-  "veredito": "REQUEST_CHANGES",
-  "confianca": 0.6,
-  "criterios_atendidos": [
-    {
-      "criterio": "a spec.md gerada por escrever_sprint contem a secao Prompt original com o texto do usuario literal",
-      "atende": true,
-      "evidencia": "autodev/planner.py:158-162 grava f\"# Prompt original\\n\\n{plano.prompt_original}\\n\\n\" (escritor ja existia na base; o diff nao o altera) e .autodev/tests/test_plan_rastreabilidade.py:48-56 exige o literal exato, com \\n\\n e espacos duplos, em vez de um assert tipo 'in spec'."
-    },
-    {
-      "criterio": "o dag.json gerado registra o campo prompt_original",
-      "atende": true,
-      "evidencia": "autodev/planner.py:132-137 inclui 'prompt_original': plano.prompt_original no dict persistido; test_plan_rastreabilidade.py:54-56 compara o valor literal e test_plan_escrita.py:48 mantem a comparacao por conjunto exato de chaves."
-    },
-    {
-      "criterio": "o comando autodev report inclui o prompt original na secao de contexto quando ele existe no dag.json",
-      "atende": true,
-      "evidencia": "autodev/cli.py:126 le o dag e :132-134 repassa prompt_original=dag.get('prompt_original'); autodev/report.py:204-210 monta a secao '## Contexto do planejamento'; o teste de test_plan_rastreabilidade.py:59-71 roda cli.main de verdade (RAIZ e commit_atual monkeypatchados) e recorta a secao por split em '## Contexto do planejamento' e '## 1.'."
-    },
-    {
-      "criterio": "plano sem prompt_original e aceito, e a secao aparece como nao informado, sem quebrar o relatorio",
-      "atende": true,
-      "evidencia": "report.py:209 usa {prompt_original or '_nao informado_'} e o teste linhas 74-82 cria dag.json sem o campo e verifica 'nao informado' na secao. Ressalva verificada: o caso coberto e 'dag.json existente sem o campo'; com dag.json ausente ou JSON malformado o comando aborta (finding 1) - na base a9445a3 o mesmo comando devolvia rc=0, porque nao lia o dag."
-    },
-    {
-      "criterio": "os testes ficam em .autodev/tests/test_plan_rastreabilidade.py",
-      "atende": true,
-      "evidencia": "arquivo novo (82 linhas) exatamente nesse caminho no diff a9445a3..1eaf384; nenhum teste novo em outro arquivo."
-    },
-    {
-      "criterio": "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
-      "atende": true,
-      "evidencia": "Rodei no worktree DEVFACTORY-002-P09-codex com o venv do projeto (.venv/bin/python, -p no:cacheprovider -rs): '189 passed in 53.92s' (0 skipped aqui; o output fornecido diz 187 passed + 2 skipped = 189 coletados, coerente) e git status do worktree continua limpo."
-    },
-    {
-      "criterio": "preservacao com evolucao: ajuste minimo, decisao datada em decisions.md e prova de que a cobertura nao caiu",
-      "atende": true,
-      "evidencia": "A unica assercao tocada e test_plan_escrita.py:48, que troca o conjunto esperado para incluir prompt_original mantendo o '==' estrito (nada removido nem relaxado) - ajuste necessario, como prova .autodev/sprints/DEVFACTORY-002/evidence/P09-1790581413.txt. decisions.md tem a decisao datada de 2026-09-28. Contagem conferida de forma independente: git grep '^def test_' em a9445a3 = 158 vs HEAD = 161 (+3, sem parametrize novo, 8 ocorrencias de parametrize nos dois lados) e '--collect-only -q' no HEAD = '189 tests collected', logo antes = 186 - a cobertura nao caiu."
-    }
-  ],
-  "findings": [
-    {
-      "severidade": "media",
-      "arquivo": "autodev/cli.py",
-      "linha": 126,
-      "descricao": "A leitura `dag = json.loads((d / \"dag.json\").read_text(encoding=\"utf-8\"))` e obrigatoria e sem guarda, dentro do unico comando que o criterio manda nao quebrar. Sprint sem dag.json -> FileNotFoundError; dag.json com JSON quebrado -> JSONDecodeError; nada em cmd_report (cli.py:120-138) nem em main() (cli.py:344, `return args.fn(args)`) trata. Confirmei a semantica das duas excecoes em processo. Na base a9445a3 o cmd_report nao lia o dag.json, entao o mesmo comando retornava 0 e escrevia o SPRINT-REPORT.md: e uma regressao de comportamento introduzida pelo diff e nenhum teste a cobre (os 3 testes novos sempre criam dag.json valido). A rodada anterior de revisao ja havia reprovado a mesma linha por outro caminho (`carrega_dag(...) if exists() else {}` levantava ValueError de valida_dag); o defeito de classe sobreviveu a correcao.",
-      "correcao_sugerida": "Ler de forma tolerante, porque o relatorio e derivado do state.db e nao deveria depender da presenca/validade do DAG: `valor = None; p = d / \"dag.json\"; if p.exists():\n    try: valor = json.loads(p.read_text(encoding=\"utf-8\")).get(\"prompt_original\")\n    except (OSError, ValueError, AttributeError): valor = None` e passar `prompt_original=valor if isinstance(valor, str) else None`. Adicionar um caso no test_plan_rastreabilidade.py com sprint.yaml sem dag.json exigindo rc=0 e 'nao informado' na secao."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": "autodev/cli.py",
-      "linha": 132,
-      "descricao": "prompt_original agora e passado como keyword explicito junto de **extra (report-extras.json). Se o extras trouxer a chave prompt_original, o Python levanta TypeError: got multiple values for keyword argument 'prompt_original' (semantica confirmada em processo) e o relatorio nao e gerado; nenhum teste cobre a colisao, e a precedencia ficou indefinida (no rascunho anterior deste mesmo trabalho o DAG era o vencedor e isso era testado). Impacto pratico e baixo porque nenhum sprint do repo usa report-extras.json.",
-      "correcao_sugerida": "Montar as opcoes explicitamente em vez de misturar explicito com **extra: `opcoes = {**extra, \"objetivo\": sp.get(\"objetivo\", \"\"), \"git_commit\": commit_atual(RAIZ), \"prompt_original\": valor}` e chamar `rp.gerar(st, args.sprint, **opcoes)`."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": ".autodev/tests/test_plan_rastreabilidade.py",
-      "linha": 62,
-      "descricao": "No teste do relatorio o prompt e de uma unica linha e sem espacos duplos ('Implemente rastreabilidade sem alterar o texto.'), entao o assert `prompt in contexto` prova apenas presenca: uma mutacao em report.py que normalize o texto (ex.: ' '.join(prompt.split())) continuaria passando. A literalidade so esta provada no caminho dag/spec (linha 48-56).",
-      "correcao_sugerida": "Reutilizar no teste do relatorio o mesmo prompt multi-linha com espacos duplos usado no teste da linha 48, mantendo o assert de substring literal."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": ".autodev/tests/test_plan_rastreabilidade.py",
-      "linha": 74,
-      "descricao": "O criterio 'plano sem prompt_original e aceito' e provado so no caso em que o dag.json e escrito a mao com json.dumps. O caminho real plano-sem-prompt_original -> escrever_sprint -> dag.json -> report nao tem teste: Plano.prompt_original e campo obrigatorio sem default (autodev/planner.py:48), e o plano sem essa chave so nao explode porque parsear_plano:203 injeta \"\" por conta propria.",
-      "correcao_sugerida": "Acrescentar um caso que chame parsear_plano (ou construa Plano(prompt_original=\"\")) -> escrever_sprint -> cli.main report e exija a secao com 'nao informado', fechando o criterio ponta a ponta."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": ".autodev/sprints/DEVFACTORY-002/decisions.md",
-      "linha": 1,
-      "descricao": "O arquivo entra como NOVO no branch, mas o caminho ja existe na linha principal (fba74fa:.autodev/sprints/DEVFACTORY-002/decisions.md, 28026 bytes, log D-01..D-17 citado por autodev/report.py:115,130), o que implica conflito add/add na hora de levar o sprint para a main. O criterio desta task exige explicitamente registrar a decisao nesse caminho, entao o registro esta correto - o achado e so aviso de integracao.",
-      "correcao_sugerida": "Na integracao, anexar a decisao ao arquivo existente da main em vez de sobrescrever (resolver o add/add a favor do log do autor + entrada nova)."
-    }
-  ],
-  "resumo": "Os 7 criterios estao atendidos com evidencia verificada (inclusive a prova de cobertura 158->161 defs / 186->189 coletados), mas a linha nova de autodev/cli.py tornou o `autodev report` dependente da existencia e da validade do dag.json - onde a base devolvia rc=0, agora sai traceback nao tratado e sem teste, defeito de classe que a revisao anterior ja havia apontado naquele ponto."
-}
-```
+Billing or credits exhausted: HTTP 402: Insufficient Balance (request_id: a3520676-e385-410c-ac06-b9304f4b3e82)
+
+DeepSeek reported that billing, credits, or account entitlement is exhausted for deepseek-v4-pro.
+Add credits or update billing with that provider, then retry.
+DeepSeek billing: https://platform.deepseek.com/top_up
+You can switch providers temporarily with /model <model> --provider <provider>.
 
 
 ===== STDERR =====
