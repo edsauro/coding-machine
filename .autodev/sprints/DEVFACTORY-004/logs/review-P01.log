@@ -1,0 +1,350 @@
+# exit_code=0 duracao=170.8s modelo=deepseek-flash effort=(default) failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- a secao '## Planejador' deixa de ficar dentro de '## Como rodar' (o README da sprint 2 a inseriu no meio dessa secao)
+- '### Ciclo de vida do sprint' e '### Conclusao por evidencia' voltam a ser subsecoes de '## Como rodar', na ordem em que estavam antes da P10 da sprint 2
+- nenhum conteudo e removido: a secao da tela de eventos ('### Acompanhar ao vivo'), a secao do Planejador e as subsecoes de '## Como rodar' continuam presentes, com o mesmo texto
+- a arvore de titulos fica coerente: nenhum '##' abre dentro de outro '##' sem fechar, e nenhuma subsecao de um assunto fica sob titulo de outro
+- os testes ficam em .autodev/tests/test_readme_estrutura.py e provam a hierarquia (nivel e ordem dos titulos lidos do arquivo), inclusive que '### Ciclo de vida do sprint' vem depois de '## Como rodar' e antes do proximo '##'
+- rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q (nao use .venv/bin/python: dentro do worktree esse venv nao existe de verdade — em 28/09 isso queimou 12 tentativas, evidencia em .autodev/sprints/DEVFACTORY-004/evidence/, D-23)
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa
+
+## Task
+P01: Restaurar a hierarquia de secoes do README
+
+## Diff a revisar (base 2ca6ce2a4ef3694fd71a5267e4e147258eed306f -> HEAD)
+```diff
+diff --git a/.autodev/fixtures/readme_estrutura/como_rodar.md b/.autodev/fixtures/readme_estrutura/como_rodar.md
+new file mode 100644
+index 0000000..18a25e1
+--- /dev/null
++++ b/.autodev/fixtures/readme_estrutura/como_rodar.md
+@@ -0,0 +1,75 @@
++## Como rodar
++
++Requisitos: Python 3.11+, `git`, e `bubblewrap` (`bwrap`).
++
++```bash
++python3 -m venv .venv && .venv/bin/pip install pytest pyyaml
++
++.venv/bin/python -m autodev detect          # quais agentes estão instalados
++.venv/bin/python -m autodev init            # valida o DAG do sprint
++.venv/bin/python -m autodev status          # estado das tarefas
++.venv/bin/python -m autodev run             # executa o sprint
++.venv/bin/python -m autodev report          # gera o relatório
++.venv/bin/python -m autodev resume          # retoma após interrupção
++.venv/bin/python -m autodev haq             # fila de ação humana
++.venv/bin/python -m autodev encerrar        # fecha o sprint (estado terminal)
++.venv/bin/python -m autodev evidenciar T03 -e "autodev/state.py + 8 testes"
++```
++
++Testes do próprio orquestrador:
++
++```bash
++.venv/bin/python -m pytest .autodev/tests/ -q
++```
++
++### Acompanhar ao vivo (tela de eventos)
++
++```bash
++./tela.sh                  # tela permanente: cabeçalho do sprint + uma linha por evento
++./tela.sh --once           # um quadro só (para log ou pipe)
++./tela.sh --intervalo 5 --linhas 25 --tudo
++```
++
++O cabeçalho traz sprint, estado, quantas tarefas já foram integradas, se há rodada
++viva e a fila; abaixo, cada evento do motor em uma linha curta — reinício da
++codificação e teste, fim de desenvolvimento, testes do pacote, revisão aprovada ou
++reprovada (com revisor e número de achados), integração com o commit, bloqueio, espera
++de cota e HAQ que dependem de você. É só leitura (abre o `state.db` em modo `ro`) e sai
++com Ctrl-C. No Hyprland/Omarchy, para deixar sempre à mão:
++
++```
++bind = SUPER, D, exec, $terminal --title=tela-devfactory -e ~/Code/Coding_Machine/tela.sh
++```
++
++### Ciclo de vida do sprint
++
++Tarefas têm 12 estados; o **sprint** tem os seus:
++
++```
++PLANEJADO → EM_EXECUCAO → EM_VERIFICACAO → ENCERRADO
++                  ↘              ↘
++                            ABORTADO
++```
++
++`encerrar` **recusa** se houver tarefa fora de estado terminal — encerrar com
++trabalho em aberto é justamente o que o HAQ existe para evitar. `--forcar` aborta
++um sprint travado e grava o motivo.
++
++A fonte autoritativa é `state.db`. O `status:` do `sprint.yaml` é declaração de
++intenção, não fato.
++
++### Conclusão por evidência
++
++Quando o trabalho de uma tarefa foi feito **fora** do laço do orquestrador, ele
++não pode ser registrado como se o orquestrador tivesse executado — isso seria
++evidência falsa.
++
++```bash
++.venv/bin/python -m autodev evidenciar T03 -e "descrição do artefato verificável"
++```
++
++O comando percorre o caminho válido de transições e marca a tentativa com
++**`origem='retroativo'`**. O relatório mostra essa distinção e alerta quando
++existe conclusão que não veio do laço.
++
++---
+diff --git a/.autodev/fixtures/readme_estrutura/planejador.md b/.autodev/fixtures/readme_estrutura/planejador.md
+new file mode 100644
+index 0000000..dd7ac15
+--- /dev/null
++++ b/.autodev/fixtures/readme_estrutura/planejador.md
+@@ -0,0 +1,21 @@
++## Planejador
++
++O planejador transforma um prompt em texto livre em um sprint executável. Ele
++envia o pedido a um agente, interpreta e valida o plano devolvido, ordena as
++tarefas por dependência e materializa os arquivos que o orquestrador consome:
++`spec.md`, `dag.json` e `sprint.yaml`.
++
++Por exemplo:
++
++```bash
++.venv/bin/python -m autodev plan "Adicionar autenticação à API"
++```
++
++O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
++contendo os três arquivos acima. Como o planejador usa um agente, cada execução
++consome cota do agente configurado. O plano gerado **sempre precisa de revisão
++humana antes de rodar**: a validação estrutural não garante que a interpretação
++do pedido ou os critérios de aceitação estejam corretos.
++
++`plan` somente prepara os arquivos locais do sprint; ele **não faz merge nem
++push**.
+diff --git a/.autodev/sprints/DEVFACTORY-004/decisions.md b/.autodev/sprints/DEVFACTORY-004/decisions.md
+new file mode 100644
+index 0000000..7ba0d25
+--- /dev/null
++++ b/.autodev/sprints/DEVFACTORY-004/decisions.md
+@@ -0,0 +1,33 @@
++# Decisões — DEVFACTORY-004
++
++## D-24 — 2026-09-28 — P01 não pode integrar a base da sprint 2
++
++A P01 foi criada sobre `main` (`2ca6ce2`), que não contém o subcomando `plan`,
++`autodev/planner.py` nem os testes da sprint 2; eles existem em
++`sprint/DEVFACTORY-002/integration`. Integrar essa branch nesta task alteraria 193
++arquivos e extrapolaria o escopo de reorganização do README. A seção Planejador já
++foi introduzida pela tentativa anterior e permanece com o texto de referência; a
++P01 fortalece apenas a prova da estrutura e da preservação integral dos textos.
++
++Não houve remoção nem enfraquecimento de teste de task anterior: o teste P01
++anterior foi substituído por verificações estritamente mais fortes (árvore inteira
++e igualdade do corpo integral com fixtures). A contagem da suíte sobe de 194 para
++197; o arquivo da task mantém 3 casos, com verificações estritamente mais fortes.
++
++## D-25 — 2026-09-28 — P01 fixa a árvore completa do README
++
++A revisão da tentativa 8 demonstrou que validar apenas a janela entre `## Como
++rodar` e `## Planejador` não protegia o restante da hierarquia: rebaixar `## Estado
++atual` ou `## Segurança` para nível 3 ainda passava. O teste de parentesco foi
++fortalecido, sem criar ou remover casos, para comparar a sequência completa e
++literal de pares `(nível, texto)`. Assim, qualquer seção colocada sob assunto
++incorreto falha, inclusive fora da janela reorganizada. O helper de corpos agora
++ancora o título no início da linha e exige ocorrência única; os dois títulos que
++delimitam a janela também são explicitamente únicos.
++
++A base histórica continua sendo a documentada em D-24. A fixture de `Como rodar`
++reproduz o corpo de `main` (`2ca6ce2`), antes da inserção defeituosa; a fixture de
++`Planejador` reproduz somente o bloco introduzido pela P10 em
++`sprint/DEVFACTORY-002/P10-codex` (`785988d`), até antes das subseções que vazaram
++para dentro dele. A preservação é provada contra esses snapshots históricos, não
++contra texto derivado pelo teste.
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+new file mode 100644
+index 0000000..4bce481
+--- /dev/null
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -0,0 +1,77 @@
++import re
++from pathlib import Path
++
++
++ROOT = Path(__file__).parents[2]
++README = ROOT / "README.md"
++REFERENCIAS = ROOT / ".autodev" / "fixtures" / "readme_estrutura"
++TITULOS_ESPERADOS = [
++    (1, "Coding Machine"),
++    (2, 'Por que não é só "chamar o Codex num loop"'),
++    (2, "Estrutura"),
++    (2, "Como rodar"),
++    (3, "Acompanhar ao vivo (tela de eventos)"),
++    (3, "Ciclo de vida do sprint"),
++    (3, "Conclusão por evidência"),
++    (2, "Planejador"),
++    (2, "Os agentes"),
++    (2, "Estado atual"),
++    (2, "Segurança"),
++]
++
++
++def _texto() -> str:
++    return README.read_text(encoding="utf-8")
++
++
++def _titulos():
++    return [
++        (len(match.group("marcador")), match.group("texto"))
++        for match in re.finditer(
++            r"^(?P<marcador>#{1,6}) (?P<texto>.+)$",
++            _texto(),
++            re.MULTILINE,
++        )
++    ]
++
++
++def _corpo_da_secao(titulo: str) -> str:
++    texto = _texto()
++    secoes = list(re.finditer(rf"^## {re.escape(titulo)}$", texto, re.MULTILINE))
++    assert len(secoes) == 1, f"esperada uma seção '## {titulo}', obtidas {len(secoes)}"
++    inicio = secoes[0].start()
++    proximo = texto.find("\n## ", inicio + 1)
++    return texto[inicio : None if proximo == -1 else proximo].rstrip() + "\n"
++
++
++def test_como_rodar_contem_suas_subsecoes_antes_da_proxima_secao():
++    titulos = _titulos()
++    assert titulos.count((2, "Como rodar")) == 1
++    assert titulos.count((2, "Planejador")) == 1
++    inicio = titulos.index((2, "Como rodar"))
++    proximo_nivel_dois = next(
++        indice
++        for indice in range(inicio + 1, len(titulos))
++        if titulos[indice][0] == 2
++    )
++
++    assert titulos[inicio + 1 : proximo_nivel_dois] == [
++        (3, "Acompanhar ao vivo (tela de eventos)"),
++        (3, "Ciclo de vida do sprint"),
++        (3, "Conclusão por evidência"),
++    ]
++    assert titulos[proximo_nivel_dois] == (2, "Planejador")
++
++
++def test_arvore_completa_de_titulos_preserva_niveis_ordem_e_parentesco():
++    assert _titulos() == TITULOS_ESPERADOS
++
++
++def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
++    for titulo, arquivo in (
++        ("Como rodar", "como_rodar.md"),
++        ("Planejador", "planejador.md"),
++    ):
++        assert _corpo_da_secao(titulo) == (REFERENCIAS / arquivo).read_text(
++            encoding="utf-8"
++        )
+diff --git a/README.md b/README.md
+index d1a7722..8321a65 100644
+--- a/README.md
++++ b/README.md
+@@ -144,6 +144,28 @@ existe conclusão que não veio do laço.
+ 
+ ---
+ 
++## Planejador
++
++O planejador transforma um prompt em texto livre em um sprint executável. Ele
++envia o pedido a um agente, interpreta e valida o plano devolvido, ordena as
++tarefas por dependência e materializa os arquivos que o orquestrador consome:
++`spec.md`, `dag.json` e `sprint.yaml`.
++
++Por exemplo:
++
++```bash
++.venv/bin/python -m autodev plan "Adicionar autenticação à API"
++```
++
++O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
++contendo os três arquivos acima. Como o planejador usa um agente, cada execução
++consome cota do agente configurado. O plano gerado **sempre precisa de revisão
++humana antes de rodar**: a validação estrutural não garante que a interpretação
++do pedido ou os critérios de aceitação estejam corretos.
++
++`plan` somente prepara os arquivos locais do sprint; ele **não faz merge nem
++push**.
++
+ ## Os agentes
+ 
+ Configurados em `.autodev/config/agents.yaml`. O orquestrador **detecta** o que
+```
+
+## Saida dos testes
+```
+...                                                                      [100%]
+3 passed in 0.01s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+{
+  "veredito": "APPROVE",
+  "confianca": 0.72,
+  "criterios_atendidos": [
+    {"criterio": "a secao '## Planejador' deixa de ficar dentro de '## Como rodar'", "atende": true, "evidencia": "No worktree (.autodev/worktrees/DEVFACTORY-004-P01-codex, HEAD 00fc3a4) os titulos lidos do README sao: 71 '## Como rodar', 95/114/131 '###', 147 '## Planejador', 169 '## Os agentes'. Test 1 (assert titulos[inicio+1:proximo_nivel_dois] == as 3 subsecoes e titulos[proximo_nivel_dois] == (2,'Planejador')) prova que nenhum nivel 2 se interpoe entre '## Como rodar' e as subsecoes. Mutacao M1 (devolver o bloco Planejador para antes de '### Ciclo de vida do sprint') => 3 failed."},
+    {"criterio": "'### Ciclo de vida do sprint' e '### Conclusao por evidencia' voltam a ser subsecoes de '## Como rodar', na ordem pre-P10", "atende": true, "evidencia": "Ordem final: (3,'Acompanhar ao vivo (tela de eventos)'), (3,'Ciclo de vida do sprint'), (3,'Conclusão por evidência') sob '## Como rodar'. Conferi a referencia pre-P10: em 785988d^ o README tinha '## Como rodar' (l.67) seguido de '### Ciclo de vida do sprint' (l.91) e '### Conclusão por evidência' (l.108), sem nenhum '##' entre eles; o proprio diff da P10 (git show 785988d -- README.md) insere o bloco '## Planejador' exatamente entre o bloco de testes e '### Ciclo de vida do sprint' — era esse o defeito. Nao houve reordenacao das duas subsecoes."},
+    {"criterio": "nenhum conteudo e removido (tela de eventos, Planejador, subsecoes de Como rodar com o mesmo texto)", "atende": true, "evidencia": "git diff 2ca6ce2 HEAD --stat = 5 files, 228 insertions(+), 0 deletions; nenhuma linha removida em README.md. Comparacao byte a byte que fiz: corpo('Como rodar') do README final == fixture como_rodar.md == corpo('Como rodar') de 2ca6ce2 (base) -> True/True; corpo('Planejador') do README final == fixture planejador.md, e a fixture e prefixo identico das 21 linhas que a P10 inseriu em 785988d (diff fixture x bloco P10 mostrou apenas a remocao das subsecoes vazadas + '---'). '### Acompanhar ao vivo (tela de eventos)' presente na l.95 dentro do corpo congelado."},
+    {"criterio": "a arvore de titulos fica coerente (nenhum '##' dentro de outro '##', nenhuma subsecao sob titulo de outro assunto)", "atende": true, "evidencia": "grep '^#' do README final: 1x '#', 9x '##', 3x '###', todos os '###' agrupados sob '## Como rodar'. test_arvore_completa_de_titulos_preserva_niveis_ordem_e_parentesco compara a sequencia literal e completa de pares (nivel, texto) com TITULOS_ESPERADOS. Mutacoes que rodei sobre copia em scratch: M2 rebaixar '## Estado atual' -> '###' => 1 failed; M3 README defeituoso da sprint 2 (e8ca2e0) => 3 failed; M5 remover 'Ciclo de vida'/'Conclusao por evidencia' => 3 failed. A assercao rejeita tambem titulos duplicados (count == 1 em test 1 e len(secoes) == 1 no helper)."},
+    {"criterio": "testes em .autodev/tests/test_readme_estrutura.py provando nivel/ordem, inclusive 'Ciclo de vida' depois de '## Como rodar' e antes do proximo '##'", "atende": true, "evidencia": "Arquivo existe no caminho exigido (77 linhas, 3 casos). _titulos() le os titulos do arquivo com regex ancorado em '^#{1,6} ' + MULTILINE; test 1 localiza '## Como rodar', acha o proximo nivel 2 e afirma a fatia intermediaria; test 2 fixa a arvore inteira. Rodado no worktree: 3 passed in 0.01s (mesma saida anexada pelo agente). Nao e teste vazio: as 5 mutacoes acima foram detectadas."},
+    {"criterio": "rode a suite com a forma que o RUNNER resolve (nao .venv/bin/python relativo)", "atende": true, "evidencia": "A evidencia anexada (.autodev/sprints/DEVFACTORY-004/evidence/P01-1790618165.txt) registra '/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest ...', que e o resultado de _resolver() em autodev/testrunner.py:110-125 (troca o 'python3' simbolico por sys.executable) — o .venv relativo que falhava por bwrap aparece so nas tentativas antigas (P01-1790616068.txt, D-23). Reproduzi eu mesmo a forma resolvida da suite inteira dentro do worktree: '/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q -p no:cacheprovider' => 197 passed in 20.98s (nenhuma regressao). O '/usr/bin/python3 -m pytest' cru realmente nao roda aqui ('No module named pytest'), como o proprio D-23 diz."},
+    {"criterio": "preservacao com evolucao: nao enfraquecer teste anterior, decisao datada e cobertura nao menor", "atende": true, "evidencia": "O diff nao toca nenhum arquivo de teste existente (so cria o novo). Contagem medida por mim: main/base 2ca6ce2 = 194 coletados (--collect-only -q), HEAD do worktree = 197 coletados => +3, nao caiu. Comparei as versoes do proprio arquivo na task: t7 (aa587f9) tinha 3 casos com checagem de 6 substrings; t9 (HEAD) tem 3 casos mais fortes (test 3 passou de substring para igualdade do corpo integral com fixture versionada; o antigo caso de indice 'Planejador antes de Os agentes' virou implicito no test 1 e no test 2). Nada foi deletado. Decisao datada registrada em .autodev/sprints/DEVFACTORY-004/decisions.md (D-24 e D-25, 2026-09-28)."}
+  ],
+  "findings": [
+    {"severidade": "media", "arquivo": "README.md", "linha": 147, "descricao": "A secao '## Planejador' (exigida pelo criterio 3) documenta comportamento que NAO existe nesta arvore: `python3 -m autodev plan \"...\"` responde \"autodev: error: argument cmd: invalid choice: 'plan' (choose from 'detect', 'init', ...)\" e nao existe autodev/planner.py no worktree nem em 2ca6ce2. Nao e violacao de criterio — o criterio 3 manda manter o texto — e a base sem a sprint 2 esta registrada em D-24; por isso nao bloqueio. Mas o entregavel afirma um comando inexistente na arvore em que sera integrado.", "correcao_sugerida": "Nao alterar o texto (criterio 3 proibe). Complementar D-24, datado, com a constatacao medida ('-m autodev plan' => invalid choice nesta base) e a condicao de veracidade: o bloco so descreve a arvore se a integracao da sprint 2 estiver presente; senao, planejar a base da task sobre a branch que contem o planejador."},
+    {"severidade": "baixa", "arquivo": ".autodev/sprints/DEVFACTORY-004/evidence/", "linha": 0, "descricao": "A evidencia anexada roda apenas o arquivo novo ('... -m pytest .autodev/tests/test_readme_estrutura.py -q' => '3 passed in 0.01s'), enquanto o criterio nomeia a suite inteira ('python3 -m pytest .autodev/tests/ -q'). O campo 'teste' do dag.json aponta o arquivo unico, entao a lacuna e de evidencia, nao de codigo: o '3 passed' isolado nao demonstra por si que os outros 194 casos continuam verdes.", "correcao_sugerida": "Anexar tambem a saida da suite completa com o interpretador resolvido: medido por mim no worktree, '... -m pytest .autodev/tests/ -q' => 197 passed in 20.98s."},
+    {"severidade": "baixa", "arquivo": ".autodev/sprints/DEVFACTORY-004/decisions.md", "linha": 15, "descricao": "O criterio 6 pede PROVA de que a cobertura nao caiu via '--collect-only -q', e nenhum artefato de coleta foi anexado: a afirmacao 'a contagem da suite sobe de 194 para 197' (D-24) existe so em prosa. Ela e verdadeira — medi 194 em main/2ca6ce2 e 197 no HEAD do worktree — mas o revisor so consegue confirma-la refazendo a medicao.", "correcao_sugerida": "Gravar em evidence/ a saida de 'python3 -m pytest .autodev/tests/ --collect-only -q' na base e no HEAD (com o interpretador resolvido) e citar o arquivo em D-24."},
+    {"severidade": "baixa", "arquivo": ".autodev/tests/test_readme_estrutura.py", "linha": 70, "descricao": "O test 3 congela o corpo do Planejador byte a byte contra fixture criada na mesma entrega; a P03 desta mesma sprint tem por mandato alterar exatamente a frase 'consome cota do agente configurado' (que vive nesse corpo). Mutacao M4 (trocar essa frase) => 1 failed. O criterio 6 preve ajuste minimo + decisao datada, entao e aceitavel, mas a fixture deixa de ser snapshot historico na primeira edicao. Alem disso, a fidelidade das fixtures as referencias historicas (corpo de 2ca6ce2; as 21 linhas inseridas em 785988d) nao e provada pela entrega — e verificada de fora; se a fixture for editada, nada no repo detecta a perda.", "correcao_sugerida": "Registrar em D-25 (datado) que a fixture e snapshot de 785988d/2ca6ce2 e que qualquer edicao futura do corpo a invalida como snapshot (exigindo nota datada), ou guardar o hash do blob de referencia (785988d:README.md / 2ca6ce2:README.md) junto da fixture."},
+    {"severidade": "baixa", "arquivo": "README.md", "linha": 147, "descricao": "O diff tem 0 delecoes: numa base sem a secao, 'restaurar a hierarquia' se materializa por insercao de 22 linhas (D-24 admite isso). Consequencia pratica: nada no entregavel demonstra que '## Planejador deixou de ficar dentro de ## Como rodar' — a prova da equivalencia com a referencia pos-P10 e externa (revisor contra 785988d). O resultado final, que conferi, esta correto.", "correcao_sugerida": "Anexar a evidencia da movimentacao (README de 785988d x README final, mostrando que as mesmas 21 linhas passaram de dentro de '## Como rodar' para nivel 2 depois das tres subsecoes) e citar em D-24 qual base foi usada e por que."}
+  ],
+  "resumo": "Os sete criterios se sustentam no artefato real (Planejador em nivel 2 fora de '## Como rodar', as tres subsecoes na ordem pre-P10, zero delecoes, arvore inteira pinada por teste que eu derrubei com 5 mutacoes, suite resolvida 197 passed e coleta 194->197), com ressalvas registradas de severidade media/baixa que nao invalidam a entrega."
+}
+
+
+===== STDERR =====
+

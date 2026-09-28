@@ -10,6 +10,7 @@ sentido.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import time
@@ -127,6 +128,20 @@ CREATE TABLE IF NOT EXISTS writer_lock (
     agent      TEXT,
     pid        INTEGER,
     heartbeat  REAL
+);
+
+-- ---------------------------------------------------------------- rodada única por sprint
+-- O motor é quem garante que NÃO existe rodada dupla no mesmo sprint. Depender de
+-- heurística de fora (guardar por pgrep, ou por heartbeat do writer_lock, que não é
+-- reescrito durante uma revisão de 5 min) já custou caro: em 28/09 uma segunda rodada
+-- disparada por vigia integrou uma task no meio da revisão de outra e a bloqueou por
+-- limite de tentativas, derrubando o sprint com TransicaoInvalida.
+CREATE TABLE IF NOT EXISTS run_lock (
+    sprint_id   TEXT PRIMARY KEY,
+    pid         INTEGER,
+    iniciado_em REAL,
+    heartbeat   REAL,
+    nota        TEXT
 );
 
 -- ---------------------------------------------------------------- checkpoint do sprint
@@ -592,6 +607,83 @@ class StateStore:
 
     def liberar_worktree(self, worktree: str) -> None:
         self.conn.execute("DELETE FROM writer_lock WHERE worktree=?", (worktree,))
+
+    # ------------------------------------------------- rodada única por sprint
+    @staticmethod
+    def _pid_vivo(pid: int | None) -> bool:
+        if not pid:
+            return False
+        try:
+            os.kill(int(pid), 0)
+            return True
+        except (OSError, ValueError):
+            return False
+
+    def adquirir_run_lock(self, sprint_id: str, pid: int | None = None,
+                          validade_s: float = 3600) -> tuple[bool, str]:
+        """Toma o direito de rodar este sprint. (True, motivo) = é esta rodada.
+
+        Recusa se houver outra rodada VIVA. "Viva" = processo com o pid registrado
+        andando; se o pid morreu (crash/kill) e o heartbeat passou da validade, o
+        lock é assumido como órfão e a rodada nova prossegue — nunca fica travado
+        para sempre por causa de um processo morto.
+        """
+        pid = os.getpid() if pid is None else pid
+        r = self.conn.execute("SELECT * FROM run_lock WHERE sprint_id=?",
+                              (sprint_id,)).fetchone()
+        agora = time.time()
+        if r:
+            vivo = self._pid_vivo(r["pid"])
+            idade = agora - float(r["heartbeat"] or 0)
+            if vivo and int(r["pid"]) != pid:
+                return False, (f"já existe rodada viva no sprint {sprint_id} "
+                               f"(pid {r['pid']}, heartbeat há {idade / 60:.0f} min)")
+            if not vivo and idade < validade_s and int(r["pid"]) != pid:
+                # pid morto mas heartbeat fresco: pode ser outra máquina/sessão
+                # renovando; na dúvida, não rouba.
+                return False, (f"rodada registrada sem processo local vivo "
+                               f"(pid {r['pid']}, heartbeat há {idade / 60:.0f} min)")
+        with self.tx():
+            if r:
+                self.conn.execute(
+                    "UPDATE run_lock SET pid=?, heartbeat=?, nota=? WHERE sprint_id=?",
+                    (pid, agora,
+                     f"assumiu de pid {r['pid']} (sem processo vivo)" if r["pid"] != pid
+                     else (r["nota"] or ""), sprint_id))
+            else:
+                self.conn.execute(
+                    "INSERT INTO run_lock (sprint_id, pid, iniciado_em, heartbeat, nota)"
+                    " VALUES (?,?,?,?,?)", (sprint_id, pid, agora, agora, "rodada dona"))
+        return True, "rodada única"
+
+    def renovar_lock(self, sprint_id: str, pid: int | None = None) -> None:
+        """Batimento dos locks desta rodada: run_lock + writer_lock do sprint.
+
+        O writer_lock só era escrito no início da tentativa e não era reescrito
+        durante a revisão (que leva minutos) — quem observa de fora (tela, guarda,
+        vigia) via um heartbeat parado e concluía que a rodada tinha morrido.
+        """
+        pid = os.getpid() if pid is None else pid
+        agora = time.time()
+        self.conn.execute("UPDATE run_lock SET heartbeat=? WHERE sprint_id=? AND pid=?",
+                          (agora, sprint_id, pid))
+        self.conn.execute(
+            "UPDATE writer_lock SET heartbeat=? WHERE (pid=? OR pid IS NULL OR pid=0)"
+            " AND task_id IN (SELECT task_id FROM tasks WHERE sprint_id=?)",
+            (agora, pid, sprint_id))
+        self.conn.commit()
+
+    def liberar_run_lock(self, sprint_id: str, pid: int | None = None) -> None:
+        """Libera só se o lock for DESTA rodada (não derruba o dono novo)."""
+        pid = os.getpid() if pid is None else pid
+        self.conn.execute("DELETE FROM run_lock WHERE sprint_id=? AND pid=?",
+                          (sprint_id, pid))
+        self.conn.commit()
+
+    def run_lock(self, sprint_id: str) -> dict | None:
+        r = self.conn.execute("SELECT * FROM run_lock WHERE sprint_id=?",
+                              (sprint_id,)).fetchone()
+        return dict(r) if r else None
 
     def stale_workers(self, timeout_s: float = 900) -> list[sqlite3.Row]:
         """Tentativas RUNNING cujo heartbeat parou (spec §21)."""

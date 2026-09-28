@@ -31,7 +31,12 @@ TRANSICOES = {
     "DONE": {"INTEGRATED"},
     "INTEGRATED": set(),
     "FAILED": {"QUEUED"},
-    "BLOCKED": {"QUEUED"},
+    # BLOCKED -> DONE: um bloqueio por limite de tentativas é uma decisão sobre
+    # TENTATIVAS, não sobre o trabalho. Se a revisão da última tentativa volta
+    # APPROVE depois disso (revisão de LLM leva minutos), a entrega está validada e
+    # precisa poder ser finalizada. Sem esta aresta o motor quebrava com
+    # "TransicaoInvalida: P04: BLOCKED -> DONE não permitido" e derrubava a rodada.
+    "BLOCKED": {"QUEUED", "DONE"},
 }
 
 # Estados TERMINAIS de tarefa: nada mais a fazer, com ou sem sucesso.

@@ -1,4 +1,4 @@
-# exit_code=0 duracao=75.0s modelo=gpt-5.6-sol effort=medium failure_class=None
+# exit_code=0 duracao=180.3s modelo=gpt-5.6-sol effort=medium failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -6,13 +6,13 @@ Voce e o agente de implementacao de uma task de um Sprint autonomo.
 ## Task P04: Comando de teste nos criterios tem de rodar nesta maquina
 
 ## Criterios de aceitacao (todos obrigatorios)
-- o verificador de planos (.autodev/scripts/verificar_plano.py) aponta AVISO quando o campo 'teste' de uma task ou um criterio de teste cita 'python3 -m pytest' sem o interpretador do projeto, sugerindo a forma '.venv/bin/python -m pytest'
-- o mesmo aviso explica por que: nesta maquina o python3 do sistema nao tem pytest (o runner do motor resolve o interpretador, mas quem roda o comando literalmente falha)
-- o prompt de planejamento (autodev/plan_prompt.py) passa a exigir a forma que roda nesta maquina (.venv/bin/python -m pytest ...) nos criterios e no campo 'teste'
-- o verificador continua somente leitura: nao escreve em dag.json nem em nenhum arquivo do sprint
-- os testes ficam em .autodev/tests/test_plano_comando.py e cobrem: um DAG com '.venv/bin/python -m pytest' nao gera aviso, um DAG com 'python3 -m pytest' gera aviso, e o prompt de planejamento cita a forma correta
-- estende .autodev/scripts/verificar_plano.py e autodev/plan_prompt.py preservando as funcoes existentes (checagens de colisao na mesma onda, arquivo de teste repetido, criterio sem arquivo, edicao sem preservacao) sem remover nem renomear nada
-- rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q
+- o verificador de planos (.autodev/scripts/verificar_plano.py) aponta ERRO quando o campo 'teste' de uma task ou um criterio de teste usa caminho de venv relativo ('.venv/bin/python'), porque dentro do worktree esse venv nao existe util: em 28/09 isso queimou 12 tentativas (P01 e P04 desta sprint), com a evidencia 'No module named pytest'
+- o verificador passa a EXIGIR a forma que o runner do motor resolve: 'python3 -m pytest ...' — o runner roda com cwd no worktree e o sandbox resolve o interpretador do projeto (autodev/testrunner.py, funcao rodar; autodev/sandbox.py, resolucao do python3)
+- o prompt de planejamento (autodev/plan_prompt.py) passa a exigir 'python3 -m pytest ...' nos criterios e no campo 'teste', e a proibir caminho de venv relativo, explicando em uma linha por que (o worktree nao tem venv)
+- o verificador continua SOMENTE LEITURA: nao escreve em dag.json nem em nenhum arquivo do sprint
+- os testes ficam em .autodev/tests/test_plano_comando.py e cobrem os tres casos: DAG com 'python3 -m pytest' nao gera erro; DAG com 'python3 -m pytest' gera erro com a explicacao; o prompt de planejamento cita a forma correta
+- estende .autodev/scripts/verificar_plano.py e autodev/plan_prompt.py preservando as checagens existentes (colisao na mesma onda, arquivo de teste repetido, criterio sem arquivo, edicao sem preservacao) sem remover nem renomear nada
+- rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q
 
 ## Contexto do projeto
 # DEVFACTORY-004 — Correções apontadas pela revisão retroativa da sprint 2
@@ -83,16 +83,14 @@ para os próximos DAGs, não só para este.
 
 ---
 ## CONTEXTO DAS TENTATIVAS ANTERIORES
-  - tentativa 1: TEST_FAILURE (exit 1) — 
-  - tentativa 2: TEST_FAILURE (exit 1) — 
-  - tentativa 3: TEST_FAILURE (exit 1) — 
+  - tentativa 6: REVIEW_FAILURE (exit 0) — 
+  - tentativa 7: TEST_FAILURE (exit 1) — 
+  - tentativa 8: REVIEW_FAILURE (exit 0) — 
 
 ## EVIDENCIA NOVA (leia antes de agir)
 ### Saida do ultimo teste
 ```
-
-/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-004-P04-codex/.venv/bin/python: No module named pytest
-
+executar'/'suite' nao estao na lista).", "correcao_sugerida": "Tratar a presenca de CAMINHO_VENV_RELATIVO como evidencia suficiente nos criterios (o caminho so tem sentido como comando) ou trocar a lista por \\btest\\w*\\b|roda|rodam|execut|su[ií]te|comando e cobrir as duas redacoes nos testes."}, {"severidade": "media", "arquivo": ".autodev/scripts/verificar_plano.py", "linha": 99, "descricao": "_sentencas divide so em ';' e '\\n', entao uma negacao numa frase engole um comando infrator de outra frase separada por ponto: \"edita autodev/alvo.py. nao use .venv/bin/python. rode .venv/bin/python -m pytest -q\" -> NENHUM E5 (verificado). O teste existente mascara isso porque usa ';' como separador.", "correcao_sugerida": "Dividir tambem no ponto (com cuidado para abreviacoes/'...') ou avaliar por ocorrencia de comando em vez de por sentenca; adicionar o caso com '.' como separador ao arquivo de teste."}, {"severidade": "media", "arquivo": ".autodev/scripts/verificar_plano.py", "linha": 170, "descricao": "Escopo extra nao pedido pelos criterios: 'not teste.strip()' faz E5 disparar em task SEM campo 'teste'. Efeito medido: DEVFACTORY-001 passa de 12 para 27 erros (15 novos, um por task, todas sem 'teste'), e a mensagem diagnostica errado ('usa comando de teste fora da forma exigida' quando nao ha comando nenhum).", "correcao_sugerida": "Separar o diagnostico ('E5: {id} sem campo teste executavel — declare python3 -m pytest ...') ou remover a clausula e manter E5 restrita a forma do comando; se mantida, documentar a nova regra no cabecalho de regras do script."}, {"severidade": "media", "arquivo": "autodev/plan_prompt.py", "linha": 3, "descricao": "O modulo e NOVO no branch (nao existe em 2ca6ce2) e nada em producao o importa: 'git grep PROMPT_PLANEJAMENTO' acha so o proprio arquivo e o teste. No branch sprint/DEVFACTORY-002/integration o MESMO caminho tem outra API (PROMPT_PLANO + montar_prompt_plano), ja consumida por autodev/planner.py ('from .plan_prompt import montar_prompt_plano') — e a spec da 004 declara a 002 integrada. Consequencia: o prompt que o planejador realmente usa (PROMPT_PLANO) segue permitindo a forma errada, e a integracao da 004 colide add/add com a 002 podendo derrubar montar_prompt_plano (quebrando o import) ou perder a exigencia nova.", "correcao_sugerida": "Estender o plan_prompt.py da 002 (acrescentar o paragrafo em PROMPT_PLANO, mantendo montar_prompt_plano) em vez de criar uma constante paralela; o teste deve importar o mesmo nome que o planejador usa."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plano_comando.py", "linha": 75, "descricao": "O teste do prompt prova presenca de substring, nao a direcao do requisito. Mutacao executada: trocando 'Não use `.venv/bin/python`' por 'Use `.venv/bin/python`' (o inverso do criterio) o teste continua verde. Nenhum teste cobre o criterio 4 (somente leitura) nem a preservacao de E2/E3/E4/A1/A2.", "correcao_sugerida": "Afirmar a direcao (ex.: regex exigindo verbo de proibicao junto do caminho, e ausencia de '<verbo de uso> .venv/bin/python'), e acrescentar um teste que capture o sys.modules/arquivos do sprint antes e depois de verificar() para provar leitura pura."}, {"severidade": "baixa", "arquivo": ".autodev/sprints/DEVFACTORY-004/dag.json", "linha": 0, "descricao": "O branch do P04 foi cortado de 2ca6ce2, ANTES do commit D-23 (c25ff2d): o dag.json/spec.md dentro do worktree ainda mandam usar '.venv/bin/python -m pytest' (estado contraditorio com o codigo entregue, que faz o inverso). Por isso a execucao do verificador novo dentro do worktree acusa 4 erros (P01-P04) em vez de 1. Tambem foi colada como evidencia a saida de 'pytest .autodev/tests/test_plano_comando.py -q' (11 passed) em vez do comando do criterio (205 passed, conferido por mim).", "correcao_sugerida": "Rebasear o branch sobre main (c25ff2d) antes da integracao, para que worktree, DAG e codigo contem a mesma versao dos criterios, e colar a saida do comando do criterio (suite inteira)."}]
 ```
 ### Arquivos ja tocados
   - .autodev/scripts/verificar_plano.py
@@ -112,7 +110,7 @@ Responda ao final com: RESULTADO: <resumo do que mudou>
 
 
 ===== STDOUT =====
-RESULTADO: verificador A3, prompt e 4 testes implementados; testes comportamentais passaram e somente leitura foi confirmada. Suíte obrigatória bloqueada pelo ambiente: `.venv/bin/python` não possui `pytest`.
+RESULTADO: E5 robusto, prompt canônico preservado e verificador somente leitura | TESTES: `python3 -m pytest .autodev/tests/ -q` via runner — 210 passed.
 
 ===== STDERR =====
 

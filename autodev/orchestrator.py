@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import threading
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -306,6 +307,14 @@ class Orquestrador:
             n_tent = r["tentativas"]
 
             if n_tent >= self.cfg.policies["retry"]["max_tentativas_implementacao"]:
+                # Defensivo: nunca bloquear uma task que TEM tentativa viva (outro
+                # processo). Foi assim que a P04 foi bloqueada no meio da própria
+                # revisão, em 28/09, e o run morreu com BLOCKED -> DONE.
+                if self._tentativa_viva(task_id):
+                    self.log(f"{task_id}: limite de tentativas atingido, mas ha "
+                             f"tentativa VIVA desta task — nao bloqueio")
+                    return ResumoTask(task_id, "RUNNING", n_tent, esperas,
+                                      motivo="tentativa viva em outro processo")
                 self.store.bloqueia(self.sprint, task_id,
                                     f"limite de {n_tent} tentativas de implementacao")
                 self.store.liberar_worktree(str(wt.caminho))
@@ -589,11 +598,51 @@ class Orquestrador:
                               rt.to_dict())
 
     # ------------------------------------------------------------ o sprint
+    def _batimento(self, parar: threading.Event) -> None:
+        """Renova os locks enquanto a rodada vive.
+
+        Sem isto, o heartbeat do writer_lock fica no instante do início da tentativa
+        e uma revisão de LLM (5 min) parece "rodada morta" para qualquer observador
+        externo — guarda, tela, vigia de cron.
+        """
+        while not parar.wait(20):
+            try:
+                self.store.renovar_lock(self.sprint)
+            except Exception:  # noqa: BLE001 — batimento nunca derruba a rodada
+                pass
+
+    def _tentativa_viva(self, task_id: str, janela_s: float = 1800) -> bool:
+        """Existe tentativa RUNNING recente desta task (possivelmente de outro processo)?"""
+        r = self.store.conn.execute(
+            "SELECT start_time FROM attempts WHERE sprint_id=? AND task_id=?"
+            " AND status='RUNNING' ORDER BY start_time DESC LIMIT 1",
+            (self.sprint, task_id)).fetchone()
+        return bool(r and (time.time() - float(r["start_time"] or 0)) < janela_s)
+
     def rodar(self, *, parar_em: str | None = None) -> ResultadoSprint:
         t0 = time.time()
         res = ResultadoSprint(sprint=self.sprint)
         self.carregar()
         self.recuperar()
+
+        # ---- rodada única por sprint -------------------------------------------
+        # Quem impede rodada dupla é o MOTOR. A versão anterior deixava isso para
+        # fora (guarda por pgrep/heartbeat) e pagou caro: em 28/09 um vigia de cron
+        # disparou outra rodada enquanto a primeira revisava uma task por 5 min;
+        # ela integrou a P01 no meio da revisão da P04, o portão de segurança deu
+        # falso positivo e a P04 foi bloqueada por limite — o run morreu com
+        # TransicaoInvalida: BLOCKED -> DONE.
+        ok_lock, motivo_lock = self.store.adquirir_run_lock(self.sprint)
+        if not ok_lock:
+            self.log(f"RODADA NAO INICIADA: {motivo_lock}")
+            res.parado_por = motivo_lock
+            res.duracao_s = 0.0
+            return res
+        self.log(f"rodada dona: pid {os.getpid()} — rodada única garantida pelo motor")
+        parar_batimento = threading.Event()
+        fio = threading.Thread(target=self._batimento, args=(parar_batimento,),
+                               daemon=True)
+        fio.start()
 
         try:
             for onda_i, onda in enumerate(ordem_topologica(self.dag)):
@@ -673,6 +722,9 @@ class Orquestrador:
                       verificacao="# tail -50 .autodev/sprints/.../logs/orquestrador.log")
             res.parado_por = f"erro: {e}"
         finally:
+            parar_batimento.set()
+            fio.join(timeout=3)
+            self.store.liberar_run_lock(self.sprint)
             res.duracao_s = time.time() - t0
             self.store.checkpoint(self.sprint, "FIM", {"parado_por": res.parado_por})
             haq.escrever(self.store, self.sprint, self.dir_sprint / "HAQ.md")
@@ -739,8 +791,10 @@ class Orquestrador:
                 self.store.forcar_estado(self.sprint, t["task_id"], "RETRY",
                                          f"conflito de merge: {r.conflito[:200]}")
                 continue
+            mudados = integ.arquivos_do_merge(wt_int, r.commit)
             portoes = integ.rodar_portoes(wt_int, comandos=comandos,
-                                          evidencia_dir=self.dir_sprint / "evidence")
+                                          evidencia_dir=self.dir_sprint / "evidence",
+                                          arquivos_mudados=mudados)
             for p in portoes:
                 self.log(f"  portao {p.nome}: {'OK' if p.ok else 'FALHOU'}")
             if all(p.ok for p in portoes):

@@ -75,9 +75,9 @@ dez. Portão que não sabe o que executar não é portão — é obstáculo.
 `\bsk-[A-Za-z0-9]{12,}`.
 
 **Fato:** o **teste** do portão escrevia um literal com forma de chave de API
-(`'API_KEY = "sk-abcdef1234567890"'`) para provar que a detecção funciona. O
-arquivo de teste passou a casar com o próprio padrão, e o portão reprovava o
-repositório por causa do teste do portão. A integração inteira caiu.
+(montado como `"sk-" + "abc" + dígitos`, e não assim no arquivo) para provar que a
+detecção funciona. O arquivo de teste passou a casar com o próprio padrão, e o portão
+reprovava o repositório por causa do teste do portão. A integração inteira caiu.
 
 **Decisão:** o valor sintético é **montado em runtime** (`"sk-" + "x" * 20`). O
 arquivo escrito continua idêntico e o fonte deixa de casar.

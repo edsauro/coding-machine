@@ -1,0 +1,421 @@
+# exit_code=0 duracao=300.9s modelo=deepseek-v4-pro effort=(default) failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- o verificador de planos (.autodev/scripts/verificar_plano.py) aponta ERRO quando o campo 'teste' de uma task ou um criterio de teste usa caminho de venv relativo ('.venv/bin/python'), porque dentro do worktree esse venv nao existe util: em 28/09 isso queimou 12 tentativas (P01 e P04 desta sprint), com a evidencia 'No module named pytest'
+- o verificador passa a EXIGIR a forma que o runner do motor resolve: 'python3 -m pytest ...' — o runner roda com cwd no worktree e o sandbox resolve o interpretador do projeto (autodev/testrunner.py, funcao rodar; autodev/sandbox.py, resolucao do python3)
+- o prompt de planejamento (autodev/plan_prompt.py) passa a exigir 'python3 -m pytest ...' nos criterios e no campo 'teste', e a proibir caminho de venv relativo, explicando em uma linha por que (o worktree nao tem venv)
+- o verificador continua SOMENTE LEITURA: nao escreve em dag.json nem em nenhum arquivo do sprint
+- os testes ficam em .autodev/tests/test_plano_comando.py e cobrem os tres casos: DAG com 'python3 -m pytest' nao gera erro; DAG com 'python3 -m pytest' gera erro com a explicacao; o prompt de planejamento cita a forma correta
+- estende .autodev/scripts/verificar_plano.py e autodev/plan_prompt.py preservando as checagens existentes (colisao na mesma onda, arquivo de teste repetido, criterio sem arquivo, edicao sem preservacao) sem remover nem renomear nada
+- rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q
+
+## Task
+P04: Comando de teste nos criterios tem de rodar nesta maquina
+
+## Diff a revisar (base 2ca6ce2a4ef3694fd71a5267e4e147258eed306f -> HEAD)
+```diff
+diff --git a/.autodev/scripts/verificar_plano.py b/.autodev/scripts/verificar_plano.py
+index 734334b..3abd1f8 100644
+--- a/.autodev/scripts/verificar_plano.py
++++ b/.autodev/scripts/verificar_plano.py
+@@ -8,15 +8,16 @@ revisor reprovava por regressao; a task queimava as 5 tentativas e bloqueava.
+ (D-16 em .autodev/sprints/DEVFACTORY-002/decisions.md.)
+ 
+ Uso:
+-    .venv/bin/python .autodev/scripts/verificar_plano.py DEVFACTORY-003
+-    .venv/bin/python .autodev/scripts/verificar_plano.py .autodev/sprints/X/dag.json
+-    .venv/bin/python .autodev/scripts/verificar_plano.py --todos
++    python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
++    python3 .autodev/scripts/verificar_plano.py .autodev/sprints/X/dag.json
++    python3 .autodev/scripts/verificar_plano.py --todos
+ 
+ Regras (ERRO bloqueia; AVISO exige justificativa no plano):
+   E1 ids duplicados, dep inexistente, ciclo            (delega para config.valida_dag)
+   E2 duas tasks da MESMA onda citam o mesmo arquivo
+   E3 duas tasks citam o MESMO arquivo de teste (qualquer onda)  <- a armadilha D-16
+   E4 task sem nenhum arquivo nomeado nos criterios (criterio nao verificavel)
++  E5 invocacao pytest deve usar `python3 -m pytest ...`; teste sem venv relativo
+   A1 arquivo compartilhado entre ondas diferentes (exige criterio de preservacao)
+   A2 task que mexe em modulo de outra task sem depender dela
+ 
+@@ -35,6 +36,9 @@ sys.path.insert(0, str(RAIZ))
+ 
+ ARQUIVO = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|md|json|ya?ml|toml|sh|txt|cfg|ini)")
+ IGNORAR = (".venv/", "site-packages/")
++COMANDO_PYTEST_CORRETO = re.compile(r"(?<![A-Za-z0-9_./-])python3\s+-m\s+pytest\b")
++CAMINHO_VENV_RELATIVO = re.compile(r"(?<![A-Za-z0-9_./-])(?:\./)?\.?venv/bin/(?:python(?:3)?|pytest)\b")
++NEGACOES_COMANDO = re.compile(r"\b(?:nao\s+(?:use|usar|rode|rodar)|não\s+(?:use|usar|rode|rodar)|proibid[oa]|nunca|em\s+vez\s+de)\b", re.I)
+ 
+ # Verbo de edicao: sem ele, a citacao do caminho e MENCAO (import, exemplo,
+ # arquivo que a task apenas le), nao entrega. Sem esta distincao o verificador
+@@ -90,6 +94,40 @@ def extrair_tocados(task: dict) -> set[str]:
+     return tocados
+ 
+ 
++def _sentencas(texto: str) -> list[str]:
++    """Separa instrucoes para nao confundir uma proibicao com um comando."""
++    return [
++        trecho.strip()
++        for trecho in re.split(r"[;\n]+|\.(?=\s|$)", texto)
++        if trecho.strip()
++    ]
++
++
++def _comando_de_teste_incorreto(texto: str, *, campo_teste: bool) -> bool:
++    """Reconhece comandos pytest afirmativos fora da forma do runner."""
++    for trecho in _sentencas(texto):
++        if NEGACOES_COMANDO.search(trecho):
++            continue
++        contexto_teste = campo_teste or re.search(
++            r"-m\s+pytest\b|\btest\w*|\bsu[ií]te\b|\bpytest\s+-", trecho, re.I,
++        )
++        if CAMINHO_VENV_RELATIVO.search(trecho) and contexto_teste:
++            return True
++        # Retire apenas a invocacao correta, nao a frase inteira: um segundo
++        # comando incorreto na mesma frase ainda precisa ser diagnosticado.
++        restante = COMANDO_PYTEST_CORRETO.sub("", trecho)
++        if re.search(r"\bpython[\d.]*\s+-m\s+pytest\b", restante):
++            return True
++        if re.search(
++            r"\bpytest\b(?=\s+(?:-|[\w./-]*[/\\]|test[\w.-]*\b))"
++            r"|(?:^|[&|`>$])\s*pytest\s*(?:$|[`;&|])"
++            r"|\b(?:rode|rodar|execute|executar)\s+pytest\b",
++            restante, re.I,
++        ):
++            return True
++    return False
++
++
+ def e_arquivo_de_teste(caminho: str) -> bool:
+     nome = Path(caminho).name
+     return nome.startswith("test_") or "/tests/" in caminho or caminho.startswith("tests/")
+@@ -131,6 +169,29 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
+ 
+     arquivos = {t["id"]: extrair_arquivos(t) for t in tasks}      # mencoes (E4)
+     tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (E2/E3/A1/A2)
++
++    # E5 — o runner resolve `python3` para o interpretador do projeto. Um
++    # caminho de venv relativo aponta para o worktree, onde esse venv não existe.
++    for t in tasks:
++        teste = t.get("teste", "") or ""
++        criterio_incorreto = any(
++            _comando_de_teste_incorreto(c, campo_teste=False)
++            for c in t.get("criterios", [])
++        )
++        if _comando_de_teste_incorreto(teste, campo_teste=True) or criterio_incorreto:
++            erros.append(
++                f"E5: {t['id']} usa comando de teste fora da forma exigida; "
++                "use python3 -m pytest ..."
++                + ("; o worktree nao tem venv" if any(
++                    CAMINHO_VENV_RELATIVO.search(trecho)
++                    and _comando_de_teste_incorreto(trecho, campo_teste=campo)
++                    for texto, campo in [(teste, True)] + [
++                        (c, False) for c in t.get("criterios", [])
++                    ]
++                    for trecho in _sentencas(texto)
++                ) else "")
++            )
++
+     teste_de: dict[str, set[str]] = {i: {a for a in f if e_arquivo_de_teste(a)}
+                                      for i, f in tocados.items()}
+     onda_de: dict[str, int] = {}
+diff --git a/.autodev/tests/test_plano_comando.py b/.autodev/tests/test_plano_comando.py
+new file mode 100644
+index 0000000..547215a
+--- /dev/null
++++ b/.autodev/tests/test_plano_comando.py
+@@ -0,0 +1,183 @@
++import importlib.util
++from pathlib import Path
++
++import pytest
++
++
++RAIZ = Path(__file__).resolve().parents[2]
++spec = importlib.util.spec_from_file_location(
++    "verificar_plano", RAIZ / ".autodev/scripts/verificar_plano.py"
++)
++verificar_plano = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(verificar_plano)
++
++
++def _dag(comando, *, criterio=None, teste=None):
++    return {
++        "tasks": [{
++            "id": "P04",
++            "titulo": "comando",
++            "criterios": [criterio if criterio is not None else "edita autodev/alvo.py; testar com " + comando],
++            "teste": comando if teste is None else teste,
++        }]
++    }
++
++
++def test_python3_pytest_e_aceito_pelo_verificador():
++    erros, _ = verificar_plano.verificar(_dag("python3 -m pytest .autodev/tests/ -q"), "X")
++    assert not any(erro.startswith("E5:") for erro in erros)
++
++
++def test_caminho_de_venv_relativo_gera_erro_explicativo():
++    erros, _ = verificar_plano.verificar(_dag(".venv/bin/python -m pytest .autodev/tests/ -q"), "X")
++    assert any(erro.startswith("E5:") and "worktree nao tem venv" in erro for erro in erros)
++
++
++def test_campo_teste_exige_python3_m_pytest():
++    erros, _ = verificar_plano.verificar(_dag("python3 -m pytest .autodev/tests/ -q", teste="pytest -q"), "X")
++    assert any(erro.startswith("E5:") and "python3 -m pytest" in erro for erro in erros)
++
++
++def test_task_sem_campo_teste_nao_inventa_comando_invalido():
++    erros, _ = verificar_plano.verificar(_dag("", teste=""), "X")
++    assert not any(erro.startswith("E5:") for erro in erros)
++
++
++@pytest.mark.parametrize("comando", [
++    "./.venv/bin/python -m pytest .autodev/tests/ -q",
++    ".venv/bin/python3 -m pytest .autodev/tests/ -q",
++    ".venv/bin/pytest -q",
++    "venv/bin/python -m pytest .autodev/tests/ -q",
++    "pytest -q",
++])
++def test_campo_teste_rejeita_formas_fora_do_runner(comando):
++    erros, _ = verificar_plano.verificar(_dag(comando), "X")
++    assert any(erro.startswith("E5:") for erro in erros)
++
++
++@pytest.mark.parametrize("criterio", [
++    "edita autodev/alvo.py; executar .venv/bin/python -m pytest -q",
++    "edita autodev/alvo.py; a suite roda com .venv/bin/python -m pytest -q",
++])
++def test_criterio_rejeita_venv_relativo_independente_da_redacao(criterio):
++    erros, _ = verificar_plano.verificar(_dag(
++        "python3 -m pytest .autodev/tests/ -q",
++        criterio=criterio,
++    ), "X")
++    assert any(erro.startswith("E5:") for erro in erros)
++
++
++def test_proibicao_em_frase_anterior_nao_mascara_comando_infrator():
++    erros, _ = verificar_plano.verificar(_dag(
++        "python3 -m pytest .autodev/tests/ -q",
++        criterio=("edita autodev/alvo.py. nao use .venv/bin/python. "
++                  "rode .venv/bin/python -m pytest -q"),
++    ), "X")
++    assert any(erro.startswith("E5:") for erro in erros)
++
++
++def test_criterio_detecta_comando_venv_mas_ignora_proibicao():
++    erros, _ = verificar_plano.verificar(_dag(
++        "python3 -m pytest .autodev/tests/ -q",
++        criterio=("edita autodev/alvo.py; nao use .venv/bin/python; "
++                  "testar com python3 -m pytest .autodev/tests/ -q"),
++        teste="python3 -m pytest .autodev/tests/ -q",
++    ), "X")
++    assert not any(erro.startswith("E5:") for erro in erros)
++
++    erros, _ = verificar_plano.verificar(_dag(
++        "./.venv/bin/python -m pytest .autodev/tests/ -q",
++        criterio="edita autodev/alvo.py; comando: ./.venv/bin/python -m pytest .autodev/tests/ -q",
++        teste="python3 -m pytest .autodev/tests/ -q",
++    ), "X")
++    assert any(erro.startswith("E5:") for erro in erros)
++
++
++def test_prompt_exige_python3_com_pytest():
++    from autodev import plan_prompt
++
++    texto = plan_prompt.PROMPT_PLANO
++    assert "python3 -m pytest" in texto
++    linhas_venv = [linha.lower() for linha in texto.splitlines()
++                   if ".venv/bin/python" in linha]
++    assert linhas_venv
++    assert all(any(negacao in linha for negacao in ("não use", "nao use", "proibido", "nunca"))
++               for linha in linhas_venv)
++    assert "worktree nao tem venv" in texto
++    assert plan_prompt.montar_prompt_plano("pedido").endswith("pedido")
++
++
++def test_verificador_e_somente_leitura(tmp_path):
++    sprint = tmp_path / "SPRINT-X"
++    sprint.mkdir()
++    dag_path = sprint / "dag.json"
++    dag_path.write_text(
++        '{"tasks":[{"id":"P1","criterios":["edita autodev/alvo.py"],'
++        '"teste":"python3 -m pytest .autodev/tests/test_alvo.py -q"}]}',
++        encoding="utf-8",
++    )
++    (sprint / "decisions.md").write_text("inalterado\n", encoding="utf-8")
++    antes = {p.relative_to(sprint): p.read_bytes() for p in sprint.rglob("*") if p.is_file()}
++
++    dag, nome = verificar_plano.carregar(str(dag_path))
++    verificar_plano.verificar(dag, nome)
++
++    depois = {p.relative_to(sprint): p.read_bytes() for p in sprint.rglob("*") if p.is_file()}
++    assert depois == antes
++
++
++def test_preserva_regras_e2_e3_e4_a1_e_a2():
++    comando = "python3 -m pytest .autodev/tests/test_compartilhado.py -q"
++    dag = {"tasks": [
++        {"id": "P1", "criterios": ["cria autodev/compartilhado.py"],
++         "teste": comando, "deps": []},
++        {"id": "P2", "criterios": ["edita autodev/compartilhado.py"],
++         "teste": comando, "deps": []},
++        {"id": "BASE", "criterios": ["cria autodev/base.py"],
++         "teste": "python3 -m pytest .autodev/tests/test_base.py -q", "deps": []},
++        {"id": "P3", "criterios": ["edita autodev/compartilhado.py"],
++         "teste": "python3 -m pytest .autodev/tests/test_p3.py -q", "deps": ["BASE"]},
++        {"id": "P4", "criterios": ["resultado sem caminho concreto"],
++         "teste": "", "deps": []},
++    ]}
++
++    erros, avisos = verificar_plano.verificar(dag, "X")
++
++    assert any(erro.startswith("E2:") for erro in erros)
++    assert any(erro.startswith("E3:") for erro in erros)
++    assert any(erro.startswith("E4: P4") for erro in erros)
++    assert any(aviso.startswith("A1:") for aviso in avisos)
++    assert any(aviso.startswith("A2:") for aviso in avisos)
++
++
++@pytest.mark.parametrize("criterio", [
++    "os testes usam pytest e a suite roda em menos de 30 s",
++    "o arquivo de teste cobre o caso de pytest sem comando",
++    "rode .venv/bin/python autodev/cli.py plan --sprint X",
++])
++def test_mencoes_e_cli_nao_sao_comandos_de_teste(criterio):
++    erros, _ = verificar_plano.verificar(_dag(
++        "python3 -m pytest -q", criterio="edita autodev/alvo.py; " + criterio,
++    ), "X")
++    assert not any(e.startswith("E5:") for e in erros)
++
++
++@pytest.mark.parametrize("comando", [
++    "make test", "npm test", "python3 -m unittest discover -v",
++    "bash .autodev/scripts/rodar.sh", "go test ./...",
++])
++def test_outras_stacks_continuam_aceitas(comando):
++    erros, _ = verificar_plano.verificar(_dag(comando), "X")
++    assert not any(e.startswith("E5:") for e in erros)
++
++
++@pytest.mark.parametrize("comando", [
++    "pytest -q", "python -m pytest -q",
++    "python3 -m pytest -q && pytest tests/",
++])
++def test_invocacao_incorreta_tem_diagnostico_sem_culpar_venv(comando):
++    erros, _ = verificar_plano.verificar(_dag(comando), "X")
++    diagnosticos = [e for e in erros if e.startswith("E5:")]
++    assert diagnosticos
++    assert all("python3 -m pytest" in e and "worktree nao tem venv" not in e
++               for e in diagnosticos)
+diff --git a/autodev/plan_prompt.py b/autodev/plan_prompt.py
+new file mode 100644
+index 0000000..8c3b510
+--- /dev/null
++++ b/autodev/plan_prompt.py
+@@ -0,0 +1,34 @@
++"""Prompt usado para transformar um pedido em um plano de sprint."""
++
++PROMPT_PLANO = """Você é um agente de planejamento de software.
++
++Responda APENAS um JSON válido, sem Markdown, comentários ou texto adicional.
++O objeto JSON deve ter exatamente as chaves de nível superior:
++- "titulo": string
++- "objetivo": string
++- "repositorio": string
++- "tasks": lista de objetos
++
++Cada item de "tasks" deve ter todas as chaves:
++- "id": string única
++- "titulo": string
++- "criterios": lista de strings
++- "deps": lista de ids de tasks
++- "agente": string
++- "teste": string com um comando executável de teste
++
++Não escreva critério vago. Cada critério deve mencionar pelo menos um arquivo
++específico ou um comando de teste concreto que permita verificar a entrega.
++A última task deve ser sempre um teste de aceitação ponta a ponta da entrega.
++
++Para testes pytest, nos critérios e no campo "teste", use `python3 -m pytest ...`.
++Não use `.venv/bin/python` nem outro caminho de venv relativo: o worktree nao tem venv;
++o runner do motor resolve o python3 para o interpretador do projeto.
++
++Pedido original do usuário:
++"""
++
++
++def montar_prompt_plano(prompt_usuario: str) -> str:
++    """Acrescenta o pedido original, sem modificá-lo, às regras do planejador."""
++    return PROMPT_PLANO + prompt_usuario
+```
+
+## Saida dos testes
+```
+...........................                                              [100%]
+27 passed in 0.04s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+```json
+{
+  "veredito": "APPROVE",
+  "confianca": 0.9,
+  "criterios_atendidos": [
+    {"criterio": "verificador aponta ERRO quando 'teste' ou criterio de teste usa venv relativo ('.venv/bin/python')", "atende": true, "evidencia": "E5 em verificar_plano.py detecta CAMINHO_VENV_RELATIVO em campo 'teste' (campo_teste=True) e em criterios (com contexto_teste). Confirmei via probe: '.venv/bin/python -m pytest', '.venv/bin/python3', '.venv/bin/pytest', './.venv/bin/python' e 'venv/bin/python' todos geram E5; teste cobre .venv/bin/python e formas variantes."},
+    {"criterio": "verificador EXIGE 'python3 -m pytest ...' (forma do runner)", "atende": true, "evidencia": "_comando_de_teste_incorreto sinaliza 'pytest' cru, 'python -m pytest', 'python3.11 -m pytest' e 'python3 -m pytest && pytest tests/'. Probe confirma: 'python3 -m pytest' (com/sem args) passa sem E5; 'python3.11 -m pytest' e bare 'pytest -q' geram E5."},
+    {"criterio": "plan_prompt.py exige 'python3 -m pytest' e proibe venv relativo, explicando em uma linha", "atende": true, "evidencia": "PROMPT_PLANO contem 'use `python3 -m pytest ...`', 'Não use `.venv/bin/python` nem outro caminho de venv relativo: o worktree nao tem venv; o runner do motor resolve o python3 para o interpretador do projeto.' (uma linha de justificativa)."},
+    {"criterio": "verificador continua SOMENTE LEITURA", "atende": true, "evidencia": "verificar()/carregar()/main() apenas leem (json.loads, regex, import valida_dag) e imprimem; nenhuma escrita. test_verificador_e_somente_leitura compara bytes de dag.json/decisions.md antes/depois em tmp_path e passa."},
+    {"criterio": "testes em test_plano_comando.py cobrem os tres casos", "atende": true, "evidencia": "test_python3_pytest_e_aceito_pelo_verificador (sem erro), test_caminho_de_venv_relativo_gera_erro_explicativo (erro com 'worktree nao tem venv') e test_prompt_exige_python3_com_pytest (prompt cita a forma correta) — os tres casos exigidos, alem de 24 casos extras."},
+    {"criterio": "estende preservando checagens existentes (E2/E3/E4/A1/A2) sem remover nem renomear", "atende": true, "evidencia": "diff HEAD->worktree confirma apenas ADIcoes (regexes E5, _sentencas, _comando_de_teste_incorreto, bloco E5) e troca dos exemplos de uso no docstring. Nenhuma checagem removida/renomeada. test_preserva_regras_e2_e3_e4_a1_e_a2 valida E2/E3/E4/A1/A2."},
+    {"criterio": "suite roda com python3 -m pytest .autodev/tests/ -q (forma do runner)", "atende": true, "evidencia": "Executei com o interpretador do projeto (mesma resolucao do _resolver do testrunner): 221 passed in 24.33s. python3 cru do sistema falha ('No module named pytest'), confirmando a premissa da task."}
+  ],
+  "findings": [
+    {"severidade": "baixa", "arquivo": "autodev/plan_prompt.py", "linha": 1, "descricao": "plan_prompt.py nao e importado por nenhum modulo de producao (grep em todo o repo: so o proprio teste o importa). O criterio #3 e atendido literalmente (o texto do prompt esta correto), mas se o agente de planejamento (codex) nao le este arquivo, o objetivo real do sprint (o planejador passar a exigir a forma correta) nao se materializa em producao. Ja era apontado na revisao da sprint 2 ('Nenhum modulo de producao importa plan_prompt ainda').", "correcao_sugerida": "Confirmar onde o planejador le o prompt e, se aplicavel, ligar montar_prompt_plano ao fluxo de planejamento (fora do escopo da P04, mas vale uma tarefa/nota)."},
+    {"severidade": "baixa", "arquivo": ".autodev/sprints/DEVFACTORY-004/dag.json", "linha": 66, "descricao": "No criterio 5 do dag.json (main, pos-D23) ha typo: 'DAG com 'python3 -m pytest' gera erro com a explicacao' — deveria ser 'DAG com '.venv/bin/python' gera erro'. O teste implementa o sentido CORRETO, entao nao ha defeito de codigo, so texto enganoso no criterio. Alem disso, o dag.json DENTRO do worktree P04 ainda esta na versao PRE-D23 (sentido invertido: sugere .venv/bin/python), mas como o diff desta task nao toca dag.json, nao ha risco de sobrescrever o dag.json corrigido no merge.", "correcao_sugerida": "Corrigir o typo no dag.json de main; dispensavel, pois nao afeta o diff revisado."},
+    {"severidade": "baixa", "arquivo": ".autodev/tests/test_plano_comando.py", "linha": 169, "descricao": "test_outras_stacks_continuam_aceitas cobre 'make test'/'npm test'/'go test'/'python3 -m unittest' SEM venv, mas o nome sugere que toda stack nao-pytest e aceita. Na pratica, uma stack nao-pytest usando '.venv/bin/...' no campo teste (ex.: '.venv/bin/python -m unittest') E sinalizada — corretamente, pois '.venv/bin/python' nao existe no worktree. Nao e bug, apenas o nome do teste sobre-declara e essa variante nao tem cobertura.", "correcao_sugerida": "Adicionar um caso '.venv/bin/python -m unittest' documentando que e rejeitado, ou renomear o teste para refletir que a excecao e sobre caminho de venv, nao sobre stack."}
+  ],
+  "resumo": "Implementacao correta e completa: E5 exige python3 -m pytest e reprova venv relativo com explicacao, suite robusta (221 passed, 27 no arquivo novo); unico ponto de atencao e plan_prompt.py ainda orfao (divida pre-existente, nao bloqueia)."
+}
+```
+
+
+===== STDERR =====
+

@@ -1,0 +1,27 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/test_plano_comando.py -q
+exit=1 (0.2s)
+
+....F......                                                              [100%]
+=================================== FAILURES ===================================
+_ test_campo_teste_rejeita_formas_fora_do_runner[.venv/bin/python3 -m pytest .autodev/tests/ -q] _
+
+comando = '.venv/bin/python3 -m pytest .autodev/tests/ -q'
+
+    @pytest.mark.parametrize("comando", [
+        "./.venv/bin/python -m pytest .autodev/tests/ -q",
+        ".venv/bin/python3 -m pytest .autodev/tests/ -q",
+        ".venv/bin/pytest -q",
+        "venv/bin/python -m pytest .autodev/tests/ -q",
+        "pytest -q",
+        "",
+    ])
+    def test_campo_teste_rejeita_formas_fora_do_runner(comando):
+        erros, _ = verificar_plano.verificar(_dag(comando), "X")
+>       assert any(erro.startswith("E5:") for erro in erros)
+E       assert False
+E        +  where False = any(<generator object test_campo_teste_rejeita_formas_fora_do_runner.<locals>.<genexpr> at 0x7f66073bbd80>)
+
+.autodev/tests/test_plano_comando.py:51: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_plano_comando.py::test_campo_teste_rejeita_formas_fora_do_runner[.venv/bin/python3 -m pytest .autodev/tests/ -q]
+1 failed, 10 passed in 0.03s

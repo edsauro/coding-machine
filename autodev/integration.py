@@ -100,7 +100,8 @@ class Integrador:
 
     def rodar_portoes(self, caminho_wt: Path, *,
                       comandos: dict[str, str] | None = None,
-                      evidencia_dir: str | Path | None = None) -> list[Portao]:
+                      evidencia_dir: str | Path | None = None,
+                      arquivos_mudados: set[str] | None = None) -> list[Portao]:
         """Portões objetivos. Cada um é um comando; ausência de comando = pulado."""
         import time
         comandos = comandos or {}
@@ -139,8 +140,24 @@ class Integrador:
             portoes.append(Portao("lint", True, "nenhum linter instalado"))
 
         # 4. segurança — sempre roda, é portão duro
-        portoes.append(self._portao_seguranca(caminho_wt))
+        portoes.append(self._portao_seguranca(caminho_wt, arquivos_mudados=arquivos_mudados))
         return portoes
+
+    @staticmethod
+    def arquivos_do_merge(caminho_wt: Path, commit: str) -> set[str]:
+        """Arquivos RELATIVOS que esta integração trouxe.
+
+        `commit` é o merge --no-ff criado por merge_task; o diff contra o 1º pai é
+        exatamente o que a task integrada mudou. É o recorte que o portão de
+        segurança usa para separar achado novo de achado pré-existente.
+        """
+        for args in (["diff", "--name-only", f"{commit}^1", commit],
+                     ["show", "--pretty=format:", "--name-only", commit]):
+            p = subprocess.run(["git", *args], cwd=str(caminho_wt),
+                               capture_output=True, text=True)
+            if p.returncode == 0:
+                return {l.strip() for l in p.stdout.splitlines() if l.strip()}
+        return set()
 
     def _portao(self, nome: str, comando: str, cwd: Path) -> Portao:
         import time
@@ -153,17 +170,33 @@ class Integrador:
         except Exception as e:  # noqa: BLE001
             return Portao(nome, False, str(e), comando, time.time() - t0)
 
-    def _portao_seguranca(self, cwd: Path) -> Portao:
-        """Checagens duras de segurança (spec §18/§23). Falha = merge rejeitado."""
+    def _portao_seguranca(self, cwd: Path, arquivos_mudados: set[str] | None = None) -> Portao:
+        """Checagens duras de segurança (spec §18/§23). Falha = merge rejeitado.
+
+        `arquivos_mudados`: caminhos RELATIVOS que esta integração mexeu. Achado em
+        arquivo de fora do diff é **pré-existente**: vira aviso no detalhe (e exige
+        HAQ), não bloqueia. Sem esse recorte, um texto antigo do repositório congela
+        a integração de TODAS as tasks para sempre — aconteceu em 28/09: a doc da
+        D-22 (sprint 2) citava um literal com forma de chave de API e derrubou a
+        integração da sprint 4 inteira, task após task, sem relação nenhuma com ela.
+        """
         import time
         t0 = time.time()
-        problemas: list[str] = []
+        bloqueiam: list[str] = []
+        pre_existentes: list[str] = []
+
+        def registra(msg: str, rel: str) -> None:
+            if arquivos_mudados is None or rel in arquivos_mudados:
+                bloqueiam.append(msg)
+            else:
+                pre_existentes.append(msg)
+
         # nenhum arquivo de segredo/credencial no repositório
         for padrao in ("**/.env", "**/*.pem", "**/*.key", "**/id_rsa",
                        "**/credentials.json", "**/auth.json"):
             for f in Path(cwd).glob(padrao):
                 if ".git/" not in str(f):
-                    problemas.append(f"arquivo sensivel versionado: {f}")
+                    registra(f"arquivo sensivel versionado: {f}", str(f.relative_to(cwd)))
         # nada escrevendo em caminho absoluto do HOME
         import re
         for f in Path(cwd).rglob("*.py"):
@@ -174,14 +207,19 @@ class Integrador:
             except OSError:
                 continue
             for m in re.finditer(r"(?m)^\s*.*open\(\s*['\"]/home/", t):
-                problemas.append(f"escrita em caminho absoluto do HOME: {f}")
+                registra(f"escrita em caminho absoluto do HOME: {f}",
+                         str(f.relative_to(cwd)))
                 break
         # segredo embutido no código (spec §18) — portão duro
-        problemas.extend(self._segredos_embutidos(Path(cwd)))
-        ok = not problemas
-        return Portao("seguranca", ok,
-                      "; ".join(problemas) if problemas else "sem achados",
-                      "(checagens internas)", time.time() - t0)
+        for achado in self._segredos_embutidos(Path(cwd)):
+            rel = achado.split(" em ", 1)[-1].split(":", 1)[0]
+            registra(achado, rel)
+        ok = not bloqueiam
+        detalhe = "; ".join(bloqueiam) if bloqueiam else "sem achados no diff"
+        if pre_existentes:
+            detalhe += (" | PRE-EXISTENTES (nao bloqueiam; exigem HAQ): "
+                        + "; ".join(pre_existentes[:5]))
+        return Portao("seguranca", ok, detalhe, "(checagens internas)", time.time() - t0)
 
     # Formatos de segredo que aparecem colados no código. São deliberadamente
     # específicos: um padrão genérico tipo `senha = "..."` daria falso positivo

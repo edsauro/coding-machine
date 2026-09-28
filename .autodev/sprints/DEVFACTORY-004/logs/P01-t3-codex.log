@@ -1,4 +1,4 @@
-# exit_code=0 duracao=72.1s modelo=gpt-5.6-sol effort=low failure_class=None
+# exit_code=0 duracao=97.7s modelo=gpt-5.6-sol effort=low failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -11,8 +11,8 @@ Voce e o agente de implementacao de uma task de um Sprint autonomo.
 - nenhum conteudo e removido: a secao da tela de eventos ('### Acompanhar ao vivo'), a secao do Planejador e as subsecoes de '## Como rodar' continuam presentes, com o mesmo texto
 - a arvore de titulos fica coerente: nenhum '##' abre dentro de outro '##' sem fechar, e nenhuma subsecao de um assunto fica sob titulo de outro
 - os testes ficam em .autodev/tests/test_readme_estrutura.py e provam a hierarquia (nivel e ordem dos titulos lidos do arquivo), inclusive que '### Ciclo de vida do sprint' vem depois de '## Como rodar' e antes do proximo '##'
-- rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q (a forma 'python3 -m pytest' so funciona dentro do runner do motor, que resolve o interpretador)
-- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de .venv/bin/python -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa
+- rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q (nao use .venv/bin/python: dentro do worktree esse venv nao existe de verdade — em 28/09 isso queimou 12 tentativas, evidencia em .autodev/sprints/DEVFACTORY-004/evidence/, D-23)
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa
 
 ## Contexto do projeto
 # DEVFACTORY-004 — Correções apontadas pela revisão retroativa da sprint 2
@@ -83,17 +83,18 @@ para os próximos DAGs, não só para este.
 
 ---
 ## CONTEXTO DAS TENTATIVAS ANTERIORES
-  - tentativa 1: TEST_FAILURE (exit 1) — 
-  - tentativa 2: TEST_FAILURE (exit 1) — 
+  - tentativa 7: REVIEW_FAILURE (exit 0) — 
+  - tentativa 8: REVIEW_FAILURE (exit 0) — 
 
 ## EVIDENCIA NOVA (leia antes de agir)
 ### Saida do ultimo teste
 ```
-
-bwrap: execvp .venv/bin/python: No such file or directory
-
+o parentesco. Mutacoes que eu apliquei em memoria e que passam nos 3 testes (PASS/PASS/PASS), embora quebrem a arvore: (g) rebaixar '## Estado atual' para '###' (ela passa a ser subsecao de '## Os agentes'); (h) rebaixar '## Seguranca' para '###'. Ou seja, 'subsecao de um assunto sob titulo de outro' fora da janela Como rodar/Planejador nao e detectada por nenhum caso da suite.", "correcao_sugerida": "Substituir o corpo do caso por uma assercao de parentesco sobre TODOS os titulos (para cada titulo de nivel N, o pai e o ultimo titulo de nivel N-1 anterior) ou comparar a lista completa de (nivel, texto) do README com uma lista esperada — cobrindo o arquivo inteiro, nao so a janela reorganizada."}, {"severidade": "media", "arquivo": "README.md", "linha": 144, "descricao": "A mudanca nao e a reorganizacao descrita no criterio 1: na base da task (2ca6ce2/main, a que o diff usa) nao existe nenhuma ocorrencia de 'Planejador' no README, e o diff tem 0 delecoes. O resultado final esta correto, mas e obtido por adicao — nao ha evidencia de que a secao 'deixou de ficar dentro' de '## Como rodar'. A justificativa esta registrada em decisions.md (D-24, datado), porem ela se baseia em 'a secao permanece com o texto de referencia', o que so e verdade por eu ter conferido manualmente contra o bloco da P10 (785988d): a suite nao prova isso, o test 3 compara contra uma fixture criada na mesma entrega.", "correcao_sugerida": "Na mesma correcao do finding alto: escolher a base com o trabalho da sprint 2 e anexar a evidencia da movimentacao (README daquela base x README final), mantendo as fixtures como snapshots das referencias (que hoje sao fieis) e registrando em decisions.md, datado, qual base foi usada e por que."}, {"severidade": "baixa", "arquivo": ".autodev/sprints/DEVFACTORY-004/evidence/", "linha": 0, "descricao": "A evidencia anexada roda apenas o arquivo novo (`... -m pytest .autodev/tests/test_readme_estrutura.py -q`, '3 passed in 0.01s'), enquanto o criterio de aceitacao nomeia a suite inteira ('python3 -m pytest .autodev/tests/ -q'). O dag.json (campo 'teste' de P01) e que aponta o arquivo unico, entao a diferenca e de evidencia, nao de codigo — e o '3 passed' isolado nao demonstra que a entrega nao quebrou os outros 194 casos.", "correcao_sugerida": "Anexar tambem a saida da suite completa: no worktree, com o interpretador do projeto, `... -m pytest .autodev/tests/ -q` => 197 passed (medido por mim, 22.40s)."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_readme_estrutura.py", "linha": 25, "descricao": "Fragilidades latentes do helper: _corpo_da_secao usa `texto.index(f\"## {titulo}\\n\")`, substring que tambem casa dentro de '### Como rodar' (um nivel 3 seria tratado como corpo da secao de nivel 2); e o test 1 usa `titulos.index((2, 'Como rodar'))`, a PRIMEIRA ocorrencia — um '## Como rodar' duplicado no arquivo passaria. Nao afetam o resultado atual (README tem exatamente 10 titulos, sem duplicatas e sem '#' dentro de fenced code), mas deixam a prova dependente de sorte.", "correcao_sugerida": "Ancorar o regex em inicio de linha no helper (re.search(rf'^## {re.escape(titulo)}$', texto, re.M)) e afirmar que cada titulo esperado aparece exatamente uma vez, em vez de usar index() do primeiro match."}, {"severidade": "baixa", "arquivo": ".autodev/sprints/DEVFACTORY-004/decisions.md", "linha": 12, "descricao": "Imprecisao no registro da decisao que o revisor deve conferir: 'A contagem de coleta deve ser maior que a da versao anterior (3 testes)'. Medido: a versao anterior do arquivo (aa587f9) tinha 3 casos e a atual tem 3 — a contagem deste arquivo e IGUAL, nao maior; o que subiu (194 -> 197) foi o total da suite. O criterio do sprint exige apenas 'nao menor', logo nao ha violacao, mas a frase da decisao nao bate com a medicao.", "correcao_sugerida": "Ajustar a frase para 'a contagem da suite sobe de 194 para 197; o arquivo da task mantem 3 casos, com verificacoes estritamente mais fortes (igualdade do corpo integral)'."}]
 ```
 ### Arquivos ja tocados
+  - .autodev/fixtures/readme_estrutura/como_rodar.md
+  - .autodev/fixtures/readme_estrutura/planejador.md
+  - .autodev/sprints/DEVFACTORY-004/decisions.md
   - .autodev/tests/test_readme_estrutura.py
   - README.md
 
@@ -110,7 +111,7 @@ Responda ao final com: RESULTADO: <resumo do que mudou>
 
 
 ===== STDOUT =====
-RESULTADO: hierarquia do README restaurada e 2 testes estruturais adicionados; testes diretos passaram e a mutação foi rejeitada, mas a suíte oficial não pôde rodar porque `.venv/bin/python` não existe neste worktree (falha de ambiente, exit 127).
+RESULTADO: testes fortalecidos para validar a árvore completa do README, títulos únicos e snapshots históricos; decisão D-25 registrada | TESTES: 3/3 passaram diretamente; `python3 -m pytest .autodev/tests/ -q` bloqueado pelo ambiente (`No module named pytest`)
 
 ===== STDERR =====
 

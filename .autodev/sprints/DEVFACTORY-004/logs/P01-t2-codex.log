@@ -1,4 +1,4 @@
-# exit_code=0 duracao=87.4s modelo=gpt-5.6-terra effort=low failure_class=None
+# exit_code=0 duracao=151.9s modelo=gpt-5.6-terra effort=low failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -11,8 +11,8 @@ Voce e o agente de implementacao de uma task de um Sprint autonomo.
 - nenhum conteudo e removido: a secao da tela de eventos ('### Acompanhar ao vivo'), a secao do Planejador e as subsecoes de '## Como rodar' continuam presentes, com o mesmo texto
 - a arvore de titulos fica coerente: nenhum '##' abre dentro de outro '##' sem fechar, e nenhuma subsecao de um assunto fica sob titulo de outro
 - os testes ficam em .autodev/tests/test_readme_estrutura.py e provam a hierarquia (nivel e ordem dos titulos lidos do arquivo), inclusive que '### Ciclo de vida do sprint' vem depois de '## Como rodar' e antes do proximo '##'
-- rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q (a forma 'python3 -m pytest' so funciona dentro do runner do motor, que resolve o interpretador)
-- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de .venv/bin/python -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa
+- rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q (nao use .venv/bin/python: dentro do worktree esse venv nao existe de verdade — em 28/09 isso queimou 12 tentativas, evidencia em .autodev/sprints/DEVFACTORY-004/evidence/, D-23)
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa
 
 ## Contexto do projeto
 # DEVFACTORY-004 — Correções apontadas pela revisão retroativa da sprint 2
@@ -83,14 +83,12 @@ para os próximos DAGs, não só para este.
 
 ---
 ## CONTEXTO DAS TENTATIVAS ANTERIORES
-  - tentativa 1: TEST_FAILURE (exit 1) — 
+  - tentativa 7: REVIEW_FAILURE (exit 0) — 
 
 ## EVIDENCIA NOVA (leia antes de agir)
 ### Saida do ultimo teste
 ```
-
-bwrap: execvp .venv/bin/python: No such file or directory
-
+[{"severidade": "alta", "arquivo": "README.md", "linha": 147, "descricao": "O diff e uma ADICAO, nao a reorganizacao que o criterio descreve. Na base 2ca6ce2 (main) nao existe nenhuma secao 'Planejador' (grep = 0 ocorrencias) — o trabalho da sprint 2 esta apenas no branch sprint/DEVFACTORY-002/integration (P-01 'Merge da DEVFACTORY-002 em main' esta ABERTA em Pendencias.md). Consequencia objetiva: a arvore entregue passa a documentar `.venv/bin/python -m autodev plan`, `spec.md`/`dag.json`/`sprint.yaml` e o comando `plan`, mas nesta mesma arvore autodev/cli.py NAO tem o subcomando (subparsers: detect, init, status, run, resume, report, haq, quota, metrics, encerrar, evidenciar, desbloquear, stop, start). Ou seja: o README passa a afirmar o que o codigo nao sustenta — exatamente a classe de defeito que esta sprint existe para corrigir (P03). Nenhum teste cobre isso (o test 3 congela o texto).", "correcao_sugerida": "Rodar a P01 sobre a base que tem o trabalho da sprint 2 (mergear sprint/DEVFACTORY-002/integration em main — P-01 — ou criar os worktrees da 004 a partir dela) e provar a MOVIMENTACAO (a secao passa de README.md:91 daquela base a irma de '## Como rodar'). Enquanto a base for main, nao inserir a secao: sem o planejador no codigo, a secao e documentacao falsa."}, {"severidade": "alta", "arquivo": ".autodev/sprints/DEVFACTORY-004/dag.json", "linha": 0, "descricao": "A base escolhida inviabiliza o resto do DAG. P02 (dep de P01, campo teste '.autodev/tests/test_plan_docs.py') e P03 (le a assinatura de cmd_plan em autodev/cli.py) apontam para arquivos/simbolos que NAO existem nesta arvore: main nao tem test_plan_docs.py, nao tem cmd_plan e nao tem nenhum dos 15 test_plan_*.py (so na branch de integracao da sprint 2). Aprovar a P01 nesta base deixa o sprint com duas tasks inexequiveis.", "correcao_sugerida": "Reexecutar a onda P01/P04 depois de a base conter a sprint 2 (ou declarar o sprint 4 dependente do merge P-01 e nao rodar as ondas 2 antes disso). Registrar a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_readme_estrutura.py", "linha": 38, "descricao": "test_conteudo_das_secoes_reorganizadas_continua_presente verifica apenas 6 substrings: uma reescrita do corpo da secao que preserve esses trechos (ex.: tirar o exemplo de comando, trocar 'nao faz merge nem push') passaria, embora o criterio 3 exija 'o mesmo texto'. A igualdade com o texto da P10 foi constatada por mim fora da suite (22 linhas identicas), nao por ela.", "correcao_sugerida": "Guardar o texto de referencia da secao como fixture versionada no repo e comparar o corpo inteiro da secao, ou ampliar as assercoes para os paragrafos que carregam a afirmacao de comportamento."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_readme_estrutura.py", "linha": 29, "descricao": "test_planejador_e_secao_irma_de_como_rodar_e_precede_os_agentes e redundante (comparacoes de indice ja cobertas pelo test 1) e nenhum caso verifica a coerencia da arvore FORA da janela '## Como rodar' -> '## Planejador' (criterio 4 fala da arvore inteira: nenhum '##' abrindo dentro de outro em qualquer ponto do README).", "correcao_sugerida": "Trocar o test 2 por uma assercao que percorra todos os titulos e verifique parentesco por nivel (todo '###' pertence ao ultimo '##' anterior), cobrindo o arquivo inteiro."}]
 ```
 ### Arquivos ja tocados
   - .autodev/tests/test_readme_estrutura.py
@@ -109,7 +107,7 @@ Responda ao final com: RESULTADO: <resumo do que mudou>
 
 
 ===== STDOUT =====
-RESULTADO: hierarquia do README restaurada e teste fortalecido para delimitar `Como rodar`; commit adicional bloqueado por `.git` somente leitura | TESTES: `.venv/bin/python -m pytest .autodev/tests/ -q` bloqueado (`.venv` ausente); validação direta das 2 funções passou
+RESULTADO: Cobertura estrutural e preservação integral do README reforçadas com fixtures; decisão D-24 registra que a base não contém a sprint 2 e impede concluir P01 corretamente sem integração fora de escopo. | TESTES: execução direta dos 3 testes passou; `python3 -m pytest .autodev/tests/ -q` bloqueado: `No module named pytest`
 
 ===== STDERR =====
 

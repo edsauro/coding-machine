@@ -25,3 +25,50 @@
 [14:37:39] P04: agy esta fora desta rodada (cota) — seguindo com codex
 [14:37:39] P04 tentativa 5: codex gpt-6-astra/low
 [14:38:28] P04: testes exit=1 passed=None failed=None (configurado)
+[14:40:34] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[14:40:34] P01 tentativa 7: codex gpt-5.6-luna/low
+[14:42:23] P01: testes exit=0 passed=3 failed=0 (configurado)
+[14:48:56] P01: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> REQUEST_CHANGES (4 findings)
+[14:48:56] P01: agy FORA desta rodada (cota esgotada)
+[14:48:56] P01 tentativa 8: codex gpt-5.6-terra/low
+[14:51:28] P01: testes exit=0 passed=3 failed=0 (configurado)
+[14:54:27] P01: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (6 findings)
+[14:54:27] P01 tentativa 9: codex gpt-5.6-sol/low
+[14:56:05] P01: testes exit=0 passed=3 failed=0 (configurado)
+[14:58:56] P01: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> APPROVE (5 findings)
+[14:58:56] P01: DONE em 9 tentativa(s) — commit 00fc3a43
+[14:58:56] P04 tentativa 6: codex gpt-5.6-luna/low
+[15:00:49] P04: testes exit=0 passed=3 failed=0 (configurado)
+[15:05:44] P04: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: hermes: revisor nao devolveu veredito parseavel] -> REQUEST_CHANGES (6 findings)
+[15:05:44] P04 tentativa 7: codex gpt-5.6-terra/low
+[15:07:26] P04: testes exit=1 passed=10 failed=1 (configurado)
+[15:07:26] P04 tentativa 8: codex gpt-5.6-sol/low
+[15:08:31] P04: testes exit=0 passed=11 failed=0 (configurado)
+[15:11:25] P04: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (7 findings)
+[15:11:25] P04: agy esta fora desta rodada (cota) — seguindo com codex
+[15:11:25] P04 tentativa 9: codex gpt-5.6-sol/medium
+[15:14:26] P04: testes exit=0 passed=16 failed=0 (configurado)
+[15:17:07] P04: revisao por hermes [escada (tentativa 4)] -> REQUEST_CHANGES (5 findings)
+[15:17:07] P04: agy esta fora desta rodada (cota) — seguindo com codex
+[15:17:07] P04 tentativa 10: codex gpt-6-astra/low
+[15:18:10] P04: testes exit=0 passed=27 failed=0 (configurado)
+[15:21:02] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[15:21:02] integrando 1 task(s) da onda 0
+[15:21:17]   portao build: OK
+[15:21:17]   portao testes: OK
+[15:21:17]   portao lint: OK
+[15:21:17]   portao seguranca: FALHOU
+[15:21:17] integracao P01: portoes falharam ['seguranca']
+[15:21:17] branch atual do repo: c25ff2d7 (main intacta — merge automatico proibido)
+[15:23:10] P04: revisao por hermes [escada (tentativa 5)] -> APPROVE (3 findings)
+[15:23:10] ERRO NAO TRATADO: P04: BLOCKED -> DONE não permitido
+Traceback (most recent call last):
+  File "/home/saurus/Code/Coding_Machine/autodev/orchestrator.py", line 637, in rodar
+    rst = self.executar_task(task_id)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saurus/Code/Coding_Machine/autodev/orchestrator.py", line 582, in executar_task
+    self.store.transicionar(self.sprint, task_id, "DONE", "testes+revisao ok")
+  File "/home/saurus/Code/Coding_Machine/autodev/state.py", line 351, in transicionar
+    raise TransicaoInvalida(f"{task_id}: {atual} -> {novo} não permitido")
+autodev.state.TransicaoInvalida: P04: BLOCKED -> DONE não permitido
+

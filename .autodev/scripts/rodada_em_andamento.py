@@ -41,12 +41,25 @@ def _pid_vivo(pid: int | None) -> bool:
 
 def rodadas_em_andamento(janela: int = JANELA_PADRAO,
                          agora: float | None = None) -> list[tuple[str, str, int]]:
-    """[(worktree, task_id, pid)] das linhas que representam rodada viva."""
+    """[(worktree, task_id, pid)] das linhas que representam rodada viva.
+
+    Fontes, em ordem de confiança:
+      1. `run_lock` — a fonte da verdade desde a D-24: o motor só escreve ali a
+         rodada dona do sprint, e mantém o heartbeat renovado a cada 20 s, inclusive
+         durante as revisões longas. Linha com processo VIVO = rodada viva, ponto.
+      2. `writer_lock` + heartbeat — rede de segurança para bases gravadas por
+         versões anteriores do motor.
+    """
     if not DB.exists():
         return []
     agora = time.time() if agora is None else agora
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     try:
+        try:
+            run = con.execute(
+                "SELECT sprint_id, pid, heartbeat FROM run_lock").fetchall()
+        except sqlite3.OperationalError:
+            run = []
         linhas = con.execute(
             "SELECT worktree, COALESCE(task_id,''), COALESCE(pid,0), "
             "COALESCE(heartbeat,0) FROM writer_lock").fetchall()
@@ -55,6 +68,10 @@ def rodadas_em_andamento(janela: int = JANELA_PADRAO,
     finally:
         con.close()
     vivas = []
+    for sprint_id, pid, hb in run:
+        recente = (agora - float(hb or 0)) < janela
+        if _pid_vivo(pid) or recente:
+            vivas.append((f"run_lock:{sprint_id}", "(sprint)", int(pid or 0)))
     for w, t, p, hb in linhas:
         recente = (agora - float(hb)) < janela
         if _pid_vivo(p) or recente:
