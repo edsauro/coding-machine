@@ -8,15 +8,16 @@ revisor reprovava por regressao; a task queimava as 5 tentativas e bloqueava.
 (D-16 em .autodev/sprints/DEVFACTORY-002/decisions.md.)
 
 Uso:
-    .venv/bin/python .autodev/scripts/verificar_plano.py DEVFACTORY-003
-    .venv/bin/python .autodev/scripts/verificar_plano.py .autodev/sprints/X/dag.json
-    .venv/bin/python .autodev/scripts/verificar_plano.py --todos
+    python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
+    python3 .autodev/scripts/verificar_plano.py .autodev/sprints/X/dag.json
+    python3 .autodev/scripts/verificar_plano.py --todos
 
 Regras (ERRO bloqueia; AVISO exige justificativa no plano):
   E1 ids duplicados, dep inexistente, ciclo            (delega para config.valida_dag)
   E2 duas tasks da MESMA onda citam o mesmo arquivo
   E3 duas tasks citam o MESMO arquivo de teste (qualquer onda)  <- a armadilha D-16
   E4 task sem nenhum arquivo nomeado nos criterios (criterio nao verificavel)
+  E5 comando de teste deve ser `python3 -m pytest ...` (o worktree nao tem venv)
   A1 arquivo compartilhado entre ondas diferentes (exige criterio de preservacao)
   A2 task que mexe em modulo de outra task sem depender dela
 
@@ -35,7 +36,9 @@ sys.path.insert(0, str(RAIZ))
 
 ARQUIVO = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|md|json|ya?ml|toml|sh|txt|cfg|ini)")
 IGNORAR = (".venv/", "site-packages/")
-COMANDO_PYTEST_VENV = re.compile(r"(?:^|[\s`'(])\.venv/bin/python(?:\s|$)")
+COMANDO_PYTEST_CORRETO = re.compile(r"\bpython3\s+-m\s+pytest\b")
+CAMINHO_VENV_RELATIVO = re.compile(r"(?<![A-Za-z0-9_./-])(?:\./)?\.?venv/bin/(?:python(?:3)?|pytest)\b")
+NEGACOES_COMANDO = re.compile(r"\b(?:nao\s+(?:use|usar|rode|rodar)|não\s+(?:use|usar|rode|rodar)|proibid[oa]|nunca|em\s+vez\s+de)\b", re.I)
 
 # Verbo de edicao: sem ele, a citacao do caminho e MENCAO (import, exemplo,
 # arquivo que a task apenas le), nao entrega. Sem esta distincao o verificador
@@ -91,6 +94,29 @@ def extrair_tocados(task: dict) -> set[str]:
     return tocados
 
 
+def _sentencas(texto: str) -> list[str]:
+    """Separa instrucoes para nao confundir uma proibicao com um comando."""
+    return [trecho.strip() for trecho in re.split(r"[;\n]", texto) if trecho.strip()]
+
+
+def _comando_de_teste_incorreto(texto: str, *, campo_teste: bool) -> bool:
+    """Reconhece comandos pytest afirmativos fora da forma do runner."""
+    for trecho in _sentencas(texto):
+        if NEGACOES_COMANDO.search(trecho):
+            continue
+        contem_pytest = re.search(r"\bpytest\b", trecho) is not None
+        contem_venv = CAMINHO_VENV_RELATIVO.search(trecho) is not None
+        if not (contem_pytest or contem_venv):
+            continue
+        if COMANDO_PYTEST_CORRETO.search(trecho):
+            continue
+        # Nos criterios, uma simples referencia a pytest sem instrucao de
+        # execucao nao e um comando. O campo `teste` e sempre executavel.
+        if campo_teste or re.search(r"\b(?:teste|testar|rode|rodar|comando)\b|[:`>$]", trecho, re.I):
+            return True
+    return False
+
+
 def e_arquivo_de_teste(caminho: str) -> bool:
     nome = Path(caminho).name
     return nome.startswith("test_") or "/tests/" in caminho or caminho.startswith("tests/")
@@ -136,10 +162,14 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
     # E5 — o runner resolve `python3` para o interpretador do projeto. Um
     # caminho de venv relativo aponta para o worktree, onde esse venv não existe.
     for t in tasks:
-        texto_comandos = "\n".join(t.get("criterios", []) + [t.get("teste", "") or ""])
-        if COMANDO_PYTEST_VENV.search(texto_comandos):
+        teste = t.get("teste", "") or ""
+        criterio_incorreto = any(
+            _comando_de_teste_incorreto(c, campo_teste=False)
+            for c in t.get("criterios", [])
+        )
+        if not teste.strip() or _comando_de_teste_incorreto(teste, campo_teste=True) or criterio_incorreto:
             erros.append(
-                f"E5: {t['id']} usa caminho de venv relativo no comando de teste; "
+                f"E5: {t['id']} usa comando de teste fora da forma exigida; "
                 "o worktree nao tem venv — use python3 -m pytest ..."
             )
 
