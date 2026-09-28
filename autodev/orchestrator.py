@@ -408,6 +408,16 @@ class Orquestrador:
                 timeout=int(os.environ.get("AUTODEV_AGENT_TIMEOUT", "900")),
                 log_path=str(log_path), fake_script=fake_spec or None), self.cfg)
 
+            # ---- consumo MEDIDO da chamada (P-10) -------------------------------
+            # O número vem do wrapper (rodapé "tokens used" capturado antes de o
+            # mktemp morrer) ou de um rodapé que tenha vazado no stdout. Quando não
+            # há fonte, a coluna fica NULL e o log diz "nao medido" — estimar aqui
+            # contaminaria qualquer comparação de custo entre modelos.
+            if self.store.gravar_tokens(self.sprint, task_id, att,
+                                        res.tokens_total, res.tokens_fonte):
+                self.log(f"{task_id} t{att}: {res.tokens_total:,} tokens "
+                         f"({res.tokens_fonte})")
+
             # ---- cota do Codex: espera de RECURSO, não falha --------------------
             if res.failure_class == "CODEX_QUOTA":
                 if agente != "codex":

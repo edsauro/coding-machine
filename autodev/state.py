@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS attempts (
     retry_after    REAL,
     log_path       TEXT,
     origem         TEXT,                -- orquestrador | retroativo
+    tokens_total   INTEGER,             -- consumo medido da chamada (NULL = não medido)
+    tokens_fonte   TEXT,                -- de onde veio o número (nunca "estimado")
     UNIQUE (sprint_id, task_id, attempt)
 );
 
@@ -491,6 +493,24 @@ class StateStore:
              sprint_id, task_id, attempt))
         self.evento(sprint_id, task_id, "tentativa_finalizada",
                     {"attempt": attempt, "status": status, "failure_class": failure_class})
+
+    def gravar_tokens(self, sprint_id: str, task_id: str, attempt: int,
+                      total: int | None, fonte: str = "") -> bool:
+        """Grava o consumo MEDIDO da chamada. Devolve False quando não há o que gravar.
+
+        Nunca estima: se a fonte não deu o número, a coluna fica NULL e o relatório
+        mostra "não medido". Um número inventado aqui contaminaria toda comparação de
+        custo entre modelos — e é justamente para comparar que ele existe.
+        """
+        if total is None:
+            return False
+        self.conn.execute(
+            "UPDATE attempts SET tokens_total=?, tokens_fonte=? "
+            "WHERE sprint_id=? AND task_id=? AND attempt=?",
+            (int(total), fonte or "desconhecida", sprint_id, task_id, attempt))
+        self.evento(sprint_id, task_id, "tokens_medidos",
+                    {"attempt": attempt, "tokens_total": int(total), "fonte": fonte})
+        return True
 
     def tentativas(self, sprint_id: str, task_id: str) -> list[sqlite3.Row]:
         return list(self.conn.execute(

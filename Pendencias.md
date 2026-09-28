@@ -137,32 +137,33 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Relacionado:** decisão de política discutida em 28/09 — escalonar por **causa**
   (teste do código falhou / revisor reprovou) em vez de por **número** de tentativa.
 
-### P-10 · Instrumentar tokens e custo por tentativa — **agente**
-- **O que é:** a tabela `attempts` não guarda tokens. O CLI do Codex **já imprime**
-  `tokens used` + um total ao fim de cada execução (ver `logs/*-codex.log`), então dá para
-  preencher `tokens_total` (e separar entrada/saída só se a fonte separar — hoje não separa:
-  registrar como total, nunca inventar o split).
-- **Caminhos:** `autodev/agents.py` (onde a saída do CLI é capturada),
-  `autodev/state.py` (`iniciar_tentativa`/`finalizar_tentativa`),
-  `.autodev/config/models.yaml` (preço por modelo), `report/gerar_relatorio_tentativas.py`
-  (coluna de custo).
-- **Verificação:** `sqlite3 .autodev/state.db "select count(*) from attempts where tokens_total is not null"`
-  e um relatório que some custo por pacote.
-- **Pronto quando:** toda tentativa nova grava tokens e o relatório mostra custo por pacote
-  aceito (não só chamadas).
-- **Contexto:** pedido do autor em 28/09 para o próximo estudo — comparar modelos por
-  qualidade, custo e tempo, não só por número de chamadas.
+### P-10 · Tokens e custo por tentativa — **CONCLUÍDA em 28/09** (passado não é recuperável)
+- **Feito:** o motor grava `attempts.tokens_total` + `tokens_fonte` em cada tentativa.
+  O wrapper `~/.local/bin/ask-codex` ganhou o opt-in `ASK_CODEX_USO`: ele copia o consumo
+  (e as últimas 200 KB da saída crua do CLI) **antes** de o `trap` apagar o `mktemp`.
+  Fiação: `autodev/agents.py` (`parse_tokens_do_texto`, `ler_uso`, `_medir_tokens`, env no
+  `subprocess.run`) → `autodev/state.py` (`gravar_tokens`) → `autodev/orchestrator.py`.
+  Testes: `.autodev/tests/test_tokens.py` (15; suíte **217 verdes**).
+- **O passado NÃO é recuperável — medido, não suposto:** o rodapé `tokens used` vivia num
+  `mktemp` apagado no fim de cada chamada. `backfill_tokens.py` varreu os 110 registros:
+  **95 têm algum arquivo em disco e só 3 têm número** (2 da P06 e 1 da P03 da 004, que
+  escaparam no fallback do wrapper). Cobertura retroativa: 3/110 (2,7%).
+- **Limite honesto:** o CLI do Codex informa **um total**, sem separar entrada/saída.
+  Registrar como total; nunca inventar o split (custo exato exige o split + preço).
+- **Próximo passo:** com tokens, falta a **tabela de preço por modelo** — ela entra junto
+  com os braços do A/B (P-11).
 
 ### P-11 · Estudo A/B de modelos (espelho) nos pacotes limpos — **autor (aprova o gasto)**
 - **O que é:** rodar o mesmo pacote, do mesmo commit-base, com o mesmo revisor, em N≥3
   repetições por braço (degraus da escada atual × 1–2 APIs externas de código),
   medindo aceite, chamadas, tokens, custo e tempo.
-- **Candidatos sugeridos pelos dados** (sem defeito de teste, teste determinístico, sem
-  dependência entre pacotes): **P08 (sprint 002, 4 chamadas, 4/0/0 e aprovada na 4ª)** e
-  **P05/P07 (sprint 002, 6 chamadas cada)**. Evitar P02/P03/P09 (002), P01/P04 (004) — todos
-  dentro de janela de culpa de teste/plano (ver "Descontando" no relatório).
-- **Caminhos:** `.autodev/sprints/DEVFACTORY-002/dag.json` (critérios dos pacotes),
-  `.autodev/config/models.yaml` (escada), `report/gerar_relatorio_tentativas.py`.
+- **Plano completo, com procedimento de cada braço:** `TesteAB-eficiencia-LLM.md` (raiz do
+  projeto). Candidatos: **P08 (sprint 002, 4 chamadas, 4/0/0, aprovada na 4ª)** e
+  **P05/P07 (sprint 002, 6 chamadas cada)**. Evitar P02/P03/P09 (002) e P01/P04 (004) —
+  todos dentro de janela de culpa de teste/plano (ver "Descontando" no relatório).
+- **Lembrete ativo:** cron `5eb37e814ff2` (`testeab-eficiencia-llm`, dias úteis 9h, entrega
+  no Telegram) cobra os braços externos e o preço por modelo, e se cala quando o estudo
+  começar.
 - **Pronto quando:** tabela por braço com aceite/custo/tempo e um veredito que nomeie o
   perdedor e a condição que inverte a decisão.
 - **Método:** skill `llm-coding-efficiency` (fases 1–6) + `capability-ab-test` (protocolo).

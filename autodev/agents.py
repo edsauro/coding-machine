@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -58,6 +59,64 @@ class AgenteInfo:
     erro: str = ""
 
 
+def parse_tokens_do_texto(texto: str) -> int | None:
+    """Lê o rodapé `tokens used` do CLI do Codex. Devolve None quando não há.
+
+    Feito linha a linha de propósito: o rodapé real vem em DUAS linhas
+    ("tokens used" / "36,037") e um regex guloso de uma linha só casa o dígito
+    errado ("1.234.567" virava "7" — bug pego pelo teste). Vale a ÚLTIMA
+    ocorrência: o CLI imprime um rodapé por rodada, e somar seria contar o mesmo
+    contexto várias vezes.
+    """
+    achado = None
+    linhas = (texto or "").splitlines()
+    for i, linha in enumerate(linhas):
+        if "tokens used" not in linha.lower():
+            continue
+        resto = linha.lower().split("tokens used", 1)[1]
+        m = re.search(r"[0-9][0-9.,]*", resto)
+        if not m:                      # rodapé de duas linhas: o número vem depois
+            for seguinte in linhas[i + 1:i + 3]:
+                m = re.search(r"[0-9][0-9.,]*", seguinte)
+                if m:
+                    break
+        if m:
+            achado = m.group(0)
+    if not achado:
+        return None
+    bruto = achado.replace(",", "").replace(".", "")
+    return int(bruto) if bruto.isdigit() else None
+
+
+def ler_uso(sidecar: Path) -> tuple[int | None, str]:
+    """Lê o JSON que o wrapper grava quando ASK_CODEX_USO está definido."""
+    try:
+        d = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None, ""
+    n = d.get("tokens_total")
+    return (int(n) if isinstance(n, (int, float)) else None), str(d.get("fonte") or "")
+
+
+def _medir_tokens(res: "Resultado", log_path: Path | None) -> None:
+    """Preenche res.tokens_* a partir da fonte mais confiável disponível.
+
+    Ordem: (1) sidecar do wrapper — o CLI imprime o rodapé e o wrapper o captura
+    antes de o mktemp morrer; (2) rodapé que tenha vazado para stdout/stderr;
+    (3) nada — e aí o campo fica None, que o relatório mostra como "não medido".
+    """
+    if log_path:
+        total, fonte = ler_uso(Path(str(log_path) + ".uso"))
+        if total is not None:
+            res.tokens_total, res.tokens_fonte = total, fonte or "wrapper"
+            return
+    for texto, origem in ((res.stdout, "cli:stdout"), (res.stderr, "cli:stderr")):
+        total = parse_tokens_do_texto(texto)
+        if total is not None:
+            res.tokens_total, res.tokens_fonte = total, origem
+            return
+
+
 @dataclass
 class Invocacao:
     agente: str
@@ -82,6 +141,8 @@ class Resultado:
     failure_class: str | None = None
     modelo_usado: str = ""
     effort_usado: str = ""
+    tokens_total: int | None = None      # consumo MEDIDO (None = não medido, nunca 0)
+    tokens_fonte: str = ""
     extra: dict = field(default_factory=dict)
 
     @property
@@ -192,8 +253,14 @@ def invocar(inv: Invocacao, cfg) -> Resultado:
         cmd += [w["flags"]["arquivo"], "-"]
 
     try:
+        # ASK_CODEX_USO: o wrapper grava o consumo ao lado do nosso log ANTES de
+        # apagar o mktemp onde o rodapé "tokens used" vive. Opt-in: quem não define
+        # a variável não muda de comportamento (ver ~/.local/bin/ask-codex).
+        env = os.environ.copy()
+        if log_path:
+            env.setdefault("ASK_CODEX_USO", str(log_path) + ".uso")
         p = subprocess.run(cmd, input=inv.prompt, capture_output=True, text=True,
-                           timeout=inv.timeout + 30, cwd=inv.worktree)
+                           timeout=inv.timeout + 30, cwd=inv.worktree, env=env)
         res = Resultado(exit_code=p.returncode, stdout=p.stdout or "",
                         stderr=p.stderr or "", modelo_usado=res_modelo,
                         effort_usado=res_effort)
@@ -219,6 +286,7 @@ def invocar(inv: Invocacao, cfg) -> Resultado:
         res.failure_class = (cls.value if cls != errors.FailureClass.UNKNOWN
                              else errors.FailureClass.ENVIRONMENT_ERROR.value)
         res.stdout = res.stdout or ""
+    _medir_tokens(res, log_path)
     _gravar_log(log_path, res)
     return res
 
@@ -287,6 +355,11 @@ def _fake_acao(acao: str, spec: dict, inv: Invocacao) -> Resultado:
     if acao == "crash":
         return Resultado(exit_code=137, stderr="Killed",
                          failure_class=errors.FailureClass.AGENT_CRASH.value)
+    if acao == "uso":
+        # usado pelos testes para provar a fiacao tokens -> attempts sem gastar cota
+        return Resultado(exit_code=0, stdout=spec.get("texto", "[fake] ok"),
+                         tokens_total=spec.get("tokens"),
+                         tokens_fonte="fake")
     if acao == "echo":
         return Resultado(exit_code=0, stdout=spec.get("texto", "[fake] ok"))
     return Resultado(exit_code=0, stdout="[fake] nada a fazer")
@@ -299,7 +372,9 @@ def _gravar_log(log_path: Path | None, res: Resultado) -> None:
     log_path.write_text(
         f"# exit_code={res.exit_code} duracao={res.duracao:.1f}s "
         f"modelo={res.modelo_usado} effort={res.effort_usado} "
-        f"failure_class={res.failure_class}\n"
+        f"failure_class={res.failure_class} "
+        f"tokens={res.tokens_total if res.tokens_total is not None else 'nao medido'}"
+        f"({res.tokens_fonte or '-'})\n"
         f"\n===== PROMPT ENVIADO =====\n{res.prompt}\n"
         f"\n===== STDOUT =====\n{res.stdout}\n"
         f"\n===== STDERR =====\n{res.stderr}\n", encoding="utf-8")
