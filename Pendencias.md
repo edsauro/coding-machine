@@ -166,6 +166,7 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 | **tela de eventos** (permanente) | `./tela.sh` → `.autodev/scripts/tela.py` |
 | verificador de planos | `.autodev/scripts/verificar_plano.py` |
 | guarda de sobreposição (vigias) | `.autodev/scripts/rodada_em_andamento.py` |
+| **relatório de tentativas** (visual, regenerável) | `REPORT-TENTATIVAS-CODEX.md` + `report/` (script, PNGs, HTML, PDF A4) |
 | testes do motor | `.venv/bin/python -m pytest .autodev/tests/ -q` |
 | estado (fonte da verdade) | `.autodev/state.db` |
 

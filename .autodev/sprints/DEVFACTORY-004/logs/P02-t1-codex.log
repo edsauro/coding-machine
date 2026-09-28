@@ -1,0 +1,87 @@
+# exit_code=0 duracao=91.8s modelo=gpt-5.6-luna effort=low failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P02: Fazer o teste de documentacao isolar a secao do Planejador
+
+## Criterios de aceitacao (todos obrigatorios)
+- _secao_planejador() em .autodev/tests/test_plan_docs.py para de cortar a secao apenas no proximo '\n## ': a secao devolvida termina no proximo titulo de nivel igual ou superior (qualquer '## ' ou '# '), sem incluir subsecoes de outros assuntos
+- o teste passa a provar o que anuncia: uma mutacao que devolva, junto com a secao do Planejador, a subsecao '### Ciclo de vida do sprint' faz o teste FALHAR
+- o arquivo pode ser alterado (esta task existe para isso), mas o numero de casos de teste nao pode diminuir: a contagem de python3 -m pytest .autodev/tests/test_plan_docs.py --collect-only -q nao pode ser menor que antes
+- os testes novos ficam no proprio .autodev/tests/test_plan_docs.py (nenhum caso novo em outro arquivo)
+- rode com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q
+- preservacao com evolucao: registre em .autodev/sprints/DEVFACTORY-004/decisions.md, com data, por que a assercao de isolamento foi trocada, e prove a contagem antes/depois; o revisor confere e reprova autorizacao sem essa prova
+
+## Contexto do projeto
+# DEVFACTORY-004 — Correções apontadas pela revisão retroativa da sprint 2
+
+## Objetivo
+
+Corrigir, **com o mesmo processo** (task → agente → revisão → integração), os defeitos
+que a revisão retroativa por LLM encontrou na P10 da sprint 2 e as pendências de
+rastreabilidade que apareceram nas duas revisões. Nada foi corrigido à mão no trabalho
+já integrado: quem corrige é esta sprint.
+
+Fonte dos achados: `~/.hermes/cache/scratch/revisoes-p09-p10/{P09,P10}-veredito-relido.json`
+e o registro D-22 em `.autodev/sprints/DEVFACTORY-002/decisions.md`.
+
+## O que esta sprint entrega
+
+1. **README com hierarquia coerente** (P01) — a seção `## Planejador`, entregue pela P10
+   da sprint 2, foi inserida **dentro** de `## Como rodar`. Consequência: `### Ciclo de
+   vida do sprint` e `### Conclusão por evidência` passaram a ser subseções do
+   Planejador. Conteúdo fica, estrutura volta ao lugar.
+2. **Teste de documentação que prova o que anuncia** (P02) — `_secao_planejador()` corta
+   a seção no próximo `\n## `, então a "seção Planejador" que o teste examina inclui
+   subseções que não são dela. O teste passa a isolar de verdade, com mutação que
+   derruba o teste quando o vazamento volta.
+3. **README sem afirmação que não bate com o código** (P03) — "consome cota do agente
+   configurado" (o agente do planejador é fixo em `codex`) e o número fixo "Suíte do
+   orquestrador: 123 testes passando", que já nasceu velho.
+4. **Critério com comando que roda nesta máquina** (P04) — os critérios e o campo
+   `teste` mandavam `python3 -m pytest`, que **não roda aqui** fora do runner do motor
+   (o `python3` do sistema não tem pytest). O verificador de planos passa a avisar, e o
+   prompt de planejamento passa a exigir a forma que roda.
+
+## Por que isso é produto, e não faxina
+
+O motor exige que cada critério seja **verificável**. Um critério cujo comando não roda
+na máquina do dono é um critério que ninguém consegue conferir — foi exatamente o que
+dois revisores apontaram de forma independente. E um teste que prova menos do que
+anuncia é a mesma classe de defeito que reprovou a P09 duas vezes na sprint 2: parece
+cobertura, não é. As duas correções entram no verificador de planos (P04) para valer
+para os próximos DAGs, não só para este.
+
+## Dependências
+
+`DEVFACTORY-004` depende de `DEVFACTORY-002` estar integrada — e está (ENCERRADA,
+10/10). Os arquivos tocados (`README.md`, `.autodev/tests/test_plan_docs.py`,
+`.autodev/scripts/verificar_plano.py`, `autodev/plan_prompt.py`) existem
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-004-P02-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+===== STDOUT =====
+RESULTADO: Corrigido o isolamento da seção Planejador, adicionado teste de regressão e registrada a contagem 4→5 | TESTES: verificação do helper e sintaxe passaram; `python3 -m pytest .autodev/tests/ -q` indisponível, pois o interpretador não possui pytest instalado.
+
+===== STDERR =====
+

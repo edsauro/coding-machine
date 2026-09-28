@@ -1,0 +1,229 @@
+# exit_code=0 duracao=165.8s modelo=deepseek-flash effort=(default) failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- _secao_planejador() em .autodev/tests/test_plan_docs.py para de cortar a secao apenas no proximo '\n## ': a secao devolvida termina no proximo titulo de nivel igual ou superior (qualquer '## ' ou '# '), sem incluir subsecoes de outros assuntos
+- o teste passa a provar o que anuncia: uma mutacao que devolva, junto com a secao do Planejador, a subsecao '### Ciclo de vida do sprint' faz o teste FALHAR
+- o arquivo pode ser alterado (esta task existe para isso), mas o numero de casos de teste nao pode diminuir: a contagem de python3 -m pytest .autodev/tests/test_plan_docs.py --collect-only -q nao pode ser menor que antes
+- os testes novos ficam no proprio .autodev/tests/test_plan_docs.py (nenhum caso novo em outro arquivo)
+- rode com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q
+- preservacao com evolucao: registre em .autodev/sprints/DEVFACTORY-004/decisions.md, com data, por que a assercao de isolamento foi trocada, e prove a contagem antes/depois; o revisor confere e reprova autorizacao sem essa prova
+
+## Task
+P02: Fazer o teste de documentacao isolar a secao do Planejador
+
+## Diff a revisar (base 6a09d822542609ba9fda9e93975d868c98731c9c -> HEAD)
+```diff
+diff --git a/.autodev/sprints/DEVFACTORY-004/decisions.md b/.autodev/sprints/DEVFACTORY-004/decisions.md
+index 7ba0d25..0b15b3d 100644
+--- a/.autodev/sprints/DEVFACTORY-004/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-004/decisions.md
+@@ -31,3 +31,18 @@ reproduz o corpo de `main` (`2ca6ce2`), antes da inserção defeituosa; a fixtur
+ `sprint/DEVFACTORY-002/P10-codex` (`785988d`), até antes das subseções que vazaram
+ para dentro dele. A preservação é provada contra esses snapshots históricos, não
+ contra texto derivado pelo teste.
++
++## D-26 — 2026-09-28 — P02 isola a seção Planejador até o próximo título de nível igual ou superior
++
++O helper `_secao_planejador()` deixou de procurar somente `\n## ` e agora encerra
++no primeiro `\n# ` ou `\n## `. A asserção de isolamento foi trocada porque o corte
++anterior incluía as subseções `### Ciclo de vida do sprint` e `### Conclusão por
++evidência`, fazendo o teste aceitar texto de outro assunto como se fosse conteúdo
++do Planejador.
++
++A prova de preservação da suíte foi registrada antes/depois: o arquivo histórico
++da P10 tinha 4 casos coletados; esta versão mantém esses 4 e adiciona 1 caso no
++próprio `.autodev/tests/test_plan_docs.py`, totalizando 5 casos coletados. A
++contagem não diminuiu (4 → 5). O novo caso injeta uma subseção `### Ciclo de vida
++do sprint` no texto lido e falha com a implementação antiga, pois exige que esse
++texto não apareça na seção retornada.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+new file mode 100644
+index 0000000..efb7b4e
+--- /dev/null
++++ b/.autodev/tests/test_plan_docs.py
+@@ -0,0 +1,75 @@
++"""Contrato da documentacao publica do planejador."""
++
++from pathlib import Path
++import re
++
++
++README = Path(__file__).parents[2] / "README.md"
++
++
++def _secao_planejador() -> str:
++    texto = README.read_text(encoding="utf-8")
++    marcador = "## Planejador"
++    assert marcador in texto
++    inicio = texto.index(marcador) + len(marcador)
++    restante = texto[inicio:]
++    proximo_titulo = re.search(r"\n#{1,6} ", restante)
++    fim = len(restante) if proximo_titulo is None else proximo_titulo.start()
++    return " ".join(restante[:fim].split())
++
++
++def test_readme_explica_fluxo_do_prompt_ao_sprint_executavel():
++    secao = _secao_planejador().lower()
++
++    assert "prompt" in secao
++    assert "spec.md" in secao
++    assert "dag.json" in secao
++    assert "sprint.yaml" in secao
++    assert "sprint executável" in secao
++
++
++def test_readme_documenta_comando_plan_e_efeito_no_disco():
++    secao = _secao_planejador()
++
++    assert 'autodev plan "' in secao
++    assert ".autodev/sprints/" in secao
++
++
++def test_readme_alerta_sobre_agente_cota_e_revisao_humana():
++    secao = _secao_planejador().lower()
++
++    assert "agente" in secao
++    assert "consome cota" in secao
++    assert "revisão humana" in secao
++    assert "sempre" in secao
++    assert "antes de rodar" in secao
++
++
++def test_readme_declara_que_plan_nao_faz_merge_nem_push():
++    secao = _secao_planejador().lower()
++
++    assert "não faz merge nem push" in secao
++
++
++def test_secao_planejador_exclui_subsecoes_do_assunto_seguinte(monkeypatch):
++    texto = """# Documento
++
++## Planejador
++
++Texto próprio do planejador.
++
++### Ciclo de vida do sprint
++
++Texto de outro assunto.
++
++## Outro assunto
++
++Mais texto.
++"""
++    monkeypatch.setattr(Path, "read_text", lambda self, encoding: texto)
++
++    secao = _secao_planejador()
++
++    assert "Texto próprio do planejador." in secao
++    assert "Ciclo de vida do sprint" not in secao
++    assert "Texto de outro assunto." not in secao
+```
+
+## Saida dos testes
+```
+.....                                                                    [100%]
+5 passed in 0.01s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+{
+  "veredito": "APPROVE",
+  "confianca": 0.82,
+  "criterios_atendidos": [
+    {
+      "criterio": "_secao_planejador() para de cortar a secao apenas no proximo '\\n## ': a secao termina no proximo titulo de nivel igual ou superior, sem incluir subsecoes de outros assuntos",
+      "atende": true,
+      "evidencia": "HEAD cfe28c5 (worktree DEVFACTORY-004-P02-codex): o helper agora usa re.search(r\"\\n#{1,6} \", restante) em vez de split(\"\\n## \"). Rodei o helper antigo e o novo contra o README.md real: ambos terminam em '\\n## Os agentes' e devolvem texto idêntico (r[:b] == r[:a] -> True), e a secao devolvida NAO contem 'Ciclo de vida do sprint' nem 'Conclusao por evidencia' (checagem booleana direta). Ou seja, o comportamento exigido e observado. Observacao: o corte implementado e em qualquer nivel 1-6, nao so em '## '/'# ' como diz o parentetico do criterio — ver finding 1; os criterios 2 e 3 exigem literalmente esse corte mais amplo, logo a implementacao escolhe a unica leitura que satisfaz o conjunto."
+    },
+    {
+      "criterio": "o teste passa a provar o que anuncia: uma mutacao que devolva a subsecao '### Ciclo de vida do sprint' junto com a secao faz o teste FALHAR",
+      "atende": true,
+      "evidencia": "Reproduzi a mutacao de forma independente (python, sem tocar no repo): com o helper antigo (split no '\\n## ') sobre o texto sintetico do teste, a secao sai como 'Texto proprio do planejador. ### Ciclo de vida do sprint Texto de outro assunto.' e as duas assercoes de isolamento FALHAM -> o caso test_secao_planejador_exclui_subsecoes_do_assunto_seguinte quebra. Com o helper novo a secao e exatamente 'Texto proprio do planejador.' e o caso passa. Logo o teste e sensivel a mutacao, nao apenas verde. Bonus verificado: a hipotese estrita \\n#{1,2} tambem faz esse caso falhar, o que confirma que o teste fixa a semantica ampla."
+    },
+    {
+      "criterio": "o numero de casos de teste nao pode diminuir: contagem de python3/.venv/bin/python -m pytest .autodev/tests/test_plan_docs.py --collect-only -q nao menor que antes",
+      "atende": true,
+      "evidencia": "Medido com o interpretador do projeto (.venv/bin/python, pytest 9.1.1): snapshot historico da P10 (.autodev/worktrees/DEVFACTORY-002-P10-codex, 785988d) = '4 tests collected'; HEAD cfe28c5 = '5 tests collected'. O diff entre os dois arquivos mostra os 4 casos legados byte-identicos (so o helper mudou) + 1 caso novo. Suite completa: base 6a09d82 = '224 passed', HEAD = '229 passed' (224+5). No base da branch o arquivo estava AUSENTE (git ls-tree 6a09d82 nao lista .autodev/tests/test_plan_docs.py; collect-only la da 'file or directory not found'), isto e, o 'antes' da branch e 0 -> 5; o recorte 4 -> 5 registrado em D-26 e contra o snapshot historico, e ambos conferem. Nenhuma diminuicao em nenhum recorte."
+    },
+    {
+      "criterio": "os testes novos ficam no proprio .autodev/tests/test_plan_docs.py (nenhum caso novo em outro arquivo)",
+      "atende": true,
+      "evidencia": "git diff --name-status 6a09d82 HEAD = 'M .autodev/sprints/DEVFACTORY-004/decisions.md' + 'A .autodev/tests/test_plan_docs.py'. O unico caso novo (test_secao_planejador_exclui_subsecoes_do_assunto_seguinte) esta nesse arquivo; grep por _secao_planejador em *.py so encontra esse arquivo; nenhum outro arquivo de teste foi criado ou alterado."
+    },
+    {
+      "criterio": "rode com o interpretador do projeto: .venv/bin/python -m pytest .autodev/tests/ -q",
+      "atende": true,
+      "evidencia": "Executei eu mesmo /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q no worktree P02: '229 passed in 20.72s'. A evidencia salva pelo executor (evidence/P02-1790620305.txt) registra apenas o arquivo isolado ('5 passed'); a suite inteira eu rodei na revisao e passa — sem regressao."
+    },
+    {
+      "criterio": "preservacao com evolucao: registrar em .autodev/sprints/DEVFACTORY-004/decisions.md, com data, por que a assercao foi trocada, e prova da contagem antes/depois",
+      "atende": true,
+      "evidencia": "D-26 em decisions.md (linhas 34-48), datado 2026-09-28 (confere com `date` = 2026-09-28 15:37 -03), explica o motivo da troca (o corte anterior arrastava '### Ciclo de vida do sprint' e '### Conclusao por evidencia') e registra a contagem '4 -> 5'. A prova e verificavel e eu a reproduzi: o arquivo da P10 coleta 4 casos e os 4 sao mantidos integralmente (diff so no helper); D-25/D-24 anteriores nao foram alterados nem removidos."
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 16,
+      "descricao": "Semantica de corte mais ampla que o texto do criterio 1 e que a propria D-26: o codigo corta no primeiro titulo de QUALQUER nivel (r\"\\n#{1,6} \"), enquanto o criterio diz 'nivel igual ou superior (qualquer \\'## \\' ou \\'# \\')' e a D-26 afirma que o helper 'encerra no primeiro \\n# ou \\n## '. Verifiquei que uma implementacao literal \\n#{1,2} faria o caso novo FALHAR (a secao incluiria '### Ciclo de vida do sprint'), ou seja, o parentetico do criterio 1 e incompativel com o criterio 2; a implementacao adota a leitura exigida pelos criterios 2 e 3, mas o registro escrito descreve outra regra. Efeito pratico hoje: nulo — no README atual a secao do Planejador nao tem subsecao e o resultado e identico ao do helper antigo. Risco futuro: se '## Planejador' ganhar um '### ' proprio legitimo, a secao sera truncada silenciosamente.",
+      "correcao_sugerida": "Nao mexer no comportamento (e o exigido pelos criterios 2/3). Ajustar a redacao da D-26 para 'encerra no primeiro titulo de qualquer nivel, \\n#{1,6} ' e deixar explicito que o parentetico do criterio foi lido como qualquer titulo."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 69,
+      "descricao": "monkeypatch.setattr(Path, \"read_text\", lambda self, encoding: texto) e fragil de dois modos: (a) exige 'encoding' como keyword — se o helper passar a chamar read_text() sem argumento ou posicional, o caso quebra por TypeError em vez de por assercao (falha pelo motivo errado); (b) o lambda ignora self e devolve o mesmo texto para qualquer Path, entao nao verifica que o caminho lido e mesmo o README (README = Path(__file__).parents[2] / \"README.md\").",
+      "correcao_sugerida": "Usar lambda self, *args, **kwargs: texto (ou monkeypatch.setattr(Path, \"read_text\", lambda *a, **k: texto)) e, se quiser cobrir o caminho, asserir que o self recebido termina em 'README.md'."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/sprints/DEVFACTORY-004/decisions.md",
+      "linha": 41,
+      "descricao": "A prova '4 -> 5' esta correta contra o snapshot historico da P10 (confirmei: 4 casos coletados la, os 4 preservados integralmente), mas a D-26 nao diz que o arquivo estava AUSENTE no base da task (6a09d82) e que o base contava 0 casos/224 testes de suite. Um leitor pode achar que 'antes' e o base da branch e nao o snapshot. A evidencia salva pelo executor tambem registra apenas a execucao do arquivo isolado, nao a suite inteira exigida pelo criterio 5 (eu a rodei na revisao: 229 passed).",
+      "correcao_sugerida": "Acrescentar a D-26 a frase de base: 'no base 6a09d82 o arquivo nao existia (0 casos; suite 224 testes); a comparacao 4 -> 5 e contra o snapshot historico sprint/DEVFACTORY-002/P10-codex (785988d)` e anexar a saida da suite completa (.venv/bin/python -m pytest .autodev/tests/ -q -> 229 passed)."
+    }
+  ],
+  "resumo": "A correcao do helper isola de fato a secao do Planejador, o caso novo comprovadamente falha sob a mutacao antiga (reproduzi), a contagem subiu (4 -> 5 no recorte historico; suite 224 -> 229), nao ha segredo, caminho fragil, dependencia nova nem codigo morto; aprovei com tres achados de baixa severidade (semantica de corte mais ampla do que o texto do criterio/D-26 descreve, monkeypatch fragil e prova de contagem sem mencionar que o arquivo faltava no base)."
+}
+
+
+===== STDERR =====
+

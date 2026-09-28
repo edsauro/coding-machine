@@ -72,3 +72,36 @@ Traceback (most recent call last):
     raise TransicaoInvalida(f"{task_id}: {atual} -> {novo} não permitido")
 autodev.state.TransicaoInvalida: P04: BLOCKED -> DONE não permitido
 
+[15:29:52] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[15:29:52] rodada dona: pid 2387107 — rodada única garantida pelo motor
+[15:29:52] integrando 2 task(s) da onda 0
+[15:30:03]   portao build: OK
+[15:30:03]   portao testes: OK
+[15:30:03]   portao lint: OK
+[15:30:03]   portao seguranca: OK
+[15:30:13]   portao build: OK
+[15:30:13]   portao testes: OK
+[15:30:13]   portao lint: OK
+[15:30:13]   portao seguranca: OK
+[15:30:13] branch atual do repo: c23573ab (main intacta — merge automatico proibido)
+[15:30:13] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[15:30:13] rodada dona: pid 2387107 — rodada única garantida pelo motor
+[15:30:13] P02 tentativa 1: codex gpt-5.6-luna/low
+[15:31:11] sprint DEVFACTORY-004: 4 tasks (0 novas) — ondas [['P01', 'P04'], ['P02', 'P03']]
+[15:31:11] RODADA NAO INICIADA: já existe rodada viva no sprint DEVFACTORY-004 (pid 2387107, heartbeat há 1 min)
+[15:31:45] P02: testes exit=0 passed=5 failed=0 (configurado)
+[15:37:27] P02: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> APPROVE (3 findings)
+[15:37:27] P02: agy FORA desta rodada (cota esgotada)
+[15:37:27] P02: DONE em 1 tentativa(s) — commit cfe28c50
+[15:37:27] P03 tentativa 1: codex gpt-5.6-luna/low
+[15:39:36] P03: testes exit=0 passed=2 failed=0 (configurado)
+[15:42:36] P03: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (5 findings)
+[15:42:36] P03 tentativa 2: codex gpt-5.6-terra/low
+[15:43:40] P03: o agente informou o reset da cota em 13699s (228 min); a política era 18600s
+[15:43:40] P03: COTA ESGOTADA — aguardando 13699s (checkpoint em a09277f1)
+[15:43:40] integrando 1 task(s) da onda 1
+[15:43:50]   portao build: OK
+[15:43:50]   portao testes: OK
+[15:43:50]   portao lint: OK
+[15:43:50]   portao seguranca: OK
+[15:43:50] branch atual do repo: c23573ab (main intacta — merge automatico proibido)

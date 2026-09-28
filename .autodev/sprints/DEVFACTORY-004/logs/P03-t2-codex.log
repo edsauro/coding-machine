@@ -1,0 +1,134 @@
+# exit_code=1 duracao=64.1s modelo=gpt-5.6-terra effort=low failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P03: Tirar do README o que nao bate com o codigo
+
+## Criterios de aceitacao (todos obrigatorios)
+- o texto que afirma que a execucao do planejador 'consome cota do agente configurado' passa a refletir o codigo: o agente do planejador e FIXO em 'codex' (autodev/cli.py, cmd_plan), ou o codigo passa a aceitar o agente por parametro e o texto continua verdadeiro — escolha UMA e prove com teste
+- a linha com numero fixo de testes ('Suite do orquestrador: 123 testes passando') deixa de envelhecer: ou sai do README, ou passa a apontar o comando que mede (python3 -m pytest .autodev/tests/ -q) sem citar contagem
+- os testes ficam em .autodev/tests/test_readme_afirmacoes.py e falham se qualquer das duas afirmacoes voltar a contradizer o codigo (leitura do README contra a assinatura real de cmd_plan)
+- rode com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; ajuste minimo, decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prova de que a cobertura nao caiu
+
+## Contexto do projeto
+# DEVFACTORY-004 — Correções apontadas pela revisão retroativa da sprint 2
+
+## Objetivo
+
+Corrigir, **com o mesmo processo** (task → agente → revisão → integração), os defeitos
+que a revisão retroativa por LLM encontrou na P10 da sprint 2 e as pendências de
+rastreabilidade que apareceram nas duas revisões. Nada foi corrigido à mão no trabalho
+já integrado: quem corrige é esta sprint.
+
+Fonte dos achados: `~/.hermes/cache/scratch/revisoes-p09-p10/{P09,P10}-veredito-relido.json`
+e o registro D-22 em `.autodev/sprints/DEVFACTORY-002/decisions.md`.
+
+## O que esta sprint entrega
+
+1. **README com hierarquia coerente** (P01) — a seção `## Planejador`, entregue pela P10
+   da sprint 2, foi inserida **dentro** de `## Como rodar`. Consequência: `### Ciclo de
+   vida do sprint` e `### Conclusão por evidência` passaram a ser subseções do
+   Planejador. Conteúdo fica, estrutura volta ao lugar.
+2. **Teste de documentação que prova o que anuncia** (P02) — `_secao_planejador()` corta
+   a seção no próximo `\n## `, então a "seção Planejador" que o teste examina inclui
+   subseções que não são dela. O teste passa a isolar de verdade, com mutação que
+   derruba o teste quando o vazamento volta.
+3. **README sem afirmação que não bate com o código** (P03) — "consome cota do agente
+   configurado" (o agente do planejador é fixo em `codex`) e o número fixo "Suíte do
+   orquestrador: 123 testes passando", que já nasceu velho.
+4. **Critério com comando que roda nesta máquina** (P04) — os critérios e o campo
+   `teste` mandavam `python3 -m pytest`, que **não roda aqui** fora do runner do motor
+   (o `python3` do sistema não tem pytest). O verificador de planos passa a avisar, e o
+   prompt de planejamento passa a exigir a forma que roda.
+
+## Por que isso é produto, e não faxina
+
+O motor exige que cada critério seja **verificável**. Um critério cujo comando não roda
+na máquina do dono é um critério que ninguém consegue conferir — foi exatamente o que
+dois revisores apontaram de forma independente. E um teste que prova menos do que
+anuncia é a mesma classe de defeito que reprovou a P09 duas vezes na sprint 2: parece
+cobertura, não é. As duas correções entram no verificador de planos (P04) para valer
+para os próximos DAGs, não só para este.
+
+## Dependências
+
+`DEVFACTORY-004` depende de `DEVFACTORY-002` estar integrada — e está (ENCERRADA,
+10/10). Os arquivos tocados (`README.md`, `.autodev/tests/test_plan_docs.py`,
+`.autodev/scripts/verificar_plano.py`, `autodev/plan_prompt.py`) existem
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-004-P03-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+utodev/tests/test_readme_afirmacoes.py", "linha": 17, "descricao": "O criterio 2 e 'a linha deixa de envelhecer ... sem citar contagem', mas o teste so proibe a string exata antiga. Mutacao M3 (README volta a citar '**Suite do orquestrador: 226 testes passando.**' mantendo o comando) resulta em '2 passed': uma contagem fixa nova (exatamente o defeito que o sprint existe para matar) passa pelo teste.", "correcao_sugerida": "Guardar a regra, nao a ocorrencia: assertar que o bloco '## Estado atual' nao casa re.search(r'\\d+\\s+testes passando', corpo_da_secao('Estado atual')) e que o comando 'python3 -m pytest .autodev/tests/ -q' esta presente ali. Mutacao a vencer: citar qualquer contagem numerica nova em 'Estado atual' deve falhar."}, {"severidade": "media", "arquivo": ".autodev/sprints/DEVFACTORY-004/decisions.md", "linha": 17, "descricao": "D-26 nao registra o ajuste de oraculo que a task exigiu: a fixture .autodev/fixtures/readme_estrutura/planejador.md foi reescrita junto com o README (a P01 tem no test_readme_estrutura.py:70-77 igualdade integral de corpo '', e D-25 declara a fixture como snapshot historico). Sem essa nota, o registro diz 'nenhum teste anterior foi removido ou enfraquecido' sem informar que a referencia de comparacao de um teste de task anterior foi editada no mesmo commit — e sem nenhuma contagem antes/depois, que o criterio 5 pede explicitamente.", "correcao_sugerida": "Ampliar D-26 com: (i) o motivo do ajuste minimo da fixture (a frase removida fazia parte do oraculo; o resto do corpo permaneceu identico, preservando a forca da comparacao integral); (ii) a prova numerica medida — base 6a09d82: 224 nodes / 224 passed; HEAD: 226 nodes / 226 passed, nenhum node antigo removido (ja verificado na revisao); (iii) corrigir a frase 'o novo teste verifica ... contra a chamada real do planejador' para refletir que essa leitura e inalcancavel nesta base (ou, melhor, corrigir o teste como no finding 1 e manter a frase verdadeira)."}, {"severidade": "baixa", "arquivo": "README.md", "linha": 189, "descricao": "A forma do comando veio literalmente do criterio, mas para um leitor humano ela nao roda nesta maquina: `python3 -m pytest .autodev/tests/ -q` falha com 'No module named pytest' (/usr/bin/python3 nao tem pytest; so o runner do motor troca python3 por sys.executable — testrunner.py:_python()). O proprio README, na secao 'Como rodar' (linha 92), continua mandando usar `.venv/bin/python -m pytest .autodev/tests/ -q`, entao o documento fica com dois comandos para a mesma coisa, um deles invalido fora do runner.", "correcao_sugerida": "Deixar explicito o contexto: 'Para medir a suite do orquestrador, rode com o interpretador do projeto (o runner resolve `python3` para o venv): `python3 -m pytest .autodev/tests/ -q`' — ou apontar o comando .venv na mesma linha 189 e usar a forma `python3` apenas nos campos 'teste' dos criterios (que e onde o runner resolve). Isso nao contraria o criterio 2, que exige apenas que o comando que mede apareca sem contagem."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_readme_afirmacoes.py", "linha": 23, "descricao": "Codigo morto no caminho vivo: `cmd_plan = _cmd_plan_source()` e sempre executado (parse do cli.py a cada teste) e seu resultado nunca e usado quando o guard da linha 24 e falso — que e o caso permanente no HEAD. Isso tambem mascara o estado real: a base nao tem planejador, mas o README continua documentando `.venv/bin/python -m autodev plan \"...\"` (README.md:156), a contradicao mais grave entre README e codigo, deixada intacta por uma task cujo titulo e 'Tirar do README o que nao bate com o codigo'.", "correcao_sugerida": "Aproveitar a mesma leitura do codigo para cobrir esse caso: se `cmd_plan` nao existir, exigir que o README nao anuncie o subcomando `plan` (ou registrar em decisions.md, com data, que a secao Planejador e preservada como referencia historica por decisao D-24/D-25 — hoje isso esta so nas decisoes da task anterior e nao em nenhuma assercao)."}]
+```
+### Arquivos ja tocados
+  - .autodev/fixtures/readme_estrutura/planejador.md
+  - .autodev/sprints/DEVFACTORY-004/decisions.md
+  - .autodev/tests/test_readme_afirmacoes.py
+  - README.md
+
+## INSTRUCAO
+Esta e a tentativa #2.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-terra/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+ask-codex: sem resposta final (rc=1) — últimas linhas do log:
+diff --git a/README.md b/README.md
+index 2bea8cffa858af228541c52eaa318e0e58202ff5..8e5ffc9ab24ff171b24632f4413aba9636c11bf4
+--- a/README.md
++++ b/README.md
+@@ -186,7 +186,9 @@
+ 
+ ## Estado atual
+ 
+-- Para medir a suíte do orquestrador, rode `python3 -m pytest .autodev/tests/ -q`.
++- Para medir a suíte do orquestrador, rode com o interpretador do projeto
++  (o runner resolve `python3` para o ambiente virtual):
++  `python3 -m pytest .autodev/tests/ -q`.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
+   ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
+   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
+
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 7:32 PM.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 7:32 PM.
+tokens used
+36,037
+

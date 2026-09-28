@@ -1,0 +1,232 @@
+# exit_code=0 duracao=180.3s modelo=deepseek-flash effort=(default) failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- o texto que afirma que a execucao do planejador 'consome cota do agente configurado' passa a refletir o codigo: o agente do planejador e FIXO em 'codex' (autodev/cli.py, cmd_plan), ou o codigo passa a aceitar o agente por parametro e o texto continua verdadeiro — escolha UMA e prove com teste
+- a linha com numero fixo de testes ('Suite do orquestrador: 123 testes passando') deixa de envelhecer: ou sai do README, ou passa a apontar o comando que mede (python3 -m pytest .autodev/tests/ -q) sem citar contagem
+- os testes ficam em .autodev/tests/test_readme_afirmacoes.py e falham se qualquer das duas afirmacoes voltar a contradizer o codigo (leitura do README contra a assinatura real de cmd_plan)
+- rode com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q
+- preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; ajuste minimo, decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prova de que a cobertura nao caiu
+
+## Task
+P03: Tirar do README o que nao bate com o codigo
+
+## Diff a revisar (base 6a09d822542609ba9fda9e93975d868c98731c9c -> HEAD)
+```diff
+diff --git a/.autodev/fixtures/readme_estrutura/planejador.md b/.autodev/fixtures/readme_estrutura/planejador.md
+index dd7ac15..83187c7 100644
+--- a/.autodev/fixtures/readme_estrutura/planejador.md
++++ b/.autodev/fixtures/readme_estrutura/planejador.md
+@@ -12,8 +12,7 @@ Por exemplo:
+ ```
+ 
+ O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
+-contendo os três arquivos acima. Como o planejador usa um agente, cada execução
+-consome cota do agente configurado. O plano gerado **sempre precisa de revisão
++contendo os três arquivos acima. O plano gerado **sempre precisa de revisão
+ humana antes de rodar**: a validação estrutural não garante que a interpretação
+ do pedido ou os critérios de aceitação estejam corretos.
+ 
+diff --git a/.autodev/sprints/DEVFACTORY-004/decisions.md b/.autodev/sprints/DEVFACTORY-004/decisions.md
+index 7ba0d25..730fd30 100644
+--- a/.autodev/sprints/DEVFACTORY-004/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-004/decisions.md
+@@ -14,6 +14,15 @@ anterior foi substituído por verificações estritamente mais fortes (árvore i
+ e igualdade do corpo integral com fixtures). A contagem da suíte sobe de 194 para
+ 197; o arquivo da task mantém 3 casos, com verificações estritamente mais fortes.
+ 
++## D-26 — 2026-09-28 — P03 remove afirmações instáveis do README
++
++O README deixa de afirmar que o planejador consome cota do agente configurado,
++porque essa formulação não corresponde ao contrato fixo de `cmd_plan` e a base
++atual não contém essa implementação. A contagem fixa de testes foi substituída
++pelo comando `python3 -m pytest .autodev/tests/ -q`. O novo teste verifica as duas
++afirmações contra o texto e, quando o comando existe, contra a chamada real do
++planejador; nenhum teste anterior foi removido ou enfraquecido.
++
+ ## D-25 — 2026-09-28 — P01 fixa a árvore completa do README
+ 
+ A revisão da tentativa 8 demonstrou que validar apenas a janela entre `## Como
+diff --git a/.autodev/tests/test_readme_afirmacoes.py b/.autodev/tests/test_readme_afirmacoes.py
+new file mode 100644
+index 0000000..055e04f
+--- /dev/null
++++ b/.autodev/tests/test_readme_afirmacoes.py
+@@ -0,0 +1,34 @@
++import ast
++from pathlib import Path
++
++
++ROOT = Path(__file__).parents[2]
++
++
++def _cmd_plan_source():
++    arvore = ast.parse((ROOT / "autodev" / "cli.py").read_text(encoding="utf-8"))
++    return next((n for n in arvore.body if isinstance(n, ast.FunctionDef)
++                 and n.name == "cmd_plan"), None)
++
++
++def test_readme_nao_afirma_agente_configurado_e_contagem_fixa():
++    readme = (ROOT / "README.md").read_text(encoding="utf-8")
++    assert "consome cota do agente configurado" not in readme
++    assert "Suíte do orquestrador: 123 testes passando" not in readme
++    assert "python3 -m pytest .autodev/tests/ -q" in readme
++
++
++def test_afirmacao_do_planejador_bate_com_o_codigo_real():
++    readme = (ROOT / "README.md").read_text(encoding="utf-8")
++    cmd_plan = _cmd_plan_source()
++    if "agente `codex`" in readme:
++        assert cmd_plan is not None, "README anuncia planejador, mas cmd_plan sumiu"
++        assert any(
++            isinstance(n, ast.Call)
++            and isinstance(n.func, ast.Attribute)
++            and n.func.attr == "planejar"
++            and len(n.args) >= 3
++            and isinstance(n.args[2], ast.Constant)
++            and n.args[2].value == "codex"
++            for n in ast.walk(cmd_plan)
++        ), "README anuncia agente fixo codex, mas cmd_plan não o fixa"
+diff --git a/README.md b/README.md
+index 8321a65..2bea8cf 100644
+--- a/README.md
++++ b/README.md
+@@ -158,8 +158,7 @@ Por exemplo:
+ ```
+ 
+ O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
+-contendo os três arquivos acima. Como o planejador usa um agente, cada execução
+-consome cota do agente configurado. O plano gerado **sempre precisa de revisão
++contendo os três arquivos acima. O plano gerado **sempre precisa de revisão
+ humana antes de rodar**: a validação estrutural não garante que a interpretação
+ do pedido ou os critérios de aceitação estejam corretos.
+ 
+@@ -187,7 +186,7 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
+ 
+ ## Estado atual
+ 
+-- **Suíte do orquestrador: 123 testes passando.**
++- Para medir a suíte do orquestrador, rode `python3 -m pytest .autodev/tests/ -q`.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
+   ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
+   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
+```
+
+## Saida dos testes
+```
+..                                                                       [100%]
+2 passed in 0.01s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+```json
+{
+  "veredito": "REQUEST_CHANGES",
+  "confianca": 0.82,
+  "criterios_atendidos": [
+    {
+      "criterio": "1) O texto 'consome cota do agente configurado' passa a refletir o codigo (agente FIXO em 'codex' em autodev/cli.py cmd_plan, OU agente por parametro) — escolher UMA e provar com teste",
+      "atende": false,
+      "evidencia": "README.md:161 e .autodev/fixtures/readme_estrutura/planejador.md:15 apenas DELETAM a frase; nenhuma das duas opcoes foi implementada (autodev/cli.py do HEAD nao tem cmd_plan: grep 'def cmd_plan' em autodev/cli.py = 0 ocorrencias; o cmd_plan real so existe em sprint/DEVFACTORY-002/integration:268, chamando planner.planejar(RAIZ, pedido, \"codex\")). O teste que deveria provar a relacao com o codigo nunca executa essa verificacao (ver finding 1). Deletar a frase resolve a contradicao de superficie, mas nao 'prova com teste' o contrato do planejador."
+    },
+    {
+      "criterio": "2) A linha com numero fixo de testes deixa de envelhecer (sai do README ou passa a apontar o comando sem citar contagem)",
+      "atende": true,
+      "evidencia": "README.md:189 agora diz 'Para medir a suite do orquestrador, rode `python3 -m pytest .autodev/tests/ -q`.'; a frase antiga sumiu do README e da fixture. Mutacao M2 (reintroduzir 'Suite do orquestrador: 123 testes passando') faz o teste FALHAR — rodado em copia scratch com .venv/bin/python: '1 failed, 1 passed'. Ressalva: o teste cobre so a string exata (finding 2)."
+    },
+    {
+      "criterio": "3) Testes em .autodev/tests/test_readme_afirmacoes.py, que falhem se qualquer afirmacao voltar a contradizer o codigo (leitura do README contra a assinatura real de cmd_plan)",
+      "atende": false,
+      "evidencia": "O arquivo existe no caminho exigido (34 linhas) e a metade 'texto' funciona (M1 reintroduzir 'consome cota do agente configurado' -> 1 failed; M2 -> 1 failed). A metade 'codigo' e codigo MORTO: a linha 24 faz `if \"agente `codex`\" in readme:` e essa string NAO existe no README do HEAD (grep -F 'agente `codex`' README.md = exit 1), entao `_cmd_plan_source()` e chamado e o resultado descartado. Prova: M3 (contagem fixa NOVA + comando presente, README de HEAD) => '2 passed'; M4 (README passa a afirmar 'agente `codex`' nesta base, sem cmd_plan) => '1 failed' — ou seja, o unico caminho que le o codigo e alcancavel apenas quando o README anuncia o agente, o que nunca acontece neste estado. M5/M6 (cmd_plan sintetico fixando 'codex' => passa; passando a aceitar agente por parametro => falha) mostram que a logica do assert esta correta, mas e inalcancavel: o teste passa por vacuidade, nao por provar a afirmacao."
+    },
+    {
+      "criterio": "4) Rodar com o interpretador do projeto: python3 -m pytest .autodev/tests/ -q",
+      "atende": true,
+      "evidencia": "HEAD (3c561697d8a295ae215faf9f268bd5609143429f, same as diff): 226 collected / '226 passed in 21.18s' na worktree DEVFACTORY-004-P03-codex usando o interpretador do projeto (.venv/bin/python, pytest 9.1.1) — que e o que autodev/testrunner.py:_python() substitui por sys.executable. /usr/bin/python3 cru nao tem pytest ('No module named pytest'), como D-23 ja registrou."
+    },
+    {
+      "criterio": "5) Preservacao com evolucao: nao remover/enfraquecer caso de teste anterior; ajuste minimo, decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prova de que a cobertura nao caiu",
+      "atende": false,
+      "evidencia": "Nenhum caso anterior removido (verificado por node-id: base 6a09d82 = 224 nodes, HEAD = 226; a diferenca sao exatamente os 2 casos novos; conjunto 'removidos' vazio) e a cobertura nao caiu (224 -> 226). Porem o ajuste exigido foi feito em DOIS artefatos e o registro cobre um so: alem do README, a fixture-oraculo .autodev/fixtures/readme_estrutura/planejador.md:15 foi editada na mesma commit (sem ela, test_readme_estrutura.py:70-77 falharia; com ela, o oraculo que D-25 declara ser 'snapshot historico do bloco da P10' passa a espelhar o texto atual). D-26 (decisions.md:17-24) nao menciona a fixture e nao traz nenhuma contagem antes/depois — a prova que o criterio exige. As contagens que existem no arquivo (D-24: '194 para 197') nao correspondem a suite real (224/226)."
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "alta",
+      "arquivo": ".autodev/tests/test_readme_afirmacoes.py",
+      "linha": 24,
+      "descricao": "A verificacao contra o codigo real e inalcancavel: o `if \"agente `codex`\" in readme:` e sempre falso no README do HEAD, entao `test_afirmacao_do_planejador_bate_com_o_codigo_real` termina sem asserir nada sobre cmd_plan — passa por vacuidade. Mutacoes comprovam: com o README de HEAD + contagem fixa nova => 2 passed (nada e checado no codigo); reintroduzindo 'agente `codex`' no README => 1 failed (porque cmd_plan nao existe nesta base). Consequencia: o criterio 1 ('prove com teste') e o criterio 3 ('leitura do README contra a assinatura real de cmd_plan') ficam sem prova, e o registro D-26 afirma que o teste 'verifica ... contra a chamada real do planejador', o que nao acontece.",
+      "correcao_sugerida": "Tornar o ramo de codigo obrigatorio e explicito: ler cmd_plan sempre (sem guard condicionado ao texto) e exigir UM dos dois estados aceitos — (a) cmd_plan existe e a chamada fixa 'codex' como 3o argumento posicional, ou (b) cmd_plan ausente E o README nao faz nenhuma afirmacao de agente/cota do planejador (assert 'consome cota' not in readme and 'agente `codex`' not in readme). Se a base sem planejador e uma condicao legitima, declarar isso com pytest.skip(..., reason=...) DATADO em decisions.md, em vez de esconder a checagem atras de um `if` que nunca e verdadeiro."
+    },
+    {
+      "severidade": "media",
+      "arquivo": ".autodev/tests/test_readme_afirmacoes.py",
+      "linha": 17,
+      "descricao": "O criterio 2 e 'a linha deixa de envelhecer ... sem citar contagem', mas o teste so proibe a string exata antiga. Mutacao M3 (README volta a citar '**Suite do orquestrador: 226 testes passando.**' mantendo o comando) resulta em '2 passed': uma contagem fixa nova (exatamente o defeito que o sprint existe para matar) passa pelo teste.",
+      "correcao_sugerida": "Guardar a regra, nao a ocorrencia: assertar que o bloco '## Estado atual' nao casa re.search(r'\\d+\\s+testes passando', corpo_da_secao('Estado atual')) e que o comando 'python3 -m pytest .autodev/tests/ -q' esta presente ali. Mutacao a vencer: citar qualquer contagem numerica nova em 'Estado atual' deve falhar."
+    },
+    {
+      "severidade": "media",
+      "arquivo": ".autodev/sprints/DEVFACTORY-004/decisions.md",
+      "linha": 17,
+      "descricao": "D-26 nao registra o ajuste de oraculo que a task exigiu: a fixture .autodev/fixtures/readme_estrutura/planejador.md foi reescrita junto com o README (a P01 tem no test_readme_estrutura.py:70-77 igualdade integral de corpo '', e D-25 declara a fixture como snapshot historico). Sem essa nota, o registro diz 'nenhum teste anterior foi removido ou enfraquecido' sem informar que a referencia de comparacao de um teste de task anterior foi editada no mesmo commit — e sem nenhuma contagem antes/depois, que o criterio 5 pede explicitamente.",
+      "correcao_sugerida": "Ampliar D-26 com: (i) o motivo do ajuste minimo da fixture (a frase removida fazia parte do oraculo; o resto do corpo permaneceu identico, preservando a forca da comparacao integral); (ii) a prova numerica medida — base 6a09d82: 224 nodes / 224 passed; HEAD: 226 nodes / 226 passed, nenhum node antigo removido (ja verificado na revisao); (iii) corrigir a frase 'o novo teste verifica ... contra a chamada real do planejador' para refletir que essa leitura e inalcancavel nesta base (ou, melhor, corrigir o teste como no finding 1 e manter a frase verdadeira)."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "README.md",
+      "linha": 189,
+      "descricao": "A forma do comando veio literalmente do criterio, mas para um leitor humano ela nao roda nesta maquina: `python3 -m pytest .autodev/tests/ -q` falha com 'No module named pytest' (/usr/bin/python3 nao tem pytest; so o runner do motor troca python3 por sys.executable — testrunner.py:_python()). O proprio README, na secao 'Como rodar' (linha 92), continua mandando usar `.venv/bin/python -m pytest .autodev/tests/ -q`, entao o documento fica com dois comandos para a mesma coisa, um deles invalido fora do runner.",
+      "correcao_sugerida": "Deixar explicito o contexto: 'Para medir a suite do orquestrador, rode com o interpretador do projeto (o runner resolve `python3` para o venv): `python3 -m pytest .autodev/tests/ -q`' — ou apontar o comando .venv na mesma linha 189 e usar a forma `python3` apenas nos campos 'teste' dos criterios (que e onde o runner resolve). Isso nao contraria o criterio 2, que exige apenas que o comando que mede apareca sem contagem."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_readme_afirmacoes.py",
+      "linha": 23,
+      "descricao": "Codigo morto no caminho vivo: `cmd_plan = _cmd_plan_source()` e sempre executado (parse do cli.py a cada teste) e seu resultado nunca e usado quando o guard da linha 24 e falso — que e o caso permanente no HEAD. Isso tambem mascara o estado real: a base nao tem planejador, mas o README continua documentando `.venv/bin/python -m autodev plan \"...\"` (README.md:156), a contradicao mais grave entre README e codigo, deixada intacta por uma task cujo titulo e 'Tirar do README o que nao bate com o codigo'.",
+      "correcao_sugerida": "Aproveitar a mesma leitura do codigo para cobrir esse caso: se `cmd_plan` nao existir, exigir que o README nao anuncie o subcomando `plan` (ou registrar em decisions.md, com data, que a secao Planejador e preservada como referencia historica por decisao D-24/D-25 — hoje isso esta so nas decisoes da task anterior e nao em nenhuma assercao)."
+    }
+  ],
+  "resumo": "As duas edicoes de README estao corretas e a suite sobe de 224 para 226 sem perder nenhum caso, mas o teste que deveria atar o README ao codigo e vacuo (a metade que le cmd_plan nunca executa, provado por mutacao), o guard do numero de testes so pega a string exata antiga, e D-26 omite o ajuste da fixture-oraculo e a prova de cobertura exigida — por isso peco mudancas em vez de aprovar."
+}
+```
+
+
+===== STDERR =====
+
