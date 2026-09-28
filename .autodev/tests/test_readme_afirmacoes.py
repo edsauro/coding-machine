@@ -19,11 +19,15 @@ def _corpo_da_secao(readme: str, titulo: str) -> str:
     return readme[inicio.start() : inicio.end() + (fim.start() if fim else len(readme))]
 
 
-def test_readme_nao_afirma_cota_configurada_sem_cmd_plan():
+def test_readme_nao_afirma_cota_configurada_sem_parametro_de_agente():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     cmd_plan = _cmd_plan_source()
-    assert cmd_plan is None, "atualize este teste para a assinatura real de cmd_plan"
-    assert "consome cota do agente configurado" not in readme
+    parametros = set() if cmd_plan is None else {
+        argumento.arg for argumento in cmd_plan.args.args
+    }
+
+    if "agent" not in parametros and "agente" not in parametros:
+        assert "consome cota do agente configurado" not in readme
 
 
 def test_estado_atual_mede_suite_sem_contagem_fixa():
