@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 
@@ -22,6 +23,40 @@ class Plano:
     repositorio: str
     tasks: list[TaskPlano]
     prompt_original: str
+
+
+class PlanoInvalido(ValueError):
+    """Indica que a resposta do agente não contém um plano reconhecível."""
+
+
+def parsear_plano(texto: str) -> Plano:
+    """Converte o primeiro objeto JSON com tasks encontrado em um Plano."""
+    decoder = json.JSONDecoder()
+    objetos: list[dict] = []
+
+    for inicio, caractere in enumerate(texto):
+        if caractere != "{":
+            continue
+        try:
+            valor, _ = decoder.raw_decode(texto[inicio:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(valor, dict):
+            objetos.append(valor)
+
+    if not objetos:
+        raise PlanoInvalido("resposta sem JSON reconhecível")
+
+    dados = next((objeto for objeto in objetos if "tasks" in objeto), None)
+    if dados is None:
+        raise PlanoInvalido("JSON sem a chave tasks")
+
+    try:
+        tasks = [TaskPlano(**task) for task in dados["tasks"]]
+        campos = {**dados, "tasks": tasks}
+        return Plano(**campos)
+    except (TypeError, KeyError) as erro:
+        raise PlanoInvalido(f"estrutura do plano inválida: {erro}") from erro
 
 
 def validar_plano(plano: Plano) -> list[str]:
