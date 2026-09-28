@@ -36,7 +36,7 @@ sys.path.insert(0, str(RAIZ))
 
 ARQUIVO = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|md|json|ya?ml|toml|sh|txt|cfg|ini)")
 IGNORAR = (".venv/", "site-packages/")
-COMANDO_PYTEST_CORRETO = re.compile(r"\bpython3\s+-m\s+pytest\b")
+COMANDO_PYTEST_CORRETO = re.compile(r"(?<![A-Za-z0-9_./-])python3\s+-m\s+pytest\b")
 CAMINHO_VENV_RELATIVO = re.compile(r"(?<![A-Za-z0-9_./-])(?:\./)?\.?venv/bin/(?:python(?:3)?|pytest)\b")
 NEGACOES_COMANDO = re.compile(r"\b(?:nao\s+(?:use|usar|rode|rodar)|não\s+(?:use|usar|rode|rodar)|proibid[oa]|nunca|em\s+vez\s+de)\b", re.I)
 
