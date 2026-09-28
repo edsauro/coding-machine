@@ -128,7 +128,7 @@ Qualquer checagem por texto de linha de comando casa com quem a escreveu.
 
 ---
 
-## D-07 **[aberto]** — o modelo de dependências do motor está errado
+## D-07 **[corrigido]** — o modelo de dependências do motor está errado
 
 **Contexto:** o DAG declara dependências entre tasks e o orquestrador as respeita
 para **ordem**: uma task só é selecionada quando suas deps estão `DONE`/`INTEGRATED`.
@@ -175,7 +175,7 @@ resultado é o da primeira noite.
 
 ---
 
-## D-08 **[gap]** — a cota do AGY é pega, mas pelo nome errado
+## D-08 **[corrigido]** — a cota do AGY é pega, mas pelo nome errado
 
 **Contexto:** o autor avisou que a cota do AGY pode acabar antes da do Codex e
 pediu para ser avisado se acontecer.
@@ -207,7 +207,7 @@ O custo é poder dormir demais diante de um 429 passageiro.
 
 ---
 
-## D-09 **[bug]** — "disk quota exceeded" seria lido como cota do Codex
+## D-09 **[corrigido]** — "disk quota exceeded" seria lido como cota do Codex
 
 **Contexto:** `SINAIS[ENVIRONMENT_ERROR]` inclui `"disk quota"` e
 `SINAIS[CODEX_QUOTA]` inclui `"quota exceeded"`.
@@ -237,3 +237,105 @@ parecer cota esgotada e parar a noite inteira.
 | Skills de terceiros | auditar antes de instalar |
 | Saída de skill | sempre em `~/workspace/s_<skill>/` |
 | Solução sem repositório | spec de problema/solução em `~/spec_solucoes_dev/` |
+
+---
+
+# Rodada de retomada (2026-09-27, tarde) — padronização a pedido do autor
+
+Contexto: a sprint parou com 1 task integrada e 9 BLOQUEADAS (limite de 5
+tentativas em P02–P05; P06–P10 caíram por dependência). O autor padronizou as
+escadas e autorizou a retomada a partir do 3º degrau.
+
+## D-10 — Escada de implementação é a matriz do autor, não intuição
+
+**Regra:** `luna/low → terra/low → sol/low → sol/medium → astra/low`, uma por
+tentativa, exatamente `max_tentativas_implementacao = 5` degraus.
+
+**Por quê:** a escada anterior (luna/low → luna/medium → terra/medium →
+sol/high → gpt-5.5 → astra/high) tinha 6 degraus para 5 tentativas, e subia
+effort antes de subir modelo — gastava mais no mesmo slug. A escada agora bate
+1:1 com `policies.retry.escalonamento` (1→tier 0 … 5→tier 4).
+
+**Implementado em:** `.autodev/config/models.yaml` (`codex.ladder`).
+**Testes:** `test_escada_de_implementacao_e_a_matriz_do_autor`,
+`test_escada_de_implementacao_nao_estoura_o_teto_de_tentativas`.
+
+## D-11 — Revisão também tem escada, e o Hermes revisa de verdade
+
+**Regra:** 1ª tentativa revisa com agy **Gemini 3.6 Flash (Low)**, 2ª **3.7**,
+3ª **3.8**, 4ª Hermes **deepseek-flash**, 5ª Hermes **deepseek-v4-pro**.
+
+**Por quê:** antes o revisor era sempre o cruzado, sem escolha de modelo. As
+tentativas 4 e 5 são a última chance sem humano — é onde faz sentido um revisor
+mais forte, e o Hermes não implementa nenhuma task, então a regra "quem
+implementa não revisa" continua valendo.
+
+**Achado da máquina:** `agy` identifica modelo por RÓTULO com o effort embutido
+(`"Gemini 3.8 Flash (Low)"`); passar `-e` junto devolve *invalid model selection:
+--effort is not supported*. Verificado: 3.6 e 3.7 estão com a cota individual
+esgotada, 3.8 responde.
+
+**Implementado em:** `models.yaml` (`revisao`), `review.revisar(tentativa=...)`,
+`config.revisor_para_tentativa`, adaptador `hermes` em `agents.WRAPPERS`
+(`hermes -z "<prompt>" -m <modelo>`, prompt no argumento, sem `-d/--timeout/-f`).
+**Testes:** `test_escada_de_revisao_por_tentativa`,
+`test_revisor_da_escada_e_usado_quando_a_tentativa_e_conhecida`,
+`test_tentativa_4_e_5_revisam_com_hermes_e_prompt_somente_leitura`,
+`test_adaptador_hermes_monta_prompt_no_argumento`.
+
+## D-12 — O revisor nunca é motivo de parada do sprint
+
+**Regra (do autor):** se o revisor da tentativa não roda, tenta o próximo da
+cadeia — `agy da tentativa → Hermes flash → Hermes pro → portão determinístico`.
+Toda troca fica registrada em `Revisao.origem` e no log da task.
+
+**Por quê:** cota do AGY estourada não pode custar uma tentativa do Codex. E
+revisor ausente não pode virar "aprovado por padrão": o portão determinístico é
+**piso** — o LLM não aprova o que ele reprova (segredo no diff, comando
+destrutivo, worktree sem alteração). Divergência entra no veredito, não é
+silenciada.
+
+**Implementado em:** `review._escolhe_revisor`, `review._revisar_por_llm`,
+`review._aplica_piso`, `models.revisao.reserva_cadeia`.
+**Testes:** `test_reserva_entra_quando_o_revisor_da_escada_falha`,
+`test_cadeia_de_reserva_atravessa_flash_e_pro_ate_revisar`,
+`test_revisao_nunca_para_o_sprint_quando_todos_os_llm_falham`,
+`test_piso_deterministico_impede_aprovacao_sem_codigo`.
+
+## D-13 — `desbloquear`: sprint volta de FIM e o contador volta ao degrau pedido
+
+**Regra:** `autodev --sprint X desbloquear [tasks...] --tentativas N` reabre o
+sprint em EM_EXECUCAO e as tasks BLOCKED em QUEUED com o contador em N. Como o
+modelo é escolhido PELO contador, `--tentativas 2` faz a próxima tentativa ser a
+3ª da escada (sol/low + agy 3.8), e não a 1ª.
+
+**Por quê:** o fim de cada rodada grava `FIM` no `sprint_state`, e `FIM` não é
+estado válido do ciclo de vida — qualquer transição a partir dele era recusada.
+Sem isso, retomar um sprint parado era impossível sem editar o banco à mão.
+
+**Recusa explícita:** `--tentativas >= 5` é rejeitado (a task bloquearia na
+primeira checagem), em vez de aceitar e falhar calado.
+**Implementado em:** `state.reabrir_sprint`, `state.reabrir_tasks`,
+`cli.cmd_desbloquear`.
+**Testes:** `test_reabrir_sprint_tira_o_sprint_de_FIM`,
+`test_reabrir_tasks_devolve_estado_e_contador`,
+`test_desbloquear_recusa_contador_no_teto`.
+
+## D-14 — HAQ-001 resolvido: credencial por `--ro-bind`, sem cópia no projeto
+
+**Decisão do autor (2026-09-27):** a opção "montar read-only, sem cópia".
+
+**Antes:** `sandbox.preparar_home()` COPIava `~/.codex/auth.json` (token OAuth
+vivo) para `.autodev/sandbox-home/.codex/` e, por tabela, para cada worktree —
+11 cópias chegaram a existir no disco do projeto. `.gitignore` e barreira de
+commit impediam o vazamento **pelo git**, não a exposição no disco.
+
+**Agora:** o HOME efêmero tem um arquivo VAZIO como ponto de montagem e o
+`montar_cmd` monta o `auth.json` real com `--ro-bind-try`, dentro do namespace.
+`_limpar_copias_antigas()` apaga as cópias que já estavam em disco. O HOME real
+continua inalcançável dentro do sandbox — `~/.codex/auth.json` segue na lista de
+caminhos proibidos do `policies.yaml`.
+
+**Testes:** `test_sandbox_nao_copia_a_credencial_para_dentro_do_projeto`,
+`test_sandbox_monta_a_credencial_somente_leitura`,
+`test_limpeza_remove_copia_antiga_em_worktree`.

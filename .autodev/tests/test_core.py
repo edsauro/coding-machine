@@ -169,13 +169,13 @@ def test_mesmo_lugar_detecta_loop():
 
 
 def test_escalonamento_sobe_um_degrau(cfg):
-    m1 = cfg.modelo_para_tentativa(1)
-    m2 = cfg.modelo_para_tentativa(2)
-    m3 = cfg.modelo_para_tentativa(3)
+    m1, m2, m3 = (cfg.modelo_para_tentativa(n) for n in (1, 2, 3))
     assert (m1["slug"], m1["effort"]) == ("gpt-5.6-luna", "low")
-    assert m2["tier"] == 1 and m2["slug"] == "gpt-5.6-luna"
-    assert m3["tier"] == 2, "a 3a tentativa sobe um degrau"
-    assert m3["tier"] > m2["tier"] > m1["tier"]
+    # matriz do autor (2026-09-27): luna/low -> terra/low -> sol/low ->
+    # sol/medium -> astra/low
+    assert (m2["slug"], m2["effort"]) == ("gpt-5.6-terra", "low")
+    assert (m3["slug"], m3["effort"]) == ("gpt-5.6-sol", "low")
+    assert m3["tier"] > m2["tier"] > m1["tier"], "a cada tentativa sobe um degrau"
 
 
 def test_modelos_da_escada_existem_de_fato(cfg, tmp_path):

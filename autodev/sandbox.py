@@ -109,6 +109,12 @@ def montar_cmd(spec: SandboxSpec) -> list[str]:
     cmd += ["--tmpfs", "/tmp"]
     home_efemero = preparar_home()
     cmd += ["--bind", str(home_efemero), "/tmp/home"]
+    # HAQ-001: a credencial do Codex entra SOMENTE LEITURA, montada direto do HOME
+    # real sobre o ponto de montagem vazio do HOME efêmero. O token nunca toca o
+    # disco do projeto. Vem DEPOIS do bind do HOME para ter precedência.
+    cred = Path.home() / ".codex" / "auth.json"
+    if cred.exists():
+        cmd += ["--ro-bind-try", str(cred), "/tmp/home/.codex/auth.json"]
     cmd += ["--bind", wt, wt]
     for d in (spec.rw_extra or []):
         if Path(d).exists():
@@ -124,6 +130,27 @@ def montar_cmd(spec: SandboxSpec) -> list[str]:
     # falhar 2 testes dentro do sandbox e derrubava toda task da sprint.
     cmd += ["--setenv", "AUTODEV_SANDBOX", "1"]
     return cmd
+
+
+def _limpar_copias_antigas() -> list[str]:
+    """Apaga cópias da credencial do Codex que versões anteriores deixaram.
+
+    Antes do HAQ-001 o token era COPIADO para `<projeto>/.autodev/sandbox-home/`
+    e, por tabela, para cada worktree. Aquelas cópias continuam no disco depois do
+    deploy, então a limpeza faz parte da correção. Só apaga arquivo com conteúdo —
+    o ponto de montagem vazio do HOME efêmero é preservado.
+    """
+    raiz = RAIZ_HOME_SANDBOX.parent.parent          # raiz do projeto
+    removidos: list[str] = []
+    padrao = "*/.autodev/sandbox-home/.codex/auth.json"
+    for p in (raiz / ".autodev" / "worktrees").glob(padrao):
+        try:
+            if p.stat().st_size > 0:
+                p.unlink()
+                removidos.append(str(p))
+        except OSError:
+            continue
+    return removidos
 
 
 def preparar_home() -> Path:
@@ -149,14 +176,21 @@ def preparar_home() -> Path:
     (destino / ".cache").mkdir(parents=True, exist_ok=True)
     (destino / ".gitconfig").write_text(
         "[user]\n\tname = autodev\n\temail = autodev@localhost\n", encoding="utf-8")
-    origem = Path.home() / ".codex" / "auth.json"
     alvo = destino / ".codex" / "auth.json"
-    if origem.exists():
-        try:
-            shutil.copy2(origem, alvo)
-            alvo.chmod(0o600)
-        except Exception:  # noqa: BLE001
-            pass
+    # HAQ-001 (decisão do autor, 2026-09-27): NENHUMA credencial é copiada para
+    # dentro do projeto. O arquivo abaixo existe apenas como PONTO DE MONTAGEM —
+    # o `--ro-bind` do montar_cmd o substitui, dentro do sandbox, pelo auth.json
+    # real (somente leitura). Antes o token era copiado para cá e 11 cópias
+    # chegaram a existir entre o projeto e os worktrees: o .gitignore e a barreira
+    # de commit impediam o vazamento PELO GIT, não a exposição no disco.
+    try:
+        if alvo.exists() or alvo.is_symlink():
+            alvo.unlink()
+        alvo.write_text("", encoding="utf-8")
+        alvo.chmod(0o600)
+    except OSError:
+        pass
+    _limpar_copias_antigas()
     # config.toml também é necessário: sem ele o CLI perde defaults de modelo e
     # de sandbox e pode falhar ou se comportar de forma diferente do esperado.
     # Não contém segredo — são só preferências.

@@ -1,51 +1,81 @@
-# DEVFACTORY — catálogo de modelos e escada de escalonamento
+# DEVFACTORY — catálogo de modelos e escadas de escalonamento
 # Fonte da verdade para qual modelo/effort usar em cada papel e cada tentativa.
 # Inspecionado de ~/.codex/models_cache.json e ~/.codex/config.toml em 2026-09-26.
+# Escadas de implementação e de revisão padronizadas pelo autor em 2026-09-27.
 
 codex:
   # Ordem crescente de custo/capacidade, validada contra os modelos que a conta expõe.
   # NÃO inventar nomes: só os slugs abaixo existem.
+  # Matriz aprovada (2026-09-27): luna/low -> terra/low -> sol/low -> sol/medium -> astra/low
   ladder:
-    - slug: gpt-5.6-luna      # default do sprint — mais barato
+    - slug: gpt-5.6-luna
       effort: low
       tier: 0
-    - slug: gpt-5.6-luna
-      effort: medium
-      tier: 1
     - slug: gpt-5.6-terra
-      effort: medium
+      effort: low
+      tier: 1
+    - slug: gpt-5.6-sol
+      effort: low
       tier: 2
     - slug: gpt-5.6-sol
-      effort: high
+      effort: medium
       tier: 3
-    - slug: gpt-5.5
-      effort: high
-      tier: 4
     - slug: gpt-6-astra
-      effort: high
-      tier: 5
+      effort: low
+      tier: 4
   default:
     slug: gpt-5.6-luna
     effort: low
   efforts_validos: [none, low, medium, high, xhigh, max]
 
 agy:
-  # Antigravity expõe effort como low|medium|high no ask-agy.
+  # O Antigravity identifica o modelo por RÓTULO e o effort já vem DENTRO do
+  # rótulo ("Gemini 3.8 Flash (Low)"). Passar -e junto devolve
+  # "invalid model selection: --effort is not supported" — verificado na máquina
+  # em 2026-09-27. Por isso o effort fica embutido no nome, aqui e na escada de
+  # revisão, e nunca como flag.
   default:
     modelo: null          # null = usa o que estiver salvo no agy
-    effort: low
-  esforcos_validos: [low, medium, high]
+    effort: null
+  esforcos_validos: []
 
 hermes:
-  # Papel: orquestração barata — planejamento, roteamento, classificação de falha,
-  # sumarização de log, revisão simples e geração de relatório.
-  modelo: deepseek-v4-flash
+  # Papel: orquestração barata (planejamento, roteamento, classificação de falha,
+  # sumarização de log, relatório) e, nas tentativas 4 e 5, REVISÃO de verdade.
+  # Invocação headless: `hermes -z "<prompt>" -m <modelo>`.
+  modelo: deepseek-flash
   papel: orquestracao
+  modelos_validos: [deepseek-flash, deepseek-v4-pro]
 
 # Papéis arquiteturais (seção 8 do spec)
 papeis:
-  orquestrador:      {agente: hermes,  modelo: deepseek-v4-flash}
+  orquestrador:      {agente: hermes,  modelo: deepseek-flash}
   codificador_1:     {agente: codex,   modelo: gpt-5.6-luna, effort: low}
-  codificador_2:     {agente: agy,     modelo: null,          effort: low}
+  codificador_2:     {agente: agy,     modelo: null}
   revisor_de_codex:  {agente: agy,     modelo: null}
   revisor_de_agy:    {agente: codex,   modelo: gpt-5.6-luna, effort: low, sandbox: read-only}
+
+# --- Escada de REVISÃO por tentativa (matriz do autor, 2026-09-27) --------------
+#   1ª  codex luna/low    & agy Gemini 3.6 Flash (Low)
+#   2ª  codex terra/low   & agy Gemini 3.7 Flash (Low)
+#   3ª  codex sol/low     & agy Gemini 3.8 Flash (Low)
+#   4ª  codex sol/medium  & Hermes deepseek-flash
+#   5ª  codex astra/low   & Hermes deepseek-v4-pro   (última sem intervenção humana)
+# Quem implementa continua nunca revisando a própria entrega: nas tentativas 4 e 5
+# o revisor é o Hermes, que não codifica nenhuma task do sprint.
+revisao:
+  1: {agente: agy,    modelo: "Gemini 3.6 Flash (Low)"}
+  2: {agente: agy,    modelo: "Gemini 3.7 Flash (Low)"}
+  3: {agente: agy,    modelo: "Gemini 3.8 Flash (Low)"}
+  4: {agente: hermes, modelo: deepseek-flash}
+  5: {agente: hermes, modelo: deepseek-v4-pro}
+  # Quem entra no lugar quando o revisor da tentativa não pode rodar (cota do AGY
+  # esgotada, wrapper ausente, saída ilegível). É uma CADEIA, e a regra do autor
+  # (2026-09-27) é: o revisor nunca é motivo de parada do sprint — tenta o próximo
+  # da cadeia e, no pior caso, o portão determinístico decide. Cada troca fica
+  # REGISTRADA na tentativa (`origem` da revisão), nunca em silêncio, e jamais
+  # vira "aprovado por padrão".
+  reserva_cadeia:
+    - {agente: hermes, modelo: deepseek-flash}
+    - {agente: hermes, modelo: deepseek-v4-pro}
+  reserva: {agente: hermes, modelo: deepseek-flash}

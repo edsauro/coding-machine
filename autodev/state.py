@@ -370,6 +370,53 @@ class StateStore:
             (motivo, time.time(), sprint_id, task_id))
         self.evento(sprint_id, task_id, "bloqueado", {"motivo": motivo})
 
+    # ------------------------------------------------------- reabertura/desbloqueio
+    def reabrir_sprint(self, sprint_id: str, *, motivo: str = "") -> str:
+        """Devolve o sprint a EM_EXECUCAO depois de uma rodada que terminou.
+
+        O laço do orquestrador grava 'FIM' no `sprint_state` quando sai (é o fim
+        de UMA rodada), e `FIM` não é estado válido do ciclo de vida do sprint.
+        Sem esta reabertura, retomar um sprint parado é impossível: qualquer
+        transição a partir de 'FIM' é recusada pela máquina de estados.
+        """
+        atual = self.estado_sprint(sprint_id)
+        anterior = self.ler_checkpoint(sprint_id) or {}
+        onda = anterior.get("ultima_onda")
+        self.checkpoint(sprint_id, "EM_EXECUCAO",
+                        {**(anterior.get("checkpoint") or {}),
+                         "motivo": motivo or "reaberto para nova rodada"}, onda)
+        self.evento(sprint_id, None, "sprint_reaberto",
+                    {"de": atual, "para": "EM_EXECUCAO", "motivo": motivo})
+        return atual or ""
+
+    def reabrir_tasks(self, sprint_id: str, task_ids: list[str], *,
+                      tentativas: int = 0, motivo: str = "") -> list[str]:
+        """Devolve tasks BLOCKED/FAILED para QUEUED com o contador no degrau pedido.
+
+        O contador de tentativas é o que escolhe o modelo (escalonamento por
+        tentativa): reabrir com tentativas=2 faz a PRÓXIMA tentativa ser a 3ª da
+        escada, e não a 1ª. Reabrir com 0 recomeça do degrau mais barato.
+        """
+        reabertas: list[str] = []
+        for tid in task_ids:
+            row = self.conn.execute(
+                "SELECT estado, tentativas FROM tasks WHERE sprint_id=? AND task_id=?",
+                (sprint_id, tid)).fetchone()
+            if not row:
+                continue
+            self.conn.execute(
+                "UPDATE tasks SET estado='QUEUED', tentativas=?, tier_atual=?,"
+                " bloqueio=NULL, atualizado_em=?"
+                " WHERE sprint_id=? AND task_id=?",
+                (tentativas, tentativas, time.time(), sprint_id, tid))
+            self.evento(sprint_id, tid, "reaberto",
+                        {"de": row["estado"], "para": "QUEUED",
+                         "tentativas_antes": row["tentativas"],
+                         "tentativas": tentativas, "motivo": motivo})
+            reabertas.append(tid)
+        self.conn.commit()
+        return reabertas
+
     # ---------------------------------------------------------------- tentativas
     def proxima_tentativa(self, sprint_id: str, task_id: str) -> int:
         r = self.conn.execute(
@@ -459,6 +506,26 @@ class StateStore:
         if novo:
             self.evento(sprint_id, task_id, "haq_criado", {"haq_id": haq_id})
         return novo
+
+    def haq_resolver(self, sprint_id: str, haq_id: str, *, resultado: str = "",
+                     verificacao: str = "") -> bool:
+        """Fecha uma HAQ com a decisão registrada. False se ela não existia.
+
+        A fila humana precisa de um caminho de SAÍDA: sem isto, uma HAQ decidida
+        continua contando como atenção humana no HAR para sempre.
+        """
+        r = self.conn.execute("SELECT haq_id FROM haq WHERE haq_id=?",
+                              (haq_id,)).fetchone()
+        if not r:
+            return False
+        self.conn.execute(
+            "UPDATE haq SET status='DONE', resultado=COALESCE(NULLIF(?, ''),"
+            " resultado), verificacao=COALESCE(NULLIF(?, ''), verificacao)"
+            " WHERE haq_id=?", (resultado, verificacao, haq_id))
+        self.evento(sprint_id, None, "haq_resolvido",
+                    {"haq_id": haq_id, "resultado": resultado})
+        self.conn.commit()
+        return True
 
     def haq_listar(self, sprint_id: str) -> list[sqlite3.Row]:
         return list(self.conn.execute(

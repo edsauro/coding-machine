@@ -241,6 +241,42 @@ def cmd_evidenciar(args) -> int:
     return 0
 
 
+def cmd_desbloquear(args) -> int:
+    """Reabre tasks bloqueadas para uma nova rodada, no degrau pedido.
+
+    Não executa nada: devolve o sprint a EM_EXECUCAO e as tasks a QUEUED, com o
+    contador de tentativas no valor pedido — é o contador que escolhe o modelo
+    (escalonamento). `--tentativas 2` faz a próxima tentativa ser a 3ª da escada.
+    """
+    from .config import Config
+    cfg = Config.carregar()
+    maximo = cfg.policies["retry"]["max_tentativas_implementacao"]
+    if args.tentativas >= maximo:
+        print(f"RECUSADO: --tentativas {args.tentativas} >= maximo {maximo} —"
+              " a task bloquearia de novo na primeira checagem.")
+        return 1
+    with _store(RAIZ) as st:
+        tasks = st.tasks(args.sprint)
+        alvos = args.tasks or [t["task_id"] for t in tasks if t["estado"] == "BLOCKED"]
+        if not alvos:
+            print("nenhuma task bloqueada para reabrir")
+            return 0
+        de = st.reabrir_sprint(args.sprint,
+                               motivo=f"desbloqueio para nova rodada: {', '.join(alvos)}")
+        feitas = st.reabrir_tasks(args.sprint, alvos, tentativas=args.tentativas,
+                                  motivo=args.motivo or "desbloqueio manual")
+        prox = cfg.modelo_para_tentativa(args.tentativas + 1)
+        revisor = cfg.revisor_para_tentativa(args.tentativas + 1)
+        print(f"sprint {args.sprint}: {de or '(sem estado)'} -> EM_EXECUCAO")
+        print(f"  tasks reabertas ({len(feitas)}): {', '.join(feitas)}")
+        print(f"  contador de tentativas: {args.tentativas}/{maximo}"
+              f"  =>  proxima tentativa e a {args.tentativas + 1}a da escada")
+        print(f"  modelo da proxima tentativa: {prox.get('slug')}/{prox.get('effort')}")
+        print(f"  revisor da proxima tentativa: {revisor.get('agente') or '-'}"
+              f"{' (' + revisor['modelo'] + ')' if revisor.get('modelo') else ''}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
     p.add_argument("--sprint", default=SPRINT_PADRAO)
@@ -285,6 +321,15 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("-c", "--comando", default="")
     s.add_argument("--commit", default="")
     s.set_defaults(fn=cmd_evidenciar)
+
+    s = sub.add_parser("desbloquear",
+                       help="reabre tasks bloqueadas para uma nova rodada")
+    s.add_argument("tasks", nargs="*",
+                   help="task ids (padrao: todas as BLOCKED do sprint)")
+    s.add_argument("--tentativas", type=int, default=0,
+                   help="contador inicial: 2 => a proxima tentativa e a 3a da escada")
+    s.add_argument("--motivo", default="")
+    s.set_defaults(fn=cmd_desbloquear)
 
     s = sub.add_parser("stop")
     s.add_argument("nivel", choices=["STOP_ALL", "STOP_PROJECT", "STOP_SPRINT",

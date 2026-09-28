@@ -95,6 +95,38 @@ class Config:
     def classes_sem_escalonamento(self) -> set[str]:
         return set(self.policies["retry"]["classes_sem_escalonamento"])
 
+    # -- escada de revisão (matriz de 2026-09-27) ----------------------------
+    def revisor_para_tentativa(self, tentativa: int) -> dict:
+        """Tentativa N -> revisor da escada de revisão.
+
+        1-3 = AGY Gemini 3.6/3.7/3.8 Flash; 4-5 = Hermes deepseek-flash/pro.
+        Devolve {} quando não há escada configurada — aí vale a revisão cruzada
+        da spec §16, que é o comportamento antigo.
+        """
+        escada = self.models.get("revisao") or {}
+        entrada = escada.get(tentativa)
+        if entrada is None:
+            entrada = escada.get(str(tentativa))
+        return dict(entrada) if isinstance(entrada, dict) else {}
+
+    def revisor_reserva(self) -> dict:
+        """Revisor que entra quando o da tentativa não pode rodar."""
+        reserva = (self.models.get("revisao") or {}).get("reserva") or {}
+        return dict(reserva) if isinstance(reserva, dict) else {}
+
+    def revisor_reserva_cadeia(self) -> list[dict]:
+        """CADEIA de reserva — o revisor nunca é motivo de parada do sprint.
+
+        Ordem: agy da tentativa (se falhar) -> Hermes flash -> Hermes pro ->
+        portão determinístico. Cada troca fica registrada na revisão.
+        """
+        rev = self.models.get("revisao") or {}
+        cadeia = rev.get("reserva_cadeia")
+        if isinstance(cadeia, list) and cadeia:
+            return [dict(c) for c in cadeia if isinstance(c, dict) and c.get("agente")]
+        r = rev.get("reserva")
+        return [dict(r)] if isinstance(r, dict) and r.get("agente") else []
+
     def espera_cota(self, modo_teste: bool = False) -> int:
         c = self.policies["cota_codex"]
         return c["espera_teste_segundos"] if modo_teste else c["espera_padrao_segundos"]

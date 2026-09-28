@@ -446,8 +446,9 @@ class Orquestrador:
                 titulo=spec["titulo"], criterios=criterios,
                 testes=rt.saida[-3000:], agente_impl=agente, cfg=self.cfg,
                 disponiveis=self.disponiveis,
-                log_dir=str(self.dir_sprint / "logs"))
-            self.log(f"{task_id}: revisao por {rv.revisor} -> {rv.veredito} "
+                log_dir=str(self.dir_sprint / "logs"), tentativa=att)
+            self.log(f"{task_id}: revisao por {rv.revisor} "
+                     f"[{rv.origem or 'cruzada'}] -> {rv.veredito} "
                      f"({len(rv.findings)} findings)")
             if not rv.aprovado:
                 fp = retry.fingerprint(task_id, "REVIEW_FAILURE", rv.resumo, alterados)

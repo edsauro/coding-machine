@@ -13,12 +13,15 @@
   ```bash
   # decidir se a copia continua. Alternativas: (a) manter, com o .gitignore + barreira de commit ja implementados; (b) montar ~/.codex/auth.json somente-leitura no sandbox, sem copia; (c) usar um HOME com credencial de escopo reduzido.
   ```
-- **Expected result:** Decisao registrada e, se for o caso, sandbox.py ajustado.
+- **Expected result:** Decisao do autor (2026-09-27): montar ~/.codex/auth.json como SOMENTE LEITURA no HOME efemero, sem copia. Implementado: preparar_home() deixa um ponto de montagem vazio e montar_cmd() faz --ro-bind-try do auth.json real; _limpar_copias_antigas() apagou as 11 copias do token que existiam no disco do projeto e dos worktrees.
 - **How Hermes verifies completion:**
   ```bash
-  # git check-ignore -v .autodev/sandbox-home/.codex/auth.json  # deve casar com o .gitignore
+  # nenhuma copia com conteudo no projeto:
+find ~/Code/Coding_Machine -name auth.json -size +0c | wc -l   # -> 0
+# a credencial chega ao sandbox somente leitura (ro-bind presente):
+.venv/bin/python -c "from autodev import sandbox;print('ro-bind-try' in ' '.join(sandbox.montar_cmd(sandbox.SandboxSpec(worktree='/tmp'))))"   # -> True
   ```
-- **Status:** OPEN
+- **Status:** DONE
 
 ## HAQ-002
 - **Task:** (sprint)

@@ -37,6 +37,12 @@ WRAPPERS = {
             # sem unidade ele falha com "missing unit in duration". Bug real
             # encontrado na aceitação com o AGY de verdade.
             "timeout_fmt": "{n}s"},
+    # O Hermes entra aqui como REVISOR de verdade (LLM), não como codificador:
+    # `hermes -z "<prompt>" -m <modelo>` roda uma sessão headless. Diferenças que
+    # o adaptador precisa respeitar: o prompt vai como ARGUMENTO de -z (o CLI não
+    # lê prompt por stdin) e não existem -d/--timeout/-f.
+    "hermes": {"cmd": "hermes", "flags": {"modelo": "-m", "oneshot": "-z"},
+               "timeout_fmt": "{n}", "prompt_arg": True},
 }
 SANDBOX_FLAG = {"codex": {"editar": "workspace-write", "ler": "read-only"},
                 "agy": {"editar": "accept-edits", "ler": "plan"}}
@@ -135,44 +141,55 @@ def invocar(inv: Invocacao, cfg) -> Resultado:
                          duracao=time.time() - t0)
 
     w = WRAPPERS[inv.agente]
-    cmd = [w["cmd"]]
     modelo = inv.modelo
     effort = inv.effort
-    if modelo:
-        cmd += [w["flags"]["modelo"], modelo]
-        res_modelo = modelo
-    else:
-        res_modelo = "(default do agente)"
-    if effort:
-        cmd += [w["flags"]["effort"], effort]
-        res_effort = effort
-    else:
-        res_effort = "(default)"
-    cmd += [w["flags"]["dir"], inv.worktree]
-    cmd += [w["flags"]["timeout"], w["timeout_fmt"].format(n=inv.timeout)]
-    if inv.agente == "codex":
-        cmd += [w["flags"]["sandbox"],
-                SANDBOX_FLAG["codex"]["editar" if inv.edita else "ler"]]
-    else:
-        cmd += [w["flags"]["modo"],
-                SANDBOX_FLAG["agy"]["editar" if inv.edita else "ler"]]
-        if inv.edita:
-            # O AGY só edita de fato em modo headless com -D. É seguro AQUI
-            # porque toda execução de agente roda dentro do worktree + bwrap
-            # (HOME real fora de alcance). Sem isto, a edição simplesmente não
-            # acontece e a task falha sem motivo aparente.
-            cmd += [w["flags"]["permissao"]]
+    res_effort = "(default)"
+    if w.get("prompt_arg"):
+        # Revisor Hermes: prompt no argumento, sem -d/--timeout/-f (não existem)
+        # e sem -e (effort do Hermes não é flag de CLI). O teto de tempo é o do
+        # próprio subprocess.
+        cmd = [w["cmd"]]
+        if modelo:
+            cmd += [w["flags"]["modelo"], modelo]
+            res_modelo = modelo
         else:
-            # Mesmo em modo plano/revisão o AGY headless precisa de -D: qualquer
-            # ferramenta exige a permissão "command", que o modo headless não
-            # consegue pedir e AUTO-NEGA em silêncio (stdout vazio, exit 0).
-            # Achado real da aceitação. A mitigação é o sandbox, que é
-            # exatamente o uso que a própria documentação do AGY recomenda.
-            cmd += [w["flags"]["permissao"]]
-    # prompt via stdin — evita estourar o limite de argumento e não vaza no ps.
-    # O wrapper lê stdin com `-f -`, NÃO com um `-` solto (que ele rejeita como
-    # opção desconhecida). Bug real encontrado no teste com o Codex de verdade.
-    cmd += [w["flags"]["arquivo"], "-"]
+            res_modelo = "(default do agente)"
+        cmd += [w["flags"]["oneshot"], inv.prompt]
+    else:
+        cmd = [w["cmd"]]
+        if modelo:
+            cmd += [w["flags"]["modelo"], modelo]
+            res_modelo = modelo
+        else:
+            res_modelo = "(default do agente)"
+        if effort:
+            cmd += [w["flags"]["effort"], effort]
+            res_effort = effort
+        cmd += [w["flags"]["dir"], inv.worktree]
+        cmd += [w["flags"]["timeout"], w["timeout_fmt"].format(n=inv.timeout)]
+        if inv.agente == "codex":
+            cmd += [w["flags"]["sandbox"],
+                    SANDBOX_FLAG["codex"]["editar" if inv.edita else "ler"]]
+        else:
+            cmd += [w["flags"]["modo"],
+                    SANDBOX_FLAG["agy"]["editar" if inv.edita else "ler"]]
+            if inv.edita:
+                # O AGY só edita de fato em modo headless com -D. É seguro AQUI
+                # porque toda execução de agente roda dentro do worktree + bwrap
+                # (HOME real fora de alcance). Sem isto, a edição simplesmente não
+                # acontece e a task falha sem motivo aparente.
+                cmd += [w["flags"]["permissao"]]
+            else:
+                # Mesmo em modo plano/revisão o AGY headless precisa de -D: qualquer
+                # ferramenta exige a permissão "command", que o modo headless não
+                # consegue pedir e AUTO-NEGA em silêncio (stdout vazio, exit 0).
+                # Achado real da aceitação. A mitigação é o sandbox, que é
+                # exatamente o uso que a própria documentação do AGY recomenda.
+                cmd += [w["flags"]["permissao"]]
+        # prompt via stdin — evita estourar o limite de argumento e não vaza no ps.
+        # O wrapper lê stdin com `-f -`, NÃO com um `-` solto (que ele rejeita como
+        # opção desconhecida). Bug real encontrado no teste com o Codex de verdade.
+        cmd += [w["flags"]["arquivo"], "-"]
 
     try:
         p = subprocess.run(cmd, input=inv.prompt, capture_output=True, text=True,
