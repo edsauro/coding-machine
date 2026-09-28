@@ -30,7 +30,10 @@ class PlanoInvalido(ValueError):
 
 
 def parsear_plano(texto: str) -> Plano:
-    """Converte o primeiro objeto JSON com tasks encontrado em um Plano."""
+    """Converte um objeto JSON com ``tasks`` encontrado no texto em ``Plano``."""
+    if not isinstance(texto, str):
+        raise PlanoInvalido("resposta sem JSON reconhecível")
+
     decoder = json.JSONDecoder()
     objetos: list[dict] = []
 
@@ -47,16 +50,54 @@ def parsear_plano(texto: str) -> Plano:
     if not objetos:
         raise PlanoInvalido("resposta sem JSON reconhecível")
 
-    dados = next((objeto for objeto in objetos if "tasks" in objeto), None)
-    if dados is None:
+    candidatos = [objeto for objeto in objetos if "tasks" in objeto]
+    if not candidatos:
         raise PlanoInvalido("JSON sem a chave tasks")
 
-    try:
-        tasks = [TaskPlano(**task) for task in dados["tasks"]]
-        campos = {**dados, "tasks": tasks}
-        return Plano(**campos)
-    except (TypeError, KeyError) as erro:
-        raise PlanoInvalido(f"estrutura do plano inválida: {erro}") from erro
+    ultimo_erro: (TypeError | KeyError | ValueError) | None = None
+    for dados in candidatos:
+        try:
+            tasks_brutas = dados["tasks"]
+            if not isinstance(tasks_brutas, list):
+                raise TypeError("tasks deve ser uma lista")
+
+            tasks = [_construir_task(task) for task in tasks_brutas]
+            campos = {
+                nome: dados[nome]
+                for nome in ("titulo", "objetivo", "repositorio", "prompt_original")
+            }
+            for nome, valor in campos.items():
+                if not isinstance(valor, str):
+                    raise TypeError(f"{nome} deve ser uma string")
+            return Plano(**campos, tasks=tasks)
+        except (TypeError, KeyError, ValueError) as erro:
+            ultimo_erro = erro
+
+    raise PlanoInvalido(f"estrutura do plano inválida: {ultimo_erro}") from ultimo_erro
+
+
+def _construir_task(dados: object) -> TaskPlano:
+    """Valida os tipos de uma task e ignora metadados desconhecidos."""
+    if not isinstance(dados, dict):
+        raise TypeError("cada task deve ser um objeto")
+
+    campos = {
+        nome: dados[nome]
+        for nome in ("id", "titulo", "criterios")
+    }
+    campos["deps"] = dados.get("deps", [])
+    campos["agente"] = dados.get("agente", "codex")
+    campos["teste"] = dados.get("teste", "")
+
+    for nome in ("id", "titulo", "agente", "teste"):
+        if not isinstance(campos[nome], str):
+            raise TypeError(f"{nome} deve ser uma string")
+    for nome in ("criterios", "deps"):
+        valor = campos[nome]
+        if not isinstance(valor, list) or not all(isinstance(item, str) for item in valor):
+            raise TypeError(f"{nome} deve ser uma lista de strings")
+
+    return TaskPlano(**campos)
 
 
 def validar_plano(plano: Plano) -> list[str]:
