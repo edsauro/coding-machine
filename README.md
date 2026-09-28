@@ -186,8 +186,9 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 
 ## Estado atual
 
-- Para medir a suíte do orquestrador, rode com o interpretador do projeto
-  (o runner resolve `python3` para o ambiente virtual):
+- Para medir a suíte do orquestrador no terminal, rode
+  `.venv/bin/python -m pytest .autodev/tests/ -q`. Dentro do runner, que resolve
+  `python3` para o ambiente virtual, o comando equivalente é
   `python3 -m pytest .autodev/tests/ -q`.
 - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
   ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
@@ -200,7 +201,7 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
   de verdade. O banco marca cada caso com `origem` e o relatório diz isso na
   primeira seção.
 - **Aceitação ponta a ponta com agentes reais: verde.** Executada em ~2,5 min:
-  o Codex implementou o projeto-fixture, os 8 testes passaram, o **AGY revisou e
+  o Codex implementou o projeto-fixture, todos os testes passaram, o **AGY revisou e
   aprovou** (1 apontamento), os portões de integração passaram e a `main` ficou
   intacta (mesmo commit antes e depois).
 - **Dois itens abertos no HAQ** (`.autodev/sprints/DEVFACTORY-001/HAQ.md`).

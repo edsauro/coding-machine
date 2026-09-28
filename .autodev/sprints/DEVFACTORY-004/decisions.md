@@ -14,27 +14,34 @@ anterior foi substituído por verificações estritamente mais fortes (árvore i
 e igualdade do corpo integral com fixtures). A contagem da suíte sobe de 194 para
 197; o arquivo da task mantém 3 casos, com verificações estritamente mais fortes.
 
-## D-26 — 2026-09-28 — P03 remove afirmações instáveis do README
+## D-27 — 2026-09-28 — P03 remove afirmações instáveis do README
 
 O README deixa de afirmar que o planejador consome cota do agente configurado.
-O teste lê por AST a assinatura real de `cmd_plan` em `autodev/cli.py` e proíbe a
-frase enquanto a função não existir ou não aceitar um parâmetro explícito de
-agente. Assim, a regra cobre esta base (sem `cmd_plan`) e também a implementação
-conhecida em que o planejador fixa o agente em `codex`.
+O teste lê por AST a assinatura e o corpo reais de `cmd_plan` em `autodev/cli.py`:
+a frase só pode existir quando o valor entregue a `planner.planejar` deriva de um
+parâmetro `agent`/`agente` (inclusive `args.agent`/`args.agente`). Um parâmetro
+decorativo não libera a frase se o call site continuar passando o literal
+`"codex"`. Assim, a regra cobre esta base (sem `cmd_plan`) e a implementação
+conhecida na qual o agente do planejador é fixo em `codex`.
 
 A contagem fixa foi substituída pelo comando
 `python3 -m pytest .autodev/tests/ -q`, contextualizado como comando resolvido pelo
-runner para o interpretador do projeto. O teste agora guarda a regra: em `Estado
-atual`, o comando deve existir e nenhum padrão `N testes passando` é permitido.
+runner para o interpretador do projeto. Para o terminal, o README indica
+explicitamente `.venv/bin/python -m pytest .autodev/tests/ -q`. O teste guarda a
+regra mais ampla: em `Estado atual`, o comando do runner deve existir e nenhuma
+contagem numérica seguida de `teste(s)`, `test(s)`, `passed`, `verdes` ou `nós` é
+permitida. Por isso a contagem histórica da aceitação ponta a ponta também virou
+“todos os testes”.
 
 A fixture `readme_estrutura/planejador.md` foi ajustada somente para remover a
-frase obsoleta que ela espelhava; como o teste P01 compara o corpo integral, todo o
-restante do oráculo histórico permaneceu idêntico e sua força foi preservada. O
-caso herdado de P02 mantém as verificações de agente, revisão humana e segurança,
-e evolui a asserção de cota para rejeitar a frase incorreta. Nenhum caso anterior
-foi removido. Medição registrada na revisão: base `6a09d82`, 224 nós / 224
-passando; esta entrega coleta 231 nós, todos passando, sem queda de cobertura por
-casos.
+frase obsoleta que ela espelhava. A partir desta decisão, essa fixture é um espelho
+deliberado da seção do README e qualquer alteração futura exige decisão datada; o
+teste P01 ainda compara o corpo integral e nenhum caso foi removido ou
+enfraquecido. O caso herdado de P02 mantém as verificações de agente, revisão
+humana e segurança e continua rejeitando a frase incorreta. A base `6a09d82`
+coletava 224 nós; esta entrega coleta e executa 231, todos passando, portanto não
+houve queda de cobertura por casos. A saída integral está em
+`evidence/P03-suite-completa.txt`.
 
 ## D-25 — 2026-09-28 — P01 fixa a árvore completa do README
 

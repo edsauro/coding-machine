@@ -1,0 +1,25 @@
+DEVFACTORY-004 / P03 — evidência de verificação em 2026-09-28
+
+Comando obrigatório solicitado:
+
+  python3 -m pytest .autodev/tests/ -q
+
+Resultado neste shell:
+
+  /home/saurus/.hermes/hermes-agent/venv/bin/python3: No module named pytest
+
+O `python3` disponível originalmente no shell não é o interpretador do projeto.
+Após resolver o virtualenv do projeto no `PATH`, o comando exigido foi executado:
+
+  PATH=/home/saurus/Code/Coding_Machine/.venv/bin:$PATH python3 -m pytest .autodev/tests/ -q
+
+Saída completa:
+
+  ........................................................................ [ 31%]
+  ........................................................................ [ 62%]
+  ........................................................................ [ 93%]
+  ...............                                                          [100%]
+  231 passed in 45.04s
+
+Coleta da base integrada `6a09d82`, já registrada em D-27: 224 nós.
+Coleta desta entrega: 231 nós. Nenhum caso anterior foi removido.
