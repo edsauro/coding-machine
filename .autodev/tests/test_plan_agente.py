@@ -50,18 +50,29 @@ def test_planejar_devolve_plano_usando_driver_falso(tmp_path, monkeypatch):
 
     assert plano.titulo == "API planejada"
     assert plano.tasks[0].id == "P01"
+    assert plano.prompt_original == "Planeje uma API"
 
 
-def test_planejar_grava_prompt_e_resposta_no_log_do_sprint(tmp_path, monkeypatch):
-    logs = _preparar_sprint(tmp_path, "DEVFACTORY-012")
-    resposta = _resposta_valida()
-    _configurar_fake(monkeypatch, tmp_path, resposta)
+def test_planejar_grava_cada_prompt_e_resposta_no_sprint_mais_recente(
+    tmp_path, monkeypatch
+):
+    logs_antigos = _preparar_sprint(tmp_path, "DEVFACTORY-999")
+    logs = _preparar_sprint(tmp_path, "DEVFACTORY-1000")
+    primeira_resposta = _resposta_valida()
+    _configurar_fake(monkeypatch, tmp_path, primeira_resposta)
 
-    planejar(tmp_path, "Pedido auditável", "agy")
+    planejar(tmp_path, "Primeiro pedido auditável", "agy")
+
+    segunda_resposta = primeira_resposta.replace("API planejada", "API revisada")
+    _configurar_fake(monkeypatch, tmp_path, segunda_resposta)
+    planejar(tmp_path, "Segundo pedido auditável", "agy")
 
     auditoria = (logs / "plano-agy.log").read_text(encoding="utf-8")
-    assert "Pedido auditável" in auditoria
-    assert resposta in auditoria
+    assert "Primeiro pedido auditável" in auditoria
+    assert primeira_resposta in auditoria
+    assert "Segundo pedido auditável" in auditoria
+    assert segunda_resposta in auditoria
+    assert not (logs_antigos / "plano-agy.log").exists()
 
 
 def test_planejar_propaga_cota_esgotada(tmp_path, monkeypatch):
@@ -75,10 +86,27 @@ def test_planejar_propaga_cota_esgotada(tmp_path, monkeypatch):
         planejar(tmp_path, "Planeje sem esconder a cota", "codex")
 
 
+def test_planejar_nao_converte_falha_do_agente_em_plano_invalido(
+    tmp_path, monkeypatch
+):
+    _preparar_sprint(tmp_path)
+    spec = tmp_path / "crash.json"
+    spec.write_text(json.dumps({"acao": "crash"}), encoding="utf-8")
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
+
+    with pytest.raises(RuntimeError, match=r"AGENT_CRASH.*exit_code=137"):
+        planejar(tmp_path, "Planeje", "codex")
+
+
 def test_planejar_cita_inicio_da_resposta_sem_json(tmp_path, monkeypatch):
     _preparar_sprint(tmp_path)
-    resposta = "RESPOSTA INESPERADA: nenhum plano foi produzido"
+    resposta = "INICIO DA RESPOSTA " + ("x" * 200) + " MARCADOR NO FIM"
     _configurar_fake(monkeypatch, tmp_path, resposta)
 
-    with pytest.raises(PlanoInvalido, match="RESPOSTA INESPERADA"):
+    with pytest.raises(PlanoInvalido) as capturada:
         planejar(tmp_path, "Planeje", "codex")
+
+    mensagem = str(capturada.value)
+    assert "INICIO DA RESPOSTA" in mensagem
+    assert "MARCADOR NO FIM" not in mensagem
