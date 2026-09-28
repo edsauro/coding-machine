@@ -35,11 +35,11 @@ def test_readme_documenta_comando_plan_e_efeito_no_disco():
     assert ".autodev/sprints/" in secao
 
 
-def test_readme_alerta_sobre_agente_cota_e_revisao_humana():
+def test_readme_alerta_sobre_agente_e_revisao_humana_sem_cota_incorreta():
     secao = _secao_planejador().lower()
 
     assert "agente" in secao
-    assert "consome cota" in secao
+    assert "consome cota do agente configurado" not in secao
     assert "revisão humana" in secao
     assert "sempre" in secao
     assert "antes de rodar" in secao

@@ -158,8 +158,7 @@ Por exemplo:
 ```
 
 O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
-contendo os três arquivos acima. Como o planejador usa um agente, cada execução
-consome cota do agente configurado. O plano gerado **sempre precisa de revisão
+contendo os três arquivos acima. O plano gerado **sempre precisa de revisão
 humana antes de rodar**: a validação estrutural não garante que a interpretação
 do pedido ou os critérios de aceitação estejam corretos.
 
@@ -187,7 +186,10 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 
 ## Estado atual
 
-- **Suíte do orquestrador: 123 testes passando.**
+- Para medir a suíte do orquestrador no terminal, rode
+  `.venv/bin/python -m pytest .autodev/tests/ -q`. Dentro do runner, que resolve
+  `python3` para o ambiente virtual, o comando equivalente é
+  `python3 -m pytest .autodev/tests/ -q`.
 - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
   ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
@@ -199,7 +201,7 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
   de verdade. O banco marca cada caso com `origem` e o relatório diz isso na
   primeira seção.
 - **Aceitação ponta a ponta com agentes reais: verde.** Executada em ~2,5 min:
-  o Codex implementou o projeto-fixture, os 8 testes passaram, o **AGY revisou e
+  o Codex implementou o projeto-fixture, todos os testes passaram, o **AGY revisou e
   aprovou** (1 apontamento), os portões de integração passaram e a `main` ficou
   intacta (mesmo commit antes e depois).
 - **Dois itens abertos no HAQ** (`.autodev/sprints/DEVFACTORY-001/HAQ.md`).
