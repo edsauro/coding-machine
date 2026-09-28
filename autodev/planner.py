@@ -3,7 +3,25 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
+
+from . import config
+
+
+PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
+
+# Referências textuais: o arquivo pode ainda ser criado pela sprint.
+_ARQUIVO = re.compile(
+    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+\.[A-Za-z][A-Za-z0-9]*\b"
+    r"|\b(?:Makefile|Dockerfile)\b"
+)
+_COMANDO_TESTE = re.compile(
+    r"\b(?:pytest|(?:python(?:3)?\s+-m\s+unittest)|"
+    r"(?:npm|pnpm|yarn)\s+(?:run\s+)?test|"
+    r"(?:go|cargo)\s+test|make\s+test)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -135,3 +153,30 @@ def validar_plano(plano: Plano) -> list[str]:
         if estado[task_id] == 0:
             visita(task_id)
     return erros
+
+
+def validar_e_ordenar(plano: Plano) -> list[list[str]]:
+    """Valida o DAG e os critérios e retorna ondas; índices começam em 1."""
+    dag = {"tasks": [
+        {"id": task.id, "titulo": task.titulo,
+         "criterios": task.criterios, "deps": task.deps}
+        for task in plano.tasks
+    ]}
+    erros = config.valida_dag(dag)
+    if not plano.tasks:
+        erros.append("plano sem tasks")
+
+    for task in plano.tasks:
+        for indice, criterio in enumerate(task.criterios, start=1):
+            palavras = set(re.findall(r"\w+", criterio.casefold()))
+            if (palavras.intersection(PALAVRAS_VAGAS)
+                    and not _ARQUIVO.search(criterio)
+                    and not _COMANDO_TESTE.search(criterio)):
+                erros.append(
+                    f"task {task.id}: critério {indice} vago; "
+                    "cite um arquivo ou comando de teste"
+                )
+
+    if erros:
+        raise PlanoInvalido("Plano inválido:\n  - " + "\n  - ".join(erros))
+    return config.ordem_topologica(dag)
