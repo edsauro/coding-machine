@@ -17,7 +17,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import agents, haq, integration, killswitch, report, retry, review
+from . import agents, errors, haq, integration, killswitch, report, retry, review
 from . import sandbox as sbx
 from . import testrunner
 from .config import Config, carrega_dag, carrega_sprint, ordem_topologica
@@ -423,6 +423,18 @@ class Orquestrador:
                     agente = "codex"
                     continue
                 espera = self.cfg.espera_cota(self.modo_teste)
+                # A política é um chute (5h10m). O agente costuma dizer quando a cota
+                # volta: nesta madrugada o codex avisou "try again at 9:10 AM" e o
+                # motor dormiu 5h por cima; na vez anterior, 56 min a mais. O reset
+                # informado vale só quando é MENOR que a política — a política segue
+                # como teto, para que um parse absurdo não estacione o sprint.
+                efetiva = errors.espera_efetiva(
+                    espera, f"{res.stdout or ''}\n{res.stderr or ''}")
+                if efetiva != espera:
+                    self.log(f"{task_id}: o agente informou o reset da cota em "
+                             f"{efetiva}s ({efetiva / 60:.0f} min); a política era "
+                             f"{espera}s")
+                    espera = efetiva
                 retry_after = time.time() + espera
                 esperas += 1
                 self.store.finalizar_tentativa(
@@ -440,12 +452,13 @@ class Orquestrador:
                 # salva o trabalho já feito antes de esperar
                 c = self.wm.commit(wt.caminho, f"{task_id}: checkpoint antes de "
                                                f"aguardar cota ({att})")
+                commit_ck = c or commit_atual(wt.caminho)
                 self.store.checkpoint(self.sprint, "WAITING_RESOURCE", {
                     "task_id": task_id, "attempt": att, "retry_after": retry_after,
-                    "commit": c or commit_atual(wt.caminho),
+                    "commit": commit_ck,
                     "modelo": modelo, "effort": effort}, self._onda(task_id))
                 self.log(f"{task_id}: COTA ESGOTADA — aguardando {espera}s "
-                         f"(checkpoint em {c or 'HEAD'})")
+                         f"(checkpoint em {str(commit_ck)[:8]})")
                 self.store.liberar_worktree(str(wt.caminho))
                 return ResumoTask(task_id, "WAITING_RESOURCE", n_tent, esperas,
                                   motivo="CODEX_QUOTA")
