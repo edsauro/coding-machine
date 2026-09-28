@@ -35,6 +35,7 @@ sys.path.insert(0, str(RAIZ))
 
 ARQUIVO = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|md|json|ya?ml|toml|sh|txt|cfg|ini)")
 IGNORAR = (".venv/", "site-packages/")
+COMANDO_PYTEST_VENV = re.compile(r"(?:^|[\s`'(])\.venv/bin/python(?:\s|$)")
 
 # Verbo de edicao: sem ele, a citacao do caminho e MENCAO (import, exemplo,
 # arquivo que a task apenas le), nao entrega. Sem esta distincao o verificador
@@ -131,6 +132,17 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
 
     arquivos = {t["id"]: extrair_arquivos(t) for t in tasks}      # mencoes (E4)
     tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (E2/E3/A1/A2)
+
+    # E5 — o runner resolve `python3` para o interpretador do projeto. Um
+    # caminho de venv relativo aponta para o worktree, onde esse venv não existe.
+    for t in tasks:
+        texto_comandos = "\n".join(t.get("criterios", []) + [t.get("teste", "") or ""])
+        if COMANDO_PYTEST_VENV.search(texto_comandos):
+            erros.append(
+                f"E5: {t['id']} usa caminho de venv relativo no comando de teste; "
+                "o worktree nao tem venv — use python3 -m pytest ..."
+            )
+
     teste_de: dict[str, set[str]] = {i: {a for a in f if e_arquivo_de_teste(a)}
                                      for i, f in tocados.items()}
     onda_de: dict[str, int] = {}
