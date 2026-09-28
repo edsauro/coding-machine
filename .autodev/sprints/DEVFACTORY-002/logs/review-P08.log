@@ -1,160 +1,182 @@
-# exit_code=3 duracao=151.7s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+# exit_code=0 duracao=173.8s modelo=deepseek-flash effort=(default) failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
 Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
 
 ## Criterios de aceitacao do Sprint
-- existe o teste test_aceitacao_do_planejador em .autodev/tests/test_acceptance.py
+- existe o teste test_aceitacao_do_planejador em .autodev/tests/test_plan_aceitacao.py
 - o teste usa o driver falso para devolver um plano com 3 tasks e nao gasta cota real
 - o teste prova que o sprint escrito em tmp_path passa a validacao do autodev init sem erro
 - o teste prova que o dag.json gerado e aceito por ordem_topologica e produz pelo menos 2 ondas
 - o teste prova que um plano com criterio vago e recusado com mensagem que cita a task
 - o teste roda a suite do sprint gerado com o driver falso e prova que as tasks executam de ponta a ponta
-- os testes ficam em .autodev/tests/test_acceptance.py
+- os testes ficam em .autodev/tests/test_plan_aceitacao.py
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
 
 ## Task
 P08: Provar a aceitacao: do prompt ao sprint executavel
 
-## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+## Diff a revisar (base 51b7d07ae3ec1eaae4ce85a565979ba8d2431eba -> HEAD)
 ```diff
-diff --git a/.autodev/tests/test_acceptance.py b/.autodev/tests/test_acceptance.py
-index adfe8aa..a0ddf31 100644
---- a/.autodev/tests/test_acceptance.py
-+++ b/.autodev/tests/test_acceptance.py
-@@ -21,6 +21,11 @@ from pathlib import Path
- import pytest
- 
- from autodev import haq, killswitch, report, testrunner
-+from autodev import cli as autodev_cli
-+from autodev.config import ordem_topologica
-+from autodev.agents import driver_fake_ativo
-+from autodev.planner import (Plano, PlanoInvalido, TaskPlano, escrever_sprint,
-+                             validar_e_ordenar)
- from autodev.agents import AgenteInfo
- from autodev.orchestrator import Orquestrador
- 
-@@ -28,6 +33,43 @@ from conftest import TASK_FIXTURE, criar_fixture, escreve_fake_spec, scaffold_sp
- 
- SPRINT = "ACEITE"
- 
-+
-+def test_aceitacao_do_planejador(tmp_path, monkeypatch):
-+    """Do plano falso ao sprint validado, ordenado e executável."""
-+    raiz = tmp_path / "projeto"
-+    raiz.mkdir()
-+    (raiz / "tests").mkdir()
-+    (raiz / "tests" / "test_smoke.py").write_text("def test_smoke():\n    assert True\n")
-+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
-+    assert driver_fake_ativo(), "a aceitação deve usar o driver falso"
-+    fake_plano = Plano(
-+        titulo="Sprint de aceitação",
-+        objetivo="entregar fluxo demonstrável",
-+        repositorio=str(raiz),
-+        prompt_original="fluxo de aceitação",
-+        tasks=[
-+            TaskPlano("T01", "preparar base", ["teste smoke passa"], teste="pytest"),
-+            TaskPlano("T02", "validar resultado", ["resultado verificável"], deps=["T01"], teste="pytest"),
-+            TaskPlano("T03", "encerrar entrega", ["entrega registrada"], deps=["T01"], teste="pytest"),
-+        ],
-+    )
-+    sprint = escrever_sprint(raiz, fake_plano)
-+    assert len(fake_plano.tasks) == 3
-+    assert {p.name for p in sprint.iterdir()} == {"spec.md", "dag.json", "sprint.yaml"}
-+    dag = json.loads((sprint / "dag.json").read_text())
-+    ondas = ordem_topologica(dag)
-+    assert len(ondas) >= 2
-+    assert validar_e_ordenar(fake_plano) == ondas
-+
-+    monkeypatch.setattr(autodev_cli, "RAIZ", raiz)
-+    assert autodev_cli.main(["--sprint", sprint.name, "init"]) == 0
-+    resultado = testrunner.rodar(raiz, usar_sandbox=False)
-+    assert resultado.passou, resultado.saida
-+
-+    vago = Plano("x", "y", str(raiz), [TaskPlano("T99", "algo", ["melhorar coisa"])], "x")
-+    with pytest.raises(PlanoInvalido, match="T99"):
-+        validar_e_ordenar(vago)
-+
- STATS_CORRIGIDO = '''"""Funcoes estatisticas do projeto fixture (CORRIGIDO)."""
- from __future__ import annotations
- 
-diff --git a/autodev/plan_prompt.py b/autodev/plan_prompt.py
+diff --git a/.autodev/tests/test_plan_aceitacao.py b/.autodev/tests/test_plan_aceitacao.py
 new file mode 100644
-index 0000000..f32974f
+index 0000000..c50ae67
 --- /dev/null
-+++ b/autodev/plan_prompt.py
-@@ -0,0 +1,5 @@
-+"""Prompt e contrato textual do planejador."""
-+PROMPT_PLANO = """Responda em YAML com titulo, objetivo, repositorio e tasks.\n"""
++++ b/.autodev/tests/test_plan_aceitacao.py
+@@ -0,0 +1,143 @@
++"""Aceitacao do fluxo completo: pedido livre -> sprint executavel."""
 +
-+def montar_prompt_plano(prompt_usuario: str) -> str:
-+    return f"{PROMPT_PLANO}\nPedido: {prompt_usuario}"
-diff --git a/autodev/planner.py b/autodev/planner.py
-new file mode 100644
-index 0000000..f6a4980
---- /dev/null
-+++ b/autodev/planner.py
-@@ -0,0 +1,52 @@
-+"""Criação e persistência de planos de sprint."""
 +from __future__ import annotations
-+import json
-+from dataclasses import dataclass, field
-+from pathlib import Path
-+import yaml
-+from .config import ordem_topologica, valida_dag
 +
-+PALAVRAS_VAGAS = {"coisa", "algo", "melhorar", "ajustar", "implementar"}
-+class PlanoInvalido(ValueError):
-+    def __init__(self, erros): self.erros = list(erros); super().__init__("; ".join(self.erros))
-+class SprintJaExiste(FileExistsError): pass
-+class CotaEsgotada(RuntimeError): pass
-+@dataclass
-+class TaskPlano:
-+    id: str; titulo: str; criterios: list[str]; deps: list[str] = field(default_factory=list); agente: str = "codex"; teste: str = ""
-+@dataclass
-+class Plano:
-+    titulo: str; objetivo: str; repositorio: str; tasks: list[TaskPlano]; prompt_original: str
-+def parsear_plano(texto):
-+    try: data = yaml.safe_load(texto)
-+    except yaml.YAMLError as exc: raise PlanoInvalido([f"plano não é YAML válido: {exc}"]) from exc
-+    if not isinstance(data, dict): raise PlanoInvalido(["plano precisa ser um objeto YAML"])
-+    return Plano(str(data.get("titulo", "")), str(data.get("objetivo", "")), str(data.get("repositorio", "")), [TaskPlano(str(t.get("id", "")), str(t.get("titulo", "")), list(t.get("criterios", [])), list(t.get("deps", [])), str(t.get("agente", "codex")), str(t.get("teste", ""))) for t in data.get("tasks", [])], str(data.get("prompt_original", "")))
-+def validar_plano(plano):
-+    erros=[]
-+    if not plano.titulo.strip(): erros.append("titulo é obrigatório")
-+    if not plano.objetivo.strip(): erros.append("objetivo é obrigatório")
-+    if not plano.repositorio.strip(): erros.append("repositorio é obrigatório")
-+    if not plano.tasks: erros.append("o plano precisa de ao menos uma task")
-+    for task in plano.tasks:
-+        for criterio in task.criterios:
-+            if any(p in criterio.lower().split() for p in PALAVRAS_VAGAS): erros.append(f"task {task.id}: criterio vago: {criterio}")
-+    dag={"tasks":[{"id":t.id,"titulo":t.titulo,"criterios":t.criterios,"deps":t.deps} for t in plano.tasks]}
-+    erros.extend(valida_dag(dag)); return erros
-+def validar_e_ordenar(plano):
-+    erros=validar_plano(plano)
-+    if erros: raise PlanoInvalido(erros)
-+    return ordem_topologica({"tasks":[{"id":t.id,"deps":t.deps} for t in plano.tasks]})
-+def escrever_sprint(raiz, plano):
-+    validar_e_ordenar(plano); base=Path(raiz)/".autodev"/"sprints"; base.mkdir(parents=True, exist_ok=True)
-+    n=1
-+    while (base/(sid:=f"PLAN-{n:03d}")).exists(): n+=1
-+    dest=base/sid; dest.mkdir()
-+    (dest/"spec.md").write_text(f"# {plano.titulo}\n\n{plano.objetivo}\n", encoding="utf-8")
-+    (dest/"dag.json").write_text(json.dumps({"sprint_id":sid,"tasks":[{"id":t.id,"titulo":t.titulo,"criterios":t.criterios,"deps":t.deps,"agente":t.agente,"teste":t.teste} for t in plano.tasks]}, ensure_ascii=False), encoding="utf-8")
-+    (dest/"sprint.yaml").write_text(yaml.safe_dump({"sprint_id":sid,"titulo":plano.titulo,"objetivo":plano.objetivo}, allow_unicode=True, sort_keys=False), encoding="utf-8")
-+    return dest
-+def planejar(raiz, prompt_usuario, agente):
-+    if not prompt_usuario.strip(): raise PlanoInvalido(["pedido não pode ser vazio"])
-+    t=prompt_usuario.strip().splitlines()[0][:120]
-+    return Plano(t, prompt_usuario.strip(), str(raiz), [TaskPlano("T01",t,["pedido atendido"], teste="pytest")], prompt_usuario)
++import json
++import subprocess
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.config import ordem_topologica
++from autodev.orchestrator import Orquestrador
++from autodev.planner import (
++    PlanoInvalido,
++    escrever_sprint,
++    parsear_plano,
++    planejar,
++    validar_e_ordenar,
++    validar_plano,
++)
++
++from conftest import criar_fixture
++from test_acceptance import STATS_CORRIGIDO
++
++
++def _resposta_do_planejador() -> str:
++    return json.dumps(
++        {
++            "titulo": "Corrigir e documentar estatisticas",
++            "objetivo": "Entregar o modulo de estatisticas verificado",
++            "repositorio": ".",
++            "tasks": [
++                {
++                    "id": "P01",
++                    "titulo": "Corrigir estatisticas",
++                    "criterios": [
++                        "python3 -m pytest tests/test_stats.py -q passa"
++                    ],
++                    "deps": [],
++                    "agente": "codex",
++                    "teste": "python3 -m pytest tests/test_stats.py -q",
++                },
++                {
++                    "id": "P02",
++                    "titulo": "Registrar a entrega",
++                    "criterios": ["NOTAS.md descreve a entrega verificada"],
++                    "deps": [],
++                    "agente": "codex",
++                    "teste": "python3 -m pytest tests/test_stats.py -q",
++                },
++                {
++                    "id": "P03",
++                    "titulo": "Consolidar o resultado",
++                    "criterios": ["RESULTADO.md registra o resultado final"],
++                    "deps": ["P01", "P02"],
++                    "agente": "codex",
++                    "teste": "python3 -m pytest tests/test_stats.py -q",
++                },
++            ],
++        },
++        ensure_ascii=False,
++    )
++
++
++def _escrever_spec_fake(caminho: Path, conteudo: dict) -> None:
++    caminho.write_text(json.dumps(conteudo, ensure_ascii=False), encoding="utf-8")
++    caminho.with_suffix(".count").unlink(missing_ok=True)
++
++
++def test_aceitacao_do_planejador(tmp_path, monkeypatch, capsys):
++    raiz = criar_fixture(tmp_path / "projeto")
++    (raiz / "src/stats.py").write_text(STATS_CORRIGIDO, encoding="utf-8")
++    subprocess.run(["git", "add", "src/stats.py"], cwd=raiz, check=True)
++    subprocess.run(
++        ["git", "commit", "-q", "-m", "fixture verde"], cwd=raiz, check=True
++    )
++    logs = raiz / ".autodev/sprints/DEVFACTORY-001/logs"
++    logs.mkdir(parents=True)
++    fake_spec = tmp_path / "driver-falso.json"
++    _escrever_spec_fake(
++        fake_spec, {"acao": "echo", "texto": _resposta_do_planejador()}
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    plano = planejar(raiz, "Corrija e documente o modulo stats", "codex")
++
++    assert len(plano.tasks) == 3
++    assert validar_plano(plano) == []
++    destino = escrever_sprint(raiz, plano)
++    sprint_id = destino.name
++
++    monkeypatch.setattr(cli, "RAIZ", raiz)
++    assert cli.main(["--sprint", sprint_id, "init"]) == 0
++    assert "DAG valido: 3 tasks em 2 ondas" in capsys.readouterr().out
++
++    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
++    ondas = ordem_topologica(dag)
++    assert ondas == [["P01", "P02"], ["P03"]]
++
++    plano_vago = parsear_plano(_resposta_do_planejador())
++    plano_vago.tasks[1].criterios = ["Melhorar a documentacao"]
++    with pytest.raises(PlanoInvalido, match=r"task P02: critério 1 vago"):
++        validar_e_ordenar(plano_vago)
++
++    _escrever_spec_fake(
++        fake_spec,
++        {
++            "sequencia": [
++                {
++                    "acao": "editar",
++                    "arquivo": "ETAPA.md",
++                    "conteudo": "# Estatisticas verificadas\n",
++                },
++                {
++                    "acao": "editar",
++                    "arquivo": "NOTAS.md",
++                    "conteudo": "# Entrega verificada\n",
++                },
++                {
++                    "acao": "editar",
++                    "arquivo": "RESULTADO.md",
++                    "conteudo": "# Resultado final\n",
++                },
++            ]
++        },
++    )
++    orquestrador = Orquestrador(raiz, sprint_id, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="desativado no teste"
++    )
++
++    resultado = orquestrador.rodar()
++
++    assert resultado.parado_por is None
++    assert resultado.concluidas == 3
++    assert [
++        orquestrador.store.task(sprint_id, task_id)["estado"]
++        for task_id in ("P01", "P02", "P03")
++    ] == ["INTEGRATED", "INTEGRATED", "INTEGRATED"]
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "3"
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 54%]
-...............................................ss............            [100%]
-131 passed, 2 skipped in 7.52s
+........................................................................ [ 38%]
+..............................................ss........................ [ 77%]
+..........................................                               [100%]
+184 passed, 2 skipped in 8.62s
 
 ```
 
@@ -185,10 +207,95 @@ Responda com um unico bloco JSON, nada antes e nada depois:
 ```
 
 
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
 ===== STDOUT =====
+{
+  "veredito": "APPROVE",
+  "confianca": 0.85,
+  "criterios_atendidos": [
+    {
+      "criterio": "existe o teste test_aceitacao_do_planejador em .autodev/tests/test_plan_aceitacao.py",
+      "atende": true,
+      "evidencia": "commit bff1a7a (P08) adiciona o arquivo; 'git diff --name-status 51b7d07 bff1a7a' retorna somente 'A .autodev/tests/test_plan_aceitacao.py'; a funcao esta na linha 72."
+    },
+    {
+      "criterio": "o teste usa o driver falso para devolver um plano com 3 tasks e nao gasta cota real",
+      "atende": true,
+      "evidencia": "linhas 85-88 põem AUTODEV_FAKE_AGENT=1 e AUTODEV_FAKE_SPEC apontando para {\"acao\":\"echo\",\"texto\":<plano JSON>}; agents.invocar curto-circuita para _fake() (agents.py:125) ANTES de montar o comando ask-codex, e a acao echo devolve spec['texto'] (agents.py:273). O contador <spec>.count, escrito apenas por _fake._conta (agents.py:226-233), existe no fim com '3' — prova positiva de que o caminho falso rodou e nenhum agente real foi chamado. A revisao tambem nao gasta LLM: o teste desativa 'agy' (linhas 131-133) e review.escolher_revisor cai no revisor deterministico (review.py:119-124)."
+    },
+    {
+      "criterio": "o teste prova que o sprint escrito em tmp_path passa a validacao do autodev init sem erro",
+      "atende": true,
+      "evidencia": "linhas 92-97: escrever_sprint grava em raiz=tmp_path/'projeto', cli.RAIZ e' monkeypatched e cli.main(['--sprint', sprint_id, 'init']) == 0, com 'DAG valido: 3 tasks em 2 ondas' no stdout. Essa linha so e' impressa por cli.cmd_init depois que valida_dag retorna vazio (cli.py:55-62). Confirmei em disco: tmp/.../projeto/.autodev/sprints/DEVFACTORY-002/{dag.json,sprint.yaml,spec.md} criados, mais state.db dentro do tmp."
+    },
+    {
+      "criterio": "o teste prova que o dag.json gerado e aceito por ordem_topologica e produz pelo menos 2 ondas",
+      "atende": true,
+      "evidencia": "linhas 99-101 releem o dag.json gravado em disco e afirmam ondas == [['P01','P02'],['P03']] (2 ondas), chamando config.ordem_topologica."
+    },
+    {
+      "criterio": "o teste prova que um plano com criterio vago e recusado com mensagem que cita a task",
+      "atende": true,
+      "evidencia": "linhas 103-106: criterio 'Melhorar a documentacao' (palavra vaga, sem arquivo/comando de teste) faz validar_e_ordenar levantar PlanoInvalido casando r'task P02: criterio 1 vago' — mensagem produzida em planner.py:287-290, que cita o id da task."
+    },
+    {
+      "criterio": "o teste roda a suite do sprint gerado com o driver falso e prova que as tasks executam de ponta a ponta",
+      "atende": true,
+      "evidencia": "linhas 108-143 executam Orquestrador(raiz, sprint_id, modo_teste=True).rodar() e exigem parado_por None, concluidas == 3, estados INTEGRATED para P01/P02/P03 e count == '3'. Verifiquei os artefatos da execucao real: 3 worktrees com branch proprio + worktree de integracao contendo ETAPA.md, NOTAS.md e RESULTADO.md mesclados, e evidencias P01/P02/P03 + integracao-*.txt com '$ <venv>/python -m pytest tests/test_stats.py -q / exit=0 (0.2s) / 8 passed'. O estado INTEGRATED so e' atribuido apos merge ok E todos os portoes verdes (orchestrator.py:570-590), logo nao e' decorativo."
+    },
+    {
+      "criterio": "os testes ficam em .autodev/tests/test_plan_aceitacao.py",
+      "atende": true,
+      "evidencia": "arquivo unico adicionado nesse caminho; nenhum outro teste foi tocado."
+    },
+    {
+      "criterio": "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+      "atende": true,
+      "evidencia": "Rodei .venv/bin/python -m pytest .autodev/tests/ -q no worktree do P08 (bff1a7a): '186 passed in 17.64s', zero falhas. O total confere com a saida reportada (184 passed + 2 skipped = 186 coletados); os 2 skips sao os testes de isolamento marcados NAO_ANINHAVEL, que se auto-pulam quando AUTODEV_SANDBOX=1 (test_git_sandbox.py:20-29) — minha execucao foi fora do sandbox, por isso 0 skips. Nenhuma falha em nenhum dos dois ambientes."
+    },
+    {
+      "criterio": "preservacao obrigatoria: nenhum arquivo entregue por task anterior removido ou reescrito",
+      "atende": true,
+      "evidencia": "git diff 51b7d07..bff1a7a = 1 arquivo, 143 insercoes, 0 remocoes (name-status 'A'). O branch do P08 tem um unico commit. O worktree estava limpo antes e continuou limpo depois das minhas execucoes (git status --porcelain identico). O teste escreve apenas sob tmp_path (fixture, plano, state.db e worktrees ficam dentro do diretorio temporario do pytest), nunca no repo."
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_aceitacao.py",
+      "linha": 74,
+      "descricao": "A fixture e' pre-esverdeada: o teste sobrescreve src/stats.py com STATS_CORRIGIDO e commita ANTES de planejar, e o passo falso so escreve arquivos .md. Logo o comando de teste da sprint ('pytest tests/test_stats.py') passa mesmo que a task nao produza nada relevante; o teste prova o encanamento ponta a ponta (worktree -> commit -> teste -> revisao -> integracao), mas nao que a entrega do agente seja o que faz o portao ficar verde. Fica coberto apenas o guarda do revisor deterministico ('nenhuma alteracao encontrada').",
+      "correcao_sugerida": "Partir do fixture quebrado (sem o commit 'fixture verde') e fazer o primeiro passo da sequencia do driver falso editar src/stats.py, como faz test_acceptance.test_aceitacao_ponta_a_ponta, para que o portao de teste dependa do que a task produziu."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_aceitacao.py",
+      "linha": 67,
+      "descricao": "O helper local _escrever_spec_fake duplica conftest.escreve_fake_spec (mesmo comportamento: grava o JSON e apaga o arquivo .count ao lado), que ja esta importavel no diretorio de testes.",
+      "correcao_sugerida": "Importar e usar escreve_fake_spec de conftest.py em vez de manter uma segunda implementacao."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_aceitacao.py",
+      "linha": 79,
+      "descricao": "String magica 'DEVFACTORY-001': o teste fabrica um diretorio de sprint vazio (so com logs/) apenas porque planejar() grava o log do planejamento dentro do sprint de maior numero (planner.py:66-77). Se a fixture passar a criar sprint proprio, o teste muda de numero silenciosamente; hoje as asserts usam sprint_id, entao nao quebram, mas a intencao do diretorio criado nao esta documentada.",
+      "correcao_sugerida": "Comentar o motivo do diretorio fabricado (ou usar scaffold_sprint do conftest) para deixar explicito que ele existe so' para o log do planejador."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_aceitacao.py",
+      "linha": 25,
+      "descricao": "Importa STATS_CORRIGIDO de test_acceptance.py, arquivo entregue por outra task e protegido pela regra de preservacao. Isso acopla o P08 a um simbolo de outro arquivo de teste: qualquer refatoracao legitima em test_acceptance.py (mesmo mantendo a suite verde) pode quebrar este teste.",
+      "correcao_sugerida": "Definir a constante STATS_CORRIGIDO localmente neste arquivo (ou mover para conftest.py, que ja e' o ponto compartilhado) em vez de importar de outro modulo de teste."
+    }
+  ],
+  "resumo": "Aprovado: o teste de aceitacao e' real e determinístico, cobre os nove criterios (driver falso sem cota real, sprint escrito em tmp_path validado pelo autodev init, dag.json com 2 ondas, criterio vago recusado citando a task e as 3 tasks executadas ate INTEGRATED com evidencia de pytest em disco), preserva os arquivos das tasks anteriores e mantem a suite inteira verde (186 passed, 0 falhas); restam apenas nits de baixa severidade sobre pre-esverdeamento da fixture e duplicacao/acoplamento de helpers."
+}
 
 
 ===== STDERR =====
-error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h23m37s.
-AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h23m37s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"1a28cf30-1da5-41f4-8be6-11d8c46f5c99-9"}
 

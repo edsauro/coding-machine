@@ -1,0 +1,33 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q
+exit=1 (9.1s)
+
+........................................................................ [ 35%]
+..............................................ss.......................F [ 70%]
+.............................................................            [100%]
+=================================== FAILURES ===================================
+__________________ test_escreve_sprint_completo_no_proximo_id __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-saurus/pytest-0/test_escreve_sprint_completo_n0')
+
+    def test_escreve_sprint_completo_no_proximo_id(tmp_path):
+        (tmp_path / ".autodev/sprints/DEVFACTORY-002").mkdir(parents=True)
+    
+        destino = escrever_sprint(tmp_path, _plano())
+    
+        assert destino == tmp_path / ".autodev/sprints/DEVFACTORY-003"
+        assert {item.name for item in destino.iterdir()} == {
+            "spec.md", "dag.json", "sprint.yaml"
+        }
+    
+        dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
+>       assert set(dag) == {"sprint_id", "versao", "tasks"}
+E       AssertionError: assert {'prompt_orig...ks', 'versao'} == {'sprint_id',...ks', 'versao'}
+E         
+E         Extra items in the left set:
+E         'prompt_original'
+E         Use -v to get more diff
+
+.autodev/tests/test_plan_escrita.py:48: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_plan_escrita.py::test_escreve_sprint_completo_no_proximo_id
+1 failed, 202 passed, 2 skipped in 8.94s

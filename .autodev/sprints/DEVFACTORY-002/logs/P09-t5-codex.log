@@ -1,0 +1,129 @@
+# exit_code=0 duracao=80.9s modelo=gpt-6-astra effort=low failure_class=None
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P09: Registrar a rastreabilidade do prompt ao plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- a spec.md gerada por escrever_sprint contem a secao Prompt original com o texto do usuario literal
+- o dag.json gerado registra o campo prompt_original
+- o comando autodev report inclui o prompt original na secao de contexto quando ele existe no dag.json
+- plano sem prompt_original e aceito, e a secao aparece como nao informado, sem quebrar o relatorio
+- os testes ficam em .autodev/tests/test_plan_rastreabilidade.py e .autodev/tests/test_plan_rastreabilidade.py
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Contexto do projeto
+# DEVFACTORY-002 — Planejador: do prompt ao plano executável
+
+## O que esta sprint entrega
+
+Um comando novo, `autodev plan "<pedido em texto livre>"`, que produz um sprint
+executável em disco (`spec.md` + `dag.json` + `sprint.yaml`), validado pelas
+mesmas regras que o `autodev` já aplica na carga do DAG.
+
+Hoje esse passo é manual: alguém escreve o `spec.md` e o `dag.json` à mão antes
+de o orquestrador fazer qualquer coisa. Esta sprint fecha essa metade.
+
+## CONTRATO DE INTERFACES (não invente outros nomes)
+
+Estas assinaturas são usadas por tasks de ondas diferentes. Se você precisa de
+algo que não está aqui, **use o que está aqui**; não crie uma variante.
+
+```
+autodev/planner.py
+  @dataclass Plano:      titulo, objetivo, repositorio, tasks, prompt_original
+  @dataclass TaskPlano:  id, titulo, criterios, deps, agente, teste
+  validar_plano(plano) -> list[str]            # vazio = válido
+  parsear_plano(texto) -> Plano
+  validar_e_ordenar(plano) -> list[list[str]]  # ondas; reusa ordem_topologica
+  escrever_sprint(raiz, plano) -> Path
+  planejar(raiz, prompt_usuario, agente) -> Plano
+  exceções: PlanoInvalido, SprintJaExiste, CotaEsgotada
+  constante: PALAVRAS_VAGAS
+
+autodev/plan_prompt.py
+  PROMPT_PLANO: str
+  montar_prompt_plano(prompt_usuario) -> str
+```
+
+## REGRAS DURAS PARA O AGENTE
+
+1. **Trabalhe SOMENTE no seu worktree.** Nunca faça `cd` para fora dele, nunca
+   toque no repositório principal, nunca faça merge nem push.
+2. **Rode os testes antes de terminar:**
+   `python3 -m pytest .autodev/tests/ -q`
+   A suíte inteira tem que ficar verde. `python3` aqui é resolvido pelo runner
+   para o interpretador do projeto — use exatamente esta forma.
+3. **Os testes novos vão nos arquivos já indicados nos seus critérios.** Não
+   crie um arquivo de teste novo se o critério nomeia um existente.
+4. **Não invente APIs do projeto.** Os módulos existentes e seus nomes reais:
+   `agents.invocar`, `config.ordem_topologica`, `state.StateStore`,
+   `testrunner.rodar`, `sandbox.rodar`, `worktree.WorktreeManager`,
+   `planner` (novo). Confira a assinatura no arquivo antes de chamar.
+5. **Não altere o comportamento existente** para fazer o seu teste passar. Se um
+   teste antigo falhar, o problema é o seu código.
+6. **Cada critério é verificável.** Se você não consegue provar um critério com
+   um teste ou com um comando, o critério não foi atendido.
+7. **Sem dados pessoais.** Nada de nomes, caminhos de HOME ou credenciais em
+   código, teste ou documentação.
+
+## Por que o
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-002-P09-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 4: REVIEW_FAILURE (exit 0) — 
+  - tentativa 5: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+ercao foi afrouxada de `set(dag) == {...}` para subconjunto (`<=`), ou seja, um teste alheio passou a aceitar chaves inesperadas no dag.json — perda de rigor em verificacao que nao era desta task. Verifiquei que a suite NAO detecta essa perda (nenhum teste falha se uma chave nova, nao prevista, aparecer no dag).", "correcao_sugerida": "Reverter .autodev/tests/test_plan_escrita.py ao conteudo de P05 (cb302b4). A causa raiz e uma contradicao do DAG: o criterio de P05 exige dag.json 'com as chaves sprint_id, versao e tasks' e o de P09 exige 'registra o campo prompt_original' — nao da para atender os dois sem mexer no teste de P05. O caminho previsto pelo projeto para isso e HAQ (autodev/haq.py + .autodev/sprints/DEVFACTORY-002/HAQ.md), pedindo ao autor que evolua a assercao de P05; o worktree de P09 nao pode conceder essa excecao a si mesmo."}, {"severidade": "alta", "arquivo": ".autodev/sprints/DEVFACTORY-002/decisions.md", "linha": 1, "descricao": "O arquivo foi criado pela propria task com 9 linhas que a autorizam a quebrar o criterio de preservacao ('P09 esta autorizada a ajustar a assercao... entregue por P05'). Esse caminho e o log de decisoes do autor: em main (2409f31) ele tem 483 linhas (D-01..D-17) e e a fonte citada pelo proprio codigo (autodev/report.py:115,130). Simulei o merge num clone: 'git merge origin/sprint/DEVFACTORY-002/P09-codex' na main da 'CONFLICT (add/add) in .autodev/sprints/DEVFACTORY-002/decisions.md' — resolvido pelo lado do branch, as decisoes D-01..D-17 do autor desaparecem.", "correcao_sugerida": "Remover .autodev/sprints/DEVFACTORY-002/decisions.md do escopo do diff. Se o ponto merece registro, vai em HAQ.md (item aberto para o autor decidir), nao num arquivo de log do autor reescrito pela task."}, {"severidade": "media", "arquivo": "autodev/cli.py", "linha": 127, "descricao": "`dag = carrega_dag(caminho_dag) if caminho_dag.exists() else {}` introduz uma falha nova no report: carrega_dag valida o DAG (autodev/config.py:180-186) e levanta ValueError nao tratado. Provei em sandbox que um dag.json existente porem invalido para valida_dag (ex.: task {'id':'T01','titulo':'x'} sem 'criterios') faz `autodev report` abortar com ValueError, enquanto na base a9445a3 o mesmo comando retornava rc=0 e escrevia o relatorio. O report e derivado do state.db (docstring de report.py) e nao deveria depender da validade do DAG; nenhum teste cobre esse caso.", "correcao_sugerida": "Ler apenas a chave necessaria, de forma tolerante: `try: prompt = json.loads(texto).get('prompt_original') or '' except (OSError, json.JSONDecodeError, AttributeError): prompt = ''` — ou envolver carrega_dag em try/except ValueError e seguir com prompt_original vazio, ja que o objetivo e so enriquecer a secao de contexto."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_rastreabilidade.py", "linha": 45, "descricao": "O criterio 'plano sem prompt_original e aceito' so e provado pela metade: os testes montam o dag.json a mao com json.dumps e nunca passam por escrever_sprint/parsear_plano. O caminho real plano-sem-prompt_original -> dag.json -> report nao tem teste (e `Plano.prompt_original` e campo obrigatorio sem default em autodev/planner.py:48, aceito so porque parsear_plano:203 preenche \"\").", "correcao_sugerida": "Acrescentar um caso que parseie um JSON de plano sem 'prompt_original' (ou construa o Plano com prompt_original=\"\"), chame escrever_sprint e depois o report, exigindo 'Prompt original: nao informado' — fechando o criterio ponta a ponta."}, {"severidade": "baixa", "arquivo": "autodev/report.py", "linha": 205, "descricao": "`{prompt_original or 'não informado'}` interpola cru qualquer tipo vindo do JSON: lista/dict/int no dag.json viram repr no relatorio, sem limite de tamanho nem coerção. Nenhum teste cobre o caso nao-string (o parametrizado cobre apenas None e \"\").", "correcao_sugerida": "Coagir na fronteira, no cli: `valor = dag.get('prompt_original'); prompt = valor if isinstance(valor, str) else ''`."}]
+```
+### Arquivos ja tocados
+  - .autodev/sprints/DEVFACTORY-002/decisions.md
+  - .autodev/tests/test_plan_escrita.py
+  - .autodev/tests/test_plan_rastreabilidade.py
+  - autodev/cli.py
+  - autodev/planner.py
+  - autodev/report.py
+
+## INSTRUCAO
+Esta e a tentativa #5.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 5a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+RESULTADO: leitura tolerante do prompt corrigida, testes ampliados, P05 restaurado e autorização indevida removida; conflito P05/P09 registrado no HAQ, bloqueando aceite | TESTES: `python3 -m pytest .autodev/tests/ -q` não executou: pytest ausente; AGY bloqueado pelo sandbox.
+
+===== STDERR =====
+

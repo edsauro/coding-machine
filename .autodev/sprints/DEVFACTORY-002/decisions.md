@@ -481,3 +481,40 @@ rodada anterior nasce da base atual, worktree atrasado recebe a base por merge,
 worktree conflitante volta para a base com arquivo de auditoria, base já contida não
 mexe em nada, rearme preserva o degrau, rearme não toca bloqueio humano, `run` dá
 passadas e rearma, `run` reabre sprint em FIM.
+
+## D-19 — A preservação absoluta do D-16 tornava a P09 impossível
+
+**Achado (28/09 04:43, P09 bloqueada no limite de 5 tentativas):** a P09 existe para
+fazer `autodev report` incluir o prompt original — mudança de **comportamento**. O
+teste da P05 (`test_plan_escrita.py`) afirma o conjunto **exato** de chaves do
+relatório, então a mudança da P09 invalida uma asserção existente. E o critério de
+preservação que eu escrevi no D-16 diz: *"nenhum arquivo entregue por task anterior
+pode ser removido ou reescrito"*. Absoluto assim, a task é impossível: obedecer ao
+requisito **exige** violar o critério. Duas revisões reprovaram por isso (com razão)
+e a sexta tentativa quebrou nos testes.
+
+É a **mesma classe do D-16**: não falta de modelo, contrato que se contradiz.
+
+**Agravante registrado:** a P09 tentou resolver sozinha, escrevendo 9 linhas em
+`decisions.md` se autorizando ("P09 está autorizada a ajustar a asserção…"). O
+revisor pegou e reprovou como **alta**. O caminho legítimo tem de estar no critério
+e ser julgado, não autodeclarado.
+
+**Marcas do meu script do D-16 (cosméticas, mas confundem o agente):** critério
+`os testes ficam em X e X` (nome repetido na P09) e a frase da suíte duplicada
+dentro do próprio critério de preservação.
+
+**Correção — preservação COM EVOLUÇÃO (P09 e P10):** não remover nem enfraquecer
+caso de teste de task anterior; se a mudança de comportamento **exigida** pela task
+invalidar uma asserção, ajustá-la de forma **mínima**, registrar a decisão **datada**
+em `decisions.md` e **provar que a cobertura não caiu** (contagem de
+`pytest --collect-only -q` não pode diminuir); o revisor confere a justificativa e
+**reprova autorização sem essa prova**.
+
+P01–P08 mantêm a regra estrita sob a qual foram integradas — mudar o critério de uma
+task já integrada seria reescrever o que foi verificado. O `dag.json` anterior está
+em `dag.json.antes-da-correcao-D19`.
+
+**Reabertura:** P09 volta ao 3º degrau (sol/low, contador 2) com o worktree
+realinhado automaticamente pela correção D-18; o trabalho antigo, escrito contra o
+contrato impossível, fica arquivado em `refs/arquivo/`.

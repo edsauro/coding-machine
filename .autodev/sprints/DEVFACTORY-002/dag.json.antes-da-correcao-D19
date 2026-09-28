@@ -33,7 +33,8 @@
         "o prompt proibe criterio vago: exige que cada criterio mencione um arquivo ou um comando de teste concreto",
         "o prompt exige que a ultima task seja sempre um teste de aceitacao ponta a ponta",
         "os testes ficam em .autodev/tests/test_plan_prompt.py e provam que os elementos obrigatorios aparecem no prompt montado",
-        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
       ],
       "deps": [],
       "agente": "codex",
@@ -52,6 +53,7 @@
         "importa as dataclasses de autodev/planner.py em vez de redefinir",
         "os testes ficam em .autodev/tests/test_plan_parser.py e cobrem os 3 formatos aceitos e 2 recusas",
         "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
         "estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva"
       ],
       "deps": [
@@ -73,6 +75,7 @@
         "um criterio concreto que cita arquivo ou comando de teste e aceito",
         "os testes ficam em .autodev/tests/test_plan_validacao.py e provam as recusas e a aceitacao",
         "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
         "estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva"
       ],
       "deps": [
@@ -96,6 +99,7 @@
         "a funcao recusa sobrescrever um sprint ja existente levantando SprintJaExiste",
         "os testes ficam em .autodev/tests/test_plan_escrita.py e escrevem em tmp_path, nunca no repositorio real",
         "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
         "estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva"
       ],
       "deps": [
@@ -119,6 +123,7 @@
         "o teste usa o driver falso via AUTODEV_FAKE_AGENT e nao gasta cota real",
         "os testes ficam em .autodev/tests/test_plan_agente.py",
         "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
         "estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva"
       ],
       "deps": [
@@ -143,6 +148,7 @@
         "existe autodev plan --help funcional",
         "os testes ficam em .autodev/tests/test_plan_cli.py e cobrem sucesso, plano invalido e sprint ja existente",
         "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
         "estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva"
       ],
       "deps": [
@@ -165,7 +171,8 @@
         "o teste prova que um plano com criterio vago e recusado com mensagem que cita a task",
         "o teste roda a suite do sprint gerado com o driver falso e prova que as tasks executam de ponta a ponta",
         "os testes ficam em .autodev/tests/test_plan_aceitacao.py",
-        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
+        "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
       ],
       "deps": [
         "P07"
@@ -183,9 +190,9 @@
         "o dag.json gerado registra o campo prompt_original",
         "o comando autodev report inclui o prompt original na secao de contexto quando ele existe no dag.json",
         "plano sem prompt_original e aceito, e a secao aparece como nao informado, sem quebrar o relatorio",
-        "os testes ficam em .autodev/tests/test_plan_rastreabilidade.py",
+        "os testes ficam em .autodev/tests/test_plan_rastreabilidade.py e .autodev/tests/test_plan_rastreabilidade.py",
         "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
-        "preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca de comportamento EXIGIDA por esta task invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-002/decisions.md e prove que a cobertura nao caiu (a contagem do comando python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes da mudanca); o revisor confere a justificativa e reprova autorizacao sem essa prova"
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
       ],
       "deps": [
         "P07",
@@ -207,7 +214,7 @@
         "o README menciona que o comando plan nao faz merge nem push",
         "os testes ficam em .autodev/tests/test_plan_docs.py provando que as secoes exigidas existem no README",
         "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
-        "preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca de comportamento EXIGIDA por esta task invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-002/decisions.md e prove que a cobertura nao caiu (a contagem do comando python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes da mudanca); o revisor confere a justificativa e reprova autorizacao sem essa prova"
+        "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q"
       ],
       "deps": [
         "P08",

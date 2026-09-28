@@ -1,18 +1,18 @@
-# exit_code=0 duracao=126.9s modelo=gpt-5.6-sol effort=low failure_class=None
+# exit_code=0 duracao=74.2s modelo=gpt-6-astra effort=low failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
 
-## Task P07: Adicionar o comando autodev plan na CLI
+## Task P06: Invocar o agente em modo planejamento
 
 ## Criterios de aceitacao (todos obrigatorios)
-- a CLI aceita autodev plan 'texto do pedido' e autodev plan --de arquivo.md
-- o comando usa a funcao planejar de autodev/planner.py e escreve o sprint com escrever_sprint
-- plano invalido imprime os erros de validacao um por linha e devolve exit code 1, sem traceback
-- sucesso imprime o sprint_id gerado e o caminho onde ele foi escrito e devolve exit code 0
-- sprint ja existente imprime mensagem clara e devolve exit code 1, sem traceback
-- existe autodev plan --help funcional
-- os testes ficam em .autodev/tests/test_plan_cli.py e cobrem sucesso, plano invalido e sprint ja existente
+- existe a funcao planejar(raiz, prompt_usuario, agente) em autodev/planner.py que devolve um Plano
+- reusa agents.invocar do modulo de agentes em vez de chamar o binario diretamente
+- grava o prompt e a resposta do agente em .autodev/sprints/<sprint_id>/logs/plano-<agente>.log
+- cota esgotada (failure_class CODEX_QUOTA) propaga a excecao CotaEsgotada definida em autodev/planner.py, sem virar plano vazio
+- resposta sem JSON reconhecivel levanta PlanoInvalido citando o trecho inicial da resposta
+- o teste usa o driver falso via AUTODEV_FAKE_AGENT e nao gasta cota real
+- os testes ficam em .autodev/tests/test_plan_agente.py
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
 - preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
 - estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva
@@ -75,7 +75,7 @@ autodev/plan_prompt.py
 ## Por que o
 
 ## Restricoes
-- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-002-P07-codex
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-002-P06-codex
 - Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
 - Nao adicione dependencia nova sem necessidade demonstravel.
 - Se houver testes, eles devem passar ao final.
@@ -95,8 +95,66 @@ autodev/plan_prompt.py
    RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
 
 
+---
+# CONTINUACAO DE TASK EXISTENTE — NAO RECOMECE
+
+Voce ja trabalhou nesta task antes e foi interrompido por esgotamento de cota.
+O estado abaixo foi persistido. CONTINUE a partir dele.
+
+## Task
+P06
+
+## Criterios de aceitacao
+  - existe a funcao planejar(raiz, prompt_usuario, agente) em autodev/planner.py que devolve um Plano
+  - reusa agents.invocar do modulo de agentes em vez de chamar o binario diretamente
+  - grava o prompt e a resposta do agente em .autodev/sprints/<sprint_id>/logs/plano-<agente>.log
+  - cota esgotada (failure_class CODEX_QUOTA) propaga a excecao CotaEsgotada definida em autodev/planner.py, sem virar plano vazio
+  - resposta sem JSON reconhecivel levanta PlanoInvalido citando o trecho inicial da resposta
+  - o teste usa o driver falso via AUTODEV_FAKE_AGENT e nao gasta cota real
+  - os testes ficam em .autodev/tests/test_plan_agente.py
+  - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+  - preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+  - estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva
+
+## Estado atual da implementacao
+2 arquivo(s) ja modificado(s) por tentativa anterior; ultimo commit (nao registrado)
+
+## Arquivos relevantes
+  - .autodev/tests/test_plan_agente.py
+  - autodev/planner.py
+
+## Ultimo commit
+dc564a2151da4046a4d2ff0b2d48cde69070e905
+
+## Testes que JA PASSAM (nao mexa sem motivo)
+  (nenhum)
+
+## Testes que AINDA FALHAM
+  - .autodev/tests/test_plan_agente.py::test_planejar_grava_cada_prompt_e_resposta_no_sprint_mais_recente
+  - .autodev/tests/test_plan_agente.py::test_planejar_nao_converte_falha_do_agente_em_plano_invalido
+
+## Tentativas anteriores
+  - tentativa 2: None — 
+  - tentativa 3: None — 
+  - tentativa 4: None — 
+  - tentativa 5: REVIEW_FAILURE — 
+  - tentativa 6: CODEX_QUOTA — 
+
+## Findings de revisao em aberto
+  (nenhum)
+
+## PROXIMA ACAO ESPERADA
+Retomar de onde parou: os arquivos ja modificados estao no worktree. Corrija o que falta para os testes passarem e NAO reescreva o que ja funciona.
+
+## Regras
+1. NAO reescreva o que ja funciona.
+2. NAO recomece a task do zero.
+3. Faca a menor mudanca que resolve o proximo item em aberto.
+4. Ao terminar, responda com: RESULTADO: <o que mudou>
+
+
 ===== STDOUT =====
-RESULTADO: Implementado `autodev plan` com texto/`--de`, validação, persistência, erros limpos, ajuda e testes | TESTES: smoke/compile passaram; `python3 -m pytest .autodev/tests/ -q` bloqueado porque pytest não está instalado no ambiente (`No module named pytest`)
+RESULTADO: corrigidos seleção numérica do sprint, preservação dos logs e tratamento de falhas; testes existentes preservados | TESTES: verificações com driver falso passaram; `python3 -m pytest .autodev/tests/ -q` bloqueado por ausência de pytest, cuja instalação falhou por indisponibilidade de DNS.
 
 ===== STDERR =====
 

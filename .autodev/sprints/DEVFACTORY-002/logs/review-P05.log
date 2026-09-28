@@ -1,4 +1,4 @@
-# exit_code=3 duracao=150.8s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+# exit_code=0 duracao=161.6s modelo=deepseek-flash effort=(default) failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -11,21 +11,24 @@ Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
 - a sprint.yaml gerada tem sprint_id, titulo, objetivo, status: PLANEJADO e o bloco repositorio com raiz e merge_em_main: false
 - a spec.md gerada comeca com o prompt original do usuario em uma secao chamada Prompt original
 - a funcao recusa sobrescrever um sprint ja existente levantando SprintJaExiste
-- os testes ficam em .autodev/tests/test_planner.py e escrevem em tmp_path, nunca no repositorio real
+- os testes ficam em .autodev/tests/test_plan_escrita.py e escrevem em tmp_path, nunca no repositorio real
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva
 
 ## Task
 P05: Escrever o sprint planejado em disco
 
-## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+## Diff a revisar (base 0179cf91a72de66fd65fe33a14f88bb6ab557ce0 -> HEAD)
 ```diff
-diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+diff --git a/.autodev/tests/test_plan_escrita.py b/.autodev/tests/test_plan_escrita.py
 new file mode 100644
-index 0000000..672713c
+index 0000000..db16260
 --- /dev/null
-+++ b/.autodev/tests/test_planner.py
-@@ -0,0 +1,93 @@
++++ b/.autodev/tests/test_plan_escrita.py
+@@ -0,0 +1,96 @@
 +import json
++from pathlib import Path
 +
 +import pytest
 +import yaml
@@ -33,149 +36,48 @@ index 0000000..672713c
 +from autodev.planner import Plano, SprintJaExiste, TaskPlano, escrever_sprint
 +
 +
-+def plano_de_teste(prompt="pedido original"):
++def _plano():
 +    return Plano(
-+        titulo="Sprint de persistencia",
-+        objetivo="Escrever os artefatos do sprint",
-+        repositorio=".",
++        titulo="Persistir planejamento",
++        objetivo="Produzir um sprint executável",
++        repositorio="projeto",
 +        tasks=[
 +            TaskPlano(
 +                id="P01",
-+                titulo="Implementar persistencia",
-+                criterios=["existe autodev/planner.py"],
++                titulo="Criar arquivos",
++                criterios=["python3 -m pytest .autodev/tests/ -q passa"],
 +                deps=[],
 +                agente="codex",
 +                teste="python3 -m pytest .autodev/tests/ -q",
-+            )
++            ),
++            TaskPlano(
++                id="P02",
++                titulo="Validar arquivos",
++                criterios=["dag.json preserva os campos da task"],
++                deps=["P01"],
++                agente="agy",
++                teste="python3 -m pytest .autodev/tests/test_plan_escrita.py -q",
++            ),
 +        ],
-+        prompt_original=prompt,
++        prompt_original="Crie um planejador\nsem alterar meu pedido.",
 +    )
 +
 +
-+def test_escrever_sprint_persiste_os_tres_artefatos(tmp_path):
-+    plano = plano_de_teste()
++def test_escreve_sprint_completo_no_proximo_id(tmp_path):
++    (tmp_path / ".autodev/sprints/DEVFACTORY-002").mkdir(parents=True)
 +
-+    destino = escrever_sprint(tmp_path, plano)
++    destino = escrever_sprint(tmp_path, _plano())
 +
-+    assert destino.parent == tmp_path / ".autodev" / "sprints"
-+    assert {p.name for p in destino.iterdir()} == {"spec.md", "dag.json", "sprint.yaml"}
++    assert destino == tmp_path / ".autodev/sprints/DEVFACTORY-003"
++    assert {item.name for item in destino.iterdir()} == {
++        "spec.md", "dag.json", "sprint.yaml"
++    }
 +
 +    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
-+    assert set(dag) >= {"sprint_id", "versao", "tasks"}
++    assert set(dag) == {"sprint_id", "versao", "tasks"}
++    assert dag["sprint_id"] == "DEVFACTORY-003"
 +    assert dag["versao"] == 1
 +    assert dag["tasks"] == [
-+        {
-+            "id": "P01",
-+            "titulo": "Implementar persistencia",
-+            "criterios": ["existe autodev/planner.py"],
-+            "deps": [],
-+            "agente": "codex",
-+            "teste": "python3 -m pytest .autodev/tests/ -q",
-+        }
-+    ]
-+
-+    sprint = yaml.safe_load((destino / "sprint.yaml").read_text(encoding="utf-8"))
-+    assert sprint["sprint_id"] == destino.name
-+    assert sprint["titulo"] == plano.titulo
-+    assert sprint["objetivo"] == plano.objetivo
-+    assert sprint["status"] == "PLANEJADO"
-+    assert sprint["repositorio"] == {"raiz": ".", "merge_em_main": False}
-+
-+    spec = (destino / "spec.md").read_text(encoding="utf-8")
-+    assert spec.startswith("## Prompt original\n\n" + plano.prompt_original)
-+
-+
-+def test_escrever_sprint_recusa_sobrescrever_sprint_existente(tmp_path):
-+    plano = plano_de_teste()
-+    destino = escrever_sprint(tmp_path, plano)
-+    marcador = destino / "spec.md"
-+    marcador.write_text("nao sobrescrever", encoding="utf-8")
-+
-+    with pytest.raises(SprintJaExiste):
-+        escrever_sprint(tmp_path, plano)
-+
-+    assert marcador.read_text(encoding="utf-8") == "nao sobrescrever"
-+
-+
-+@pytest.mark.parametrize(
-+    ("titulo", "prompt"),
-+    [
-+        ("", ""),
-+        ("Sprint: API / versão 2!", ""),
-+    ],
-+)
-+def test_escrever_sprint_normaliza_dados_opcionais(tmp_path, titulo, prompt):
-+    plano = plano_de_teste(prompt)
-+    plano.titulo = titulo
-+    plano.repositorio = ""
-+
-+    destino = escrever_sprint(tmp_path, plano)
-+
-+    assert destino.name == ("sprint-planejado" if not titulo else "sprint-api-vers-o-2")
-+    sprint = yaml.safe_load((destino / "sprint.yaml").read_text(encoding="utf-8"))
-+    assert sprint["repositorio"] == {"raiz": ".", "merge_em_main": False}
-+    spec = (destino / "spec.md").read_text(encoding="utf-8")
-+    assert spec.startswith("## Prompt original\n\nnão informado")
-+    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
-+    assert "prompt_original" not in dag
-diff --git a/autodev/planner.py b/autodev/planner.py
-new file mode 100644
-index 0000000..4a84b1b
---- /dev/null
-+++ b/autodev/planner.py
-@@ -0,0 +1,83 @@
-+"""Tipos e persistência do plano de uma sprint."""
-+from __future__ import annotations
-+
-+import json
-+import re
-+from dataclasses import dataclass, field
-+from pathlib import Path
-+
-+import yaml
-+
-+
-+class SprintJaExiste(FileExistsError):
-+    """O diretório do sprint já existe e não pode ser sobrescrito."""
-+
-+
-+@dataclass
-+class TaskPlano:
-+    id: str
-+    titulo: str
-+    criterios: list[str]
-+    deps: list[str] = field(default_factory=list)
-+    agente: str = "codex"
-+    teste: str = ""
-+
-+
-+@dataclass
-+class Plano:
-+    titulo: str
-+    objetivo: str
-+    repositorio: str
-+    tasks: list[TaskPlano]
-+    prompt_original: str = ""
-+
-+
-+def _sprint_id(plano: Plano) -> str:
-+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", plano.titulo).strip("-").lower()
-+    return slug or "sprint-planejado"
-+
-+
-+def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
-+    """Escreve os artefatos do plano, sem substituir um sprint existente."""
-+    raiz = Path(raiz)
-+    sprint_id = _sprint_id(plano)
-+    destino = raiz / ".autodev" / "sprints" / sprint_id
-+    if destino.exists():
-+        raise SprintJaExiste(f"sprint já existe: {sprint_id}")
-+
-+    repositorio = {
-+        "raiz": str(plano.repositorio or "."),
-+        "merge_em_main": False,
-+    }
-+    tasks = [
 +        {
 +            "id": task.id,
 +            "titulo": task.titulo,
@@ -184,36 +86,125 @@ index 0000000..4a84b1b
 +            "agente": task.agente,
 +            "teste": task.teste,
 +        }
-+        for task in plano.tasks
++        for task in _plano().tasks
 +    ]
-+    destino.mkdir(parents=True)
-+    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks}
-+    if plano.prompt_original:
-+        dag["prompt_original"] = plano.prompt_original
-+    (destino / "dag.json").write_text(
-+        json.dumps(dag, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
++
++    sprint = yaml.safe_load((destino / "sprint.yaml").read_text(encoding="utf-8"))
++    assert sprint == {
++        "sprint_id": "DEVFACTORY-003",
++        "titulo": "Persistir planejamento",
++        "objetivo": "Produzir um sprint executável",
++        "status": "PLANEJADO",
++        "repositorio": {"raiz": "projeto", "merge_em_main": False},
++    }
++
++    spec = (destino / "spec.md").read_text(encoding="utf-8")
++    assert spec.startswith(
++        "# Prompt original\n\nCrie um planejador\nsem alterar meu pedido."
 +    )
++
++
++def test_recusa_colisao_sem_sobrescrever(tmp_path, monkeypatch):
++    sprints = tmp_path / ".autodev/sprints"
++    existente = sprints / "DEVFACTORY-001"
++    existente.mkdir(parents=True)
++    sentinela = existente / "spec.md"
++    sentinela.write_text("conteúdo anterior", encoding="utf-8")
++    mkdir_original = Path.mkdir
++
++    def mkdir_com_colisao(path, *args, **kwargs):
++        if path.name == "DEVFACTORY-002":
++            raise FileExistsError(path)
++        return mkdir_original(path, *args, **kwargs)
++
++    monkeypatch.setattr(Path, "mkdir", mkdir_com_colisao)
++
++    with pytest.raises(SprintJaExiste, match="DEVFACTORY-002"):
++        escrever_sprint(tmp_path, _plano())
++
++    assert sentinela.read_text(encoding="utf-8") == "conteúdo anterior"
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 33f77dd..53976c5 100644
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -4,7 +4,10 @@ from __future__ import annotations
+ 
+ import json
+ import re
+-from dataclasses import dataclass, field
++from dataclasses import asdict, dataclass, field
++from pathlib import Path
++
++import yaml
+ 
+ from . import config
+ 
+@@ -47,6 +50,57 @@ class PlanoInvalido(ValueError):
+     """Indica que a resposta do agente não contém um plano reconhecível."""
+ 
+ 
++class SprintJaExiste(FileExistsError):
++    """Indica que o diretório de destino do sprint já existe."""
++
++
++def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
++    """Persiste um plano em um novo diretório sequencial de sprint."""
++    diretorio_sprints = Path(raiz) / ".autodev" / "sprints"
++    diretorio_sprints.mkdir(parents=True, exist_ok=True)
++
++    numeros = [
++        int(casamento.group(1))
++        for caminho in diretorio_sprints.iterdir()
++        if (casamento := re.fullmatch(r"DEVFACTORY-(\d+)", caminho.name))
++    ]
++    sprint_id = f"DEVFACTORY-{max(numeros, default=0) + 1:03d}"
++    destino = diretorio_sprints / sprint_id
++    try:
++        destino.mkdir()
++    except FileExistsError as erro:
++        raise SprintJaExiste(f"sprint já existe: {sprint_id}") from erro
++
++    tasks = [asdict(task) for task in plano.tasks]
++    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks}
++    (destino / "dag.json").write_text(
++        json.dumps(dag, ensure_ascii=False, indent=2) + "\n",
++        encoding="utf-8",
++    )
++
 +    sprint = {
 +        "sprint_id": sprint_id,
 +        "titulo": plano.titulo,
 +        "objetivo": plano.objetivo,
 +        "status": "PLANEJADO",
-+        "repositorio": repositorio,
++        "repositorio": {
++            "raiz": plano.repositorio,
++            "merge_em_main": False,
++        },
 +    }
 +    (destino / "sprint.yaml").write_text(
-+        yaml.safe_dump(sprint, allow_unicode=True, sort_keys=False), encoding="utf-8"
++        yaml.safe_dump(sprint, allow_unicode=True, sort_keys=False),
++        encoding="utf-8",
 +    )
-+    prompt = plano.prompt_original or "não informado"
-+    spec = f"## Prompt original\n\n{prompt}\n\n## Objetivo\n\n{plano.objetivo}\n"
++
++    spec = (
++        f"# Prompt original\n\n{plano.prompt_original}\n\n"
++        f"# {plano.titulo}\n\n{plano.objetivo}\n"
++    )
 +    (destino / "spec.md").write_text(spec, encoding="utf-8")
 +    return destino
++
++
+ def parsear_plano(texto: str) -> Plano:
+     """Converte um objeto JSON com ``tasks`` encontrado no texto em ``Plano``."""
+     if not isinstance(texto, str):
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 52%]
-..............................................ss................         [100%]
-134 passed, 2 skipped in 7.32s
+........................................................................ [ 41%]
+..............................................ss........................ [ 82%]
+...............................                                          [100%]
+173 passed, 2 skipped in 7.43s
 
 ```
 
@@ -244,10 +235,37 @@ Responda com um unico bloco JSON, nada antes e nada depois:
 ```
 
 
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
 ===== STDOUT =====
+{
+  "veredito": "APPROVE",
+  "confianca": 0.82,
+  "criterios_atendidos": [
+    {"criterio": "existe a funcao escrever_sprint(raiz, plano) em autodev/planner.py", "atende": true, "evidencia": "autodev/planner.py:57-101, assinatura escrever_sprint(raiz: str | Path, plano: Plano) -> Path; importei o modulo do worktree e chamei a funcao com sucesso em tmp_path"},
+    {"criterio": "cria .autodev/sprints/<sprint_id>/ com spec.md, dag.json e sprint.yaml", "atende": true, "evidencia": "Execucao real em tmp: destino == tmp/.autodev/sprints/DEVFACTORY-002 (pre-existindo 001) com exatamente {dag.json, spec.md, sprint.yaml}; teste tambem afirma set(iterdir) == esses 3 nomes"},
+    {"criterio": "o dag.json gerado tem as chaves sprint_id, versao e tasks, e cada task preserva id, titulo, criterios, deps, agente e teste", "atende": true, "evidencia": "dag = {'sprint_id','versao':1,'tasks'}; asdict(TaskPlano) produz exatamente id, titulo, criterios, deps, agente, teste (planner.py:74-75). Verifiquei tambem que o arquivo passa no loader REAL do orquestrador: config.carrega_dag() -> valida_dag() == [] e ordem_topologica() devolve [['P01']]"},
+    {"criterio": "a sprint.yaml gerada tem sprint_id, titulo, objetivo, status: PLANEJADO e o bloco repositorio com raiz e merge_em_main: false", "atende": true, "evidencia": "yaml.safe_load do arquivo gerado devolveu {'sprint_id': 'DEVFACTORY-002', 'titulo': 'T', 'objetivo': 'O', 'status': 'PLANEJADO', 'repositorio': {'raiz': 'repo', 'merge_em_main': False}}; config.carrega_sprint() o aceita (tem sprint_id e objetivo)"},
+    {"criterio": "a spec.md gerada comeca com o prompt original do usuario em uma secao chamada Prompt original", "atende": true, "evidencia": "spec.md gerado = '# Prompt original\\n\\npedido\\n\\n# T\\n\\nO\\n' (planner.py:96-100); teste assert startswith; mutacao renomeando a secao (M7) faz o teste falhar"},
+    {"criterio": "a funcao recusa sobrescrever um sprint ja existente levantando SprintJaExiste", "atende": true, "evidencia": "planner.py:69-72 (mkdir sem exist_ok -> SprintJaExiste). Verifiquei alem do teste, com corrida reproduzida em FS real (listagem defasada + diretorio DEVFACTORY-002 existente com spec.md/dag.json): levantou SprintJaExiste e o sprint anterior ficou intacto (spec.md ainda 'SPRINT ANTERIOR')"},
+    {"criterio": "os testes ficam em .autodev/tests/test_plan_escrita.py e escrevem em tmp_path, nunca no repositorio real", "atende": true, "evidencia": "git diff --name-status base..HEAD: A .autodev/tests/test_plan_escrita.py; todas as escritas do teste passam por tmp_path (linhas 38-40, 79-83); apos rodar a suite inteira no worktree, 'git status --short' continuou vazio e a listagem de .autodev/sprints ficou identica (md5 antes == depois)"},
+    {"criterio": "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q", "atende": true, "evidencia": "Rodado no worktree com o interpretador do projeto (.venv, python 3.11.16, pytest 9.1.1): '175 passed in 15.96s' (a saida reportada de 173 passed + 2 skipped = 175 coletados, os 2 skips sao bwrap/models_cache ausente). Observacao: /usr/bin/python3 (3.14.7) nao tem pytest instalado, entao a string literal 'python3' so funciona pelo mapeamento python3 -> .venv/bin/python que o runner/sprint.yaml ja declara"},
+    {"criterio": "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q", "atende": true, "evidencia": "git diff --diff-filter=D --name-only base..HEAD == 0 arquivos; --name-status mostra apenas A test_plan_escrita.py e M autodev/planner.py; os arquivos de teste das tasks anteriores (test_planner.py, test_plan_parser.py, test_plan_prompt.py, test_plan_validacao.py, test_cli.py, test_core.py, test_adapters.py, test_acceptance.py, test_git_sandbox.py) existem no HEAD e nao aparecem no diff; suite verde como acima"},
+    {"criterio": "estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva", "atende": true, "evidencia": "Unica linha removida no arquivo inteiro e '-from dataclasses import dataclass, field' (virou 'from dataclasses import asdict, dataclass, field'); grep de simbolos no HEAD ainda lista PALAVRAS_VAGAS, TaskPlano, Plano, PlanoInvalido, parsear_plano, _construir_task, validar_plano, validar_e_ordenar alem do novo SprintJaExiste/escrever_sprint; os corpos de parsear_plano/validar_plano/validar_e_ordenar nao foram tocados"}
+  ],
+  "findings": [
+    {"severidade": "media", "arquivo": ".autodev/tests/test_plan_escrita.py", "linha": 91, "descricao": "test_recusa_colisao_sem_sobrescrever nao prova o criterio 'recusa sobrescrever': ele monkeypatcha Path.mkdir para levantar FileExistsError ignorando a semantica real do mkdir (exist_ok/EEXIST). Prova executada no scratch: trocando 'destino.mkdir()' por 'destino.mkdir(exist_ok=True)' — regressao que EM CORRIDA SOBRESCREVE o sprint existente (no meu probe o spec.md/dag.json do DEVFACTORY-002 foram substituidos) — a suite continua '2 passed'. Ou seja, o teste valida a traducao para SprintJaExiste, nao a recusa de sobrescrever. A assercao 'sentinela.read_text() == conteudo anterior' e vacuosa: a sentinela esta em DEVFACTORY-001, que o alvo (002) nunca toca.", "correcao_sugerida": "Fazer o teste exercitar o FS real: criar .autodev/sprints/DEVFACTORY-002 com spec.md/dag.json de verdade, forcar a corrida de forma deterministica (patch apenas em Path.iterdir devolvendo a listagem defasada, como fiz no probe) e entao afirmar pytest.raises(SprintJaExiste) + que o spec.md/dag.json do sprint 002 continuam byte a byte iguais; manter o monkeypatch de mkdir apenas como caso secundario."},
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 74, "descricao": "escrever_sprint grava sem validar o plano: um Plano com id duplicado/ciclo/dep inexistente e persistido normalmente. Probe real: escrever_sprint(plano com P01 duplicado e dep P02 inexistente) gerou dag.json em disco, e config.valida_dag() sobre ele devolve ['ids duplicados no DAG', 'P01 depende de P02, que nao existe no DAG']. O erro so aparece depois, na carga do DAG pelo orquestrador — sprint invalido fica plantado em disco.", "correcao_sugerida": "Chamar validar_plano(plano) no inicio de escrever_sprint e levantar PlanoInvalido com a lista de erros, antes de criar qualquer diretorio (barato e mantem o comportamento do P07, que ja validaria antes de escrever)."},
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 70, "descricao": "Escrita nao atomica: o diretorio do sprint e criado antes dos 3 arquivos. Falha no meio (disco cheio, permissao, excecao em yaml.safe_dump) deixa um sprint parcial, ja com nome numerico valido, que consome a numeracao e nao e detectado como incompleto em nenhum ponto.", "correcao_sugerida": "Escrever em diretorio temporario dentro de .autodev/sprints (ex.: .tmp-<pid>) e renomear para o sprint_id no fim, ou apagar o diretorio destino em caso de excecao (try/except -> shutil.rmtree) antes de propagar."},
+    {"severidade": "baixa", "arquivo": ".autodev/sprints/DEVFACTORY-002/dag.json", "linha": 90, "descricao": "Divergencia de criterio entre o DAG do worktree e o DAG do main (nao e defeito do diff, mas afeta a aceitacao): o dag.json da base 0179cf9 diz 'os testes ficam em .autodev/tests/test_planner.py' para a P05, enquanto o main (commit D-16, 470e7f2, linha 100) foi emendado para '.autodev/tests/test_plan_escrita.py'. O artefato entregue segue a versao emendada, que e a correta porque test_planner.py e arquivo de task anterior (P01) e reescreve-lo violaria a preservacao.", "correcao_sugerida": "Nenhuma mudanca no diff; apenas garantir que a base do worktree seja atualizada (D-18) para que o DAG usado na execucao seja o emendado, senao um revisor usando o DAG do worktree reprova a P05 por local de teste errado."},
+    {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_escrita.py", "linha": 51, "descricao": "No caso de sucesso, o esperado do dag.json e reconstruido a partir do proprio dataclass (_plano().tasks) em vez de um literal: o teste e imune a mudanca de schema do TaskPlano (se um campo for renomeado, codigo e esperado mudam juntos) e nao verifica integracao com o consumidor real do DAG.", "correcao_sugerida": "Adicionar assercoes de integracao: config.carrega_dag(destino/'dag.json') nao levanta, config.ordem_topologica(dag) devolve as ondas esperadas (no meu probe: [['P01'], ['P02']] para o plano do teste) e fixar o dict esperado com literais."}
+  ],
+  "resumo": "A implementacao atende e eu reproduzi todos os criterios (inclusive a recusa de sobrescrever, verificada em FS real e nao so pelo mock), mas o teste de colisao monkeypatcha Path.mkdir no nivel errado e passa ate numa versao regredida com exist_ok=True que sobrescreve o sprint existente — falha de forca de teste, nao de criterio."
+}
 
 
 ===== STDERR =====
-error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h32m56s.
-AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h32m56s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"c3fb3adc-6d09-47f8-8cf6-229b9c4ff3e9-9"}
 

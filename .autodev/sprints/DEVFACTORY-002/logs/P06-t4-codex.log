@@ -1,4 +1,4 @@
-# exit_code=0 duracao=35.9s modelo=gpt-5.6-luna effort=low failure_class=None
+# exit_code=1 duracao=94.9s modelo=gpt-5.6-sol effort=medium failure_class=CODEX_QUOTA
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -12,8 +12,10 @@ Voce e o agente de implementacao de uma task de um Sprint autonomo.
 - cota esgotada (failure_class CODEX_QUOTA) propaga a excecao CotaEsgotada definida em autodev/planner.py, sem virar plano vazio
 - resposta sem JSON reconhecivel levanta PlanoInvalido citando o trecho inicial da resposta
 - o teste usa o driver falso via AUTODEV_FAKE_AGENT e nao gasta cota real
-- os testes ficam em .autodev/tests/test_planner.py
+- os testes ficam em .autodev/tests/test_plan_agente.py
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva
 
 ## Contexto do projeto
 # DEVFACTORY-002 — Planejador: do prompt ao plano executável
@@ -79,6 +81,12 @@ autodev/plan_prompt.py
 - Se houver testes, eles devem passar ao final.
 - Simplicidade primeiro. Sem infraestrutura que a task nao exige.
 
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
 ## O que entregar
 1. Implemente a task de forma minima e completa.
 2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
@@ -87,8 +95,54 @@ autodev/plan_prompt.py
    RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
 
 
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 5: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+Y-002; (2) probe caso 6: um segundo planejamento para o mesmo agente SOBRESCREVE o log anterior (o 'primeiro pedido' desapareceu do arquivo), ou seja, o único registro prompt+resposta daquele planejamento é perdido — justamente o inverso do objetivo de auditabilidade do critério. O teste (test_plan_agente.py:55-64) não detecta nada disso por só haver um sprint no tmp_path.", "correcao_sugerida": "Registrar o log no diretório do sprint que o plano vai gerar (ex.: planejar recebe/devolve sprint_id, ou o CLI passa o id calculado) e/ou gravar nome único (plano-<agente>-<timestamp>.log) para não sobrescrever planejamentos anteriores; adicionar teste com dois sprints existentes e com dois planejamentos seguidos."}, {"severidade": "media", "arquivo": "autodev/planner.py", "linha": 93, "descricao": "Só CODEX_QUOTA é tratado; qualquer outra falha do agente (timeout 124, AGENT_CRASH 137, PERMISSION_REQUIRED, DEPENDENCY_ERROR) cai em 'resposta = resultado.stdout or resultado.stderr' e vira PlanoInvalido('resposta sem JSON reconhecível; início da resposta: ...'). Probe caso 9 com {\"acao\":\"crash\"} (exit 137): a mensagem final foi PlanoInvalido citando apenas 'Killed' — um erro de infraestrutura reportado ao operador como 'plano inválido', escondendo failure_class e exit_code que o adaptador já classificou.", "correcao_sugerida": "Antes de parsear, checar resultado.ok/failure_class: se a falha não for de plano (ex.: failure_class != None e != CODEX_QUOTA), levantar exceção específica (ex.: FalhaDoAgente) carregando failure_class/exit_code; reservar PlanoInvalido para resposta efetivamente recebida e não parseável."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 99, "descricao": "Duas coisas sem cobertura: (a) a atribuição plano.prompt_original = prompt_usuario não é afirmada por nenhum teste — nenhum teste do repositório chama planejar (grep: planejar( aparece só em test_plan_agente.py) e esse arquivo nunca cita prompt_original; logo a mutação 'apagar a linha 99' mantém a suíte verde, e o efeito silencioso seria spec.md/dag sem 'Prompt original' (critério P09). (b) planner.py:187 afrouxa parsear_plano, campo entregue pelo P03, de obrigatório para opcional (dados.get('prompt_original','') — sonda caso 7 confirma que agora retorna prompt_original=''), alteração de contrato de função já aceita, fora dos critérios do P06 e sem teste que a fixe (o critério 'plano sem prompt_original é aceito' é do P09).", "correcao_sugerida": "Afirmar plano.prompt_original == prompt_usuario no teste do P06 e somar um caso que prova explicitamente que a resposta do agente (que não traz prompt_original) é aceita e completada pela função; documentar na mensagem de commit que o afrouxamento é requisito de P09."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 67, "descricao": "candidatos = sorted(...) é ordenação LEXICOGRÁFICA sobre o nome. Com DEVFACTORY-999 e DEVFACTORY-1000 presentes (formato que escrever_sprint produz com %03d acima de 999), a sonda caso 5 mostrou que o log foi escrito em DEVFACTORY-999 — o sprint errado, silenciosamente.", "correcao_sugerida": "Ordenar pelo número extraído do nome: sorted(..., key=lambda p: int(re.fullmatch(r'DEVFACTORY-(\\d+)', p.name).group(1))) — mesma técnica que escrever_sprint já usa em planner.py:108-113."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_agente.py", "linha": 83, "descricao": "O teste do 'trecho inicial' não prova o 'inicial': a resposta usada tem 47 caracteres, então match='RESPOSTA INESPERADA' passaria também se a implementação citasse a resposta inteira, um trecho do meio ou os últimos caracteres. Do mesmo modo, o teste de log usa um único sprint, então não distingue 'o sprint alvo' de 'o último diretório que existir'.", "correcao_sugerida": "Usar resposta longa (>160 chars) com marcador exclusivo no FIM e afirmar que o início aparece e o fim NÃO aparece na mensagem; e criar dois sprints no tmp_path, afirmando em qual deles o log foi escrito."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_agente.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #4.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 4a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
 ===== STDOUT =====
-RESULTADO: `planejar` e testes da task já implementados, incluindo driver fake, logs, cota e JSON inválido | TESTES: `python3 -m pytest .autodev/tests/ -q` — não executado por ausência do módulo `pytest` no ambiente; compilação sintática passou.
+
 
 ===== STDERR =====
+ask-codex: sem resposta final (rc=1) — últimas linhas do log:
++
++
+ def test_planejar_cita_inicio_da_resposta_sem_json(tmp_path, monkeypatch):
+     _preparar_sprint(tmp_path)
+-    resposta = "RESPOSTA INESPERADA: nenhum plano foi produzido"
++    resposta = "INICIO DA RESPOSTA " + ("x" * 200) + " MARCADOR NO FIM"
+     _configurar_fake(monkeypatch, tmp_path, resposta)
+ 
+-    with pytest.raises(PlanoInvalido, match="RESPOSTA INESPERADA"):
++    with pytest.raises(PlanoInvalido) as capturada:
+         planejar(tmp_path, "Planeje", "codex")
++
++    mensagem = str(capturada.value)
++    assert "INICIO DA RESPOSTA" in mensagem
++    assert "MARCADOR NO FIM" not in mensagem
+
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Sep 28th, 2026 3:41 AM.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Sep 28th, 2026 3:41 AM.
+tokens used
+54,533
 

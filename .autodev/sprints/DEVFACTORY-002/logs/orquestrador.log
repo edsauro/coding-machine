@@ -286,3 +286,89 @@
 [23:02:16] integrando 1 task(s) da onda 2
 [23:02:16] integracao P04: CONFLITO — devolvido para retry
 [23:02:16] branch atual do repo: dbc9ebe5 (main intacta — merge automatico proibido)
+[23:06:58] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[23:06:58] P04: worktree realinhado para a integracao atual (base antiga 890e3d61) — a task estava nascendo sem o codigo das dependencias ja integradas (D-18)
+[23:06:58] P04 tentativa 9: codex gpt-6-astra/low
+[23:09:05] P04: testes exit=0 passed=171 failed=0 (configurado)
+[23:11:26] P04: revisao por hermes [escada (tentativa 5)] -> APPROVE (2 findings)
+[23:11:26] P04: DONE em 9 tentativa(s) — commit 9eedc1f7
+[23:11:26] integrando 1 task(s) da onda 2
+[23:11:34]   portao build: OK
+[23:11:34]   portao testes: OK
+[23:11:34]   portao lint: OK
+[23:11:34]   portao seguranca: OK
+[23:11:34] branch atual do repo: 2409f311 (main intacta — merge automatico proibido)
+[23:11:34] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[23:11:34] P05: worktree realinhado para a integracao atual (base antiga b963e0eb) — a task estava nascendo sem o codigo das dependencias ja integradas (D-18)
+[23:11:34] P05 tentativa 6: codex gpt-5.6-sol/low
+[23:13:55] P05: testes exit=0 passed=173 failed=0 (configurado)
+[23:19:25] P05: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> APPROVE (5 findings)
+[23:19:25] P05: agy FORA desta rodada (cota esgotada)
+[23:19:25] P05: DONE em 6 tentativa(s) — commit cb302b46
+[23:19:25] integrando 1 task(s) da onda 3
+[23:19:32]   portao build: OK
+[23:19:32]   portao testes: OK
+[23:19:32]   portao lint: OK
+[23:19:32]   portao seguranca: OK
+[23:19:32] branch atual do repo: 2409f311 (main intacta — merge automatico proibido)
+[23:19:32] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[23:19:32] P06: worktree realinhado para a integracao atual (base antiga b963e0eb) — a task estava nascendo sem o codigo das dependencias ja integradas (D-18)
+[23:19:32] P06 tentativa 5: codex gpt-5.6-sol/low
+[23:22:49] P06: testes exit=0 passed=177 failed=0 (configurado)
+[23:25:38] P06: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (6 findings)
+[23:25:38] P06: agy esta fora desta rodada (cota) — seguindo com codex
+[23:25:38] P06 tentativa 6: codex gpt-5.6-sol/medium
+[23:27:13] P06: COTA ESGOTADA — aguardando 18600s (checkpoint em dc564a2151da4046a4d2ff0b2d48cde69070e905)
+[04:10:04] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[04:10:04] recuperacao: {'stale': [], 'requeued': [], 'resource': ['P06']}
+[04:10:11] P06 tentativa 7: codex gpt-6-astra/low
+[04:11:33] P06: testes exit=0 passed=178 failed=0 (configurado)
+[04:16:28] P06: revisao por hermes [escada (tentativa 5)] -> APPROVE (4 findings)
+[04:16:28] P06: DONE em 7 tentativa(s) — commit 642ba493
+[04:16:28] integrando 1 task(s) da onda 4
+[04:16:36]   portao build: OK
+[04:16:36]   portao testes: OK
+[04:16:36]   portao lint: OK
+[04:16:36]   portao seguranca: OK
+[04:16:36] branch atual do repo: 2409f311 (main intacta — merge automatico proibido)
+[04:16:36] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[04:16:36] P07: worktree realinhado para a integracao atual (base antiga b963e0eb) — a task estava nascendo sem o codigo das dependencias ja integradas (D-18)
+[04:16:36] P07 tentativa 6: codex gpt-5.6-sol/low
+[04:18:51] P07: testes exit=0 passed=183 failed=0 (configurado)
+[04:23:48] P07: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> APPROVE (6 findings)
+[04:23:48] P07: agy FORA desta rodada (cota esgotada)
+[04:23:48] P07: DONE em 6 tentativa(s) — commit d618b7eb
+[04:23:48] integrando 1 task(s) da onda 5
+[04:23:56]   portao build: OK
+[04:23:56]   portao testes: OK
+[04:23:56]   portao lint: OK
+[04:23:56]   portao seguranca: OK
+[04:23:56] branch atual do repo: 2409f311 (main intacta — merge automatico proibido)
+[04:23:56] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[04:23:56] P08: worktree realinhado para a integracao atual (base antiga b963e0eb) — a task estava nascendo sem o codigo das dependencias ja integradas (D-18)
+[04:23:56] P08 tentativa 4: codex gpt-5.6-sol/low
+[04:26:03] P08: testes exit=0 passed=184 failed=0 (configurado)
+[04:28:56] P08: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> APPROVE (4 findings)
+[04:28:56] P08: DONE em 4 tentativa(s) — commit bff1a7ac
+[04:28:56] integrando 1 task(s) da onda 6
+[04:29:05]   portao build: OK
+[04:29:05]   portao testes: OK
+[04:29:05]   portao lint: OK
+[04:29:05]   portao seguranca: OK
+[04:29:05] branch atual do repo: 2409f311 (main intacta — merge automatico proibido)
+[04:29:05] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[04:29:05] P09: worktree realinhado para a integracao atual (base antiga b963e0eb) — a task estava nascendo sem o codigo das dependencias ja integradas (D-18)
+[04:29:05] P09 tentativa 4: codex gpt-5.6-sol/low
+[04:31:26] P09: testes exit=0 passed=187 failed=0 (configurado)
+[04:34:04] P09: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (5 findings)
+[04:34:04] P09: agy esta fora desta rodada (cota) — seguindo com codex
+[04:34:04] P09 tentativa 5: codex gpt-5.6-sol/medium
+[04:36:51] P09: testes exit=0 passed=191 failed=0 (configurado)
+[04:42:12] P09: revisao por hermes [escada (tentativa 4)] -> REQUEST_CHANGES (5 findings)
+[04:42:12] P09: agy esta fora desta rodada (cota) — seguindo com codex
+[04:42:12] P09 tentativa 6: codex gpt-6-astra/low
+[04:43:42] P09: testes exit=1 passed=202 failed=1 (configurado)
+[05:14:59] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[05:46:04] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[06:17:03] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[06:48:05] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]

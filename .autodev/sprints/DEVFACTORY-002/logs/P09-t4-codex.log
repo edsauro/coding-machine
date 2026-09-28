@@ -1,4 +1,4 @@
-# exit_code=0 duracao=131.2s modelo=gpt-5.6-sol effort=low failure_class=None
+# exit_code=0 duracao=158.3s modelo=gpt-5.6-sol effort=medium failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o agente de implementacao de uma task de um Sprint autonomo.
@@ -92,8 +92,36 @@ autodev/plan_prompt.py
    RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
 
 
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 4: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+[{"severidade": "media", "arquivo": ".autodev/tests/test_plan_escrita.py", "linha": 48, "descricao": "Task P09 reescreveu um arquivo de teste entregue por task anterior (P05, cb302b4): a assercao de conjunto exato de chaves foi alterada e um assert novo foi inserido (linha 51). Nao houve apagar/substituir o arquivo e a cobertura so aumentou, mas o criterio de preservacao e literal e a alteracao e silenciosa (nao ha HAQ nem nota autorizando a excecao).", "correcao_sugerida": "Reverter nao e viavel sem deixar a suite vermelha (P05 asserta o conjunto exato de chaves). Entao: (a) registrar a excecao explicitamente (HAQ/documento do sprint: 'P09 autorizada a ajustar o assert de chaves de test_plan_escrita.py'), e (b) tornar o assert tolerante a campos novos, ex.: assert {\"sprint_id\", \"versao\", \"prompt_original\"} <= set(dag), para que nenhuma task futura precise tocar de novo no teste de outra task."}, {"severidade": "media", "arquivo": "autodev/cli.py", "linha": 126, "descricao": "Regressao funcional sem cobertura: 'autodev report' passou a LER dag.json incondicionalmente (json.loads((d / 'dag.json').read_text())). Probe em repo temporario: sprint com sprint.yaml e sem dag.json -> FileNotFoundError nao tratado, rc != 0 e SPRINT-REPORT.md NAO e escrito (antes do diff o comando funcionava so com sprint.yaml). O criterio 4 pede justamente 'sem quebrar o relatorio'; nenhum dos 3 testes novos exercita esse caminho (todos os testes escrevem dag.json).", "correcao_sugerida": "Tolerar a ausencia do arquivo: dag = json.loads(caminho.read_text(encoding='utf-8')) if caminho.exists() else {}, e adicionar um caso em test_plan_rastreabilidade.py com sprint sem dag.json esperando rc 0 e 'Prompt original: nao informado'."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 126, "descricao": "Leitura crua com json.loads em vez de config.carrega_dag, contrariando a politica declarada em autodev/config.py:4 ('dag.json malformado deve falhar cedo e alto, nao no meio de uma execucao'). Probe: dag.json com JSON invalido -> json.JSONDecodeError cru (traceback) em vez de erro de dominio/validacao. Sem teste.", "correcao_sugerida": "Usar carrega_dag(d / 'dag.json') quando existir, ou capturar (json.JSONDecodeError, OSError) e degradar para 'nao informado' com aviso no relatorio."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 134, "descricao": "report-extras.json e expandido com **extra DEPOIS de prompt_original. Probe: extras = {'prompt_original': 'dos extras'} -> TypeError: autodev.report.gerar() got multiple values for keyword argument 'prompt_original' e relatorio nao escrito. Classe de bug pre-existente (valia para git_commit), agora estendida ao campo novo; nenhum teste cobre colisao de chave em report-extras.json.", "correcao_sugerida": "Filtrar colisoes: extra.pop('prompt_original', None) (e idem para os outros kwargs nomeados) ou passar os extras por um dict unico de kwargs resolvido com precedencia explicita."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_rastreabilidade.py", "linha": 69, "descricao": "O teste do fallback cobre apenas a chave AUSENTE. Nao ha caso para valor vazio/presente porem falsy nem para dag.json com prompt_original nao-string; o comportamento hoje esta correto (probe: null -> 'nao informado'), mas fica protegido so por acidente do 'or' em report.py:205.", "correcao_sugerida": "Parametrizar o teste com {'tasks': []}, {'tasks': [], 'prompt_original': ''} e {'tasks': [], 'prompt_original': None}, todos esperando 'Prompt original: nao informado' e rc 0."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_escrita.py
+  - .autodev/tests/test_plan_rastreabilidade.py
+  - autodev/cli.py
+  - autodev/planner.py
+  - autodev/report.py
+
+## INSTRUCAO
+Esta e a tentativa #4.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 4a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
 ===== STDOUT =====
-RESULTADO: rastreabilidade do prompt implementada em spec.md, dag.json e relatório, com fallback “não informado” | TESTES: python3 -m pytest .autodev/tests/ -q — 189 passed em 16.47s
+RESULTADO: rastreabilidade do prompt implementada no spec, DAG e relatório, com fallback e colisões tratados | TESTES: `python3 -m pytest .autodev/tests/ -q` — 193 passaram.
 
 ===== STDERR =====
 

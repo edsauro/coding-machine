@@ -1,4 +1,4 @@
-# exit_code=3 duracao=161.5s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+# exit_code=0 duracao=294.8s modelo=deepseek-v4-pro effort=(default) failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -11,20 +11,22 @@ Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
 - cota esgotada (failure_class CODEX_QUOTA) propaga a excecao CotaEsgotada definida em autodev/planner.py, sem virar plano vazio
 - resposta sem JSON reconhecivel levanta PlanoInvalido citando o trecho inicial da resposta
 - o teste usa o driver falso via AUTODEV_FAKE_AGENT e nao gasta cota real
-- os testes ficam em .autodev/tests/test_planner.py
+- os testes ficam em .autodev/tests/test_plan_agente.py
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva
 
 ## Task
 P06: Invocar o agente em modo planejamento
 
-## Diff a revisar (base 98f42e1784f5beef6aaab8174290e84745595947 -> HEAD)
+## Diff a revisar (base 4e9f322fb841905c1d7a50d50cfe6af6d99610f2 -> HEAD)
 ```diff
-diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
+diff --git a/.autodev/tests/test_plan_agente.py b/.autodev/tests/test_plan_agente.py
 new file mode 100644
-index 0000000..4686255
+index 0000000..813938e
 --- /dev/null
-+++ b/.autodev/tests/test_planner.py
-@@ -0,0 +1,44 @@
++++ b/.autodev/tests/test_plan_agente.py
+@@ -0,0 +1,112 @@
 +import json
 +
 +import pytest
@@ -32,206 +34,213 @@ index 0000000..4686255
 +from autodev.planner import CotaEsgotada, PlanoInvalido, planejar
 +
 +
-+def _resposta():
-+    return json.dumps({"titulo": "Plano teste", "objetivo": "entregar",
-+                       "repositorio": {}, "tasks": [{
-+                           "id": "T01", "titulo": "Implementar",
-+                           "criterios": ["autodev/x.py e python3 -m pytest .autodev/tests/ -q"],
-+                           "deps": [], "agente": "codex",
-+                           "teste": "python3 -m pytest .autodev/tests/ -q"}]})
++def _preparar_sprint(raiz, sprint_id="DEVFACTORY-007"):
++    logs = raiz / ".autodev" / "sprints" / sprint_id / "logs"
++    logs.mkdir(parents=True)
++    return logs
 +
 +
-+def test_planejar_usa_driver_fake_e_registra_log(tmp_path, monkeypatch):
-+    spec = tmp_path / "fake.json"
-+    spec.write_text(json.dumps({"acao": "echo", "texto": _resposta()}))
++def _configurar_fake(monkeypatch, tmp_path, resposta):
++    spec = tmp_path / "agente.json"
++    spec.write_text(
++        json.dumps({"acao": "echo", "texto": resposta}, ensure_ascii=False),
++        encoding="utf-8",
++    )
 +    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
 +    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
-+    plano = planejar(tmp_path, "criar uma funcionalidade", "codex")
-+    assert plano.tasks[0].id == "T01"
-+    log = tmp_path / ".autodev/sprints/CRIAR-UMA-FUNCIONALIDADE/logs/plano-codex.log"
-+    assert log.exists() and "criar uma funcionalidade" in log.read_text()
-+    assert _resposta() in log.read_text()
 +
 +
-+def test_planejar_propaga_cota(tmp_path, monkeypatch):
-+    spec = tmp_path / "fake.json"
-+    spec.write_text(json.dumps({"acao": "quota"}))
++def _resposta_valida():
++    return json.dumps(
++        {
++            "titulo": "API planejada",
++            "objetivo": "Entregar uma API testada",
++            "repositorio": ".",
++            "tasks": [
++                {
++                    "id": "P01",
++                    "titulo": "Implementar API",
++                    "criterios": ["python3 -m pytest tests/test_api.py -q passa"],
++                    "deps": [],
++                    "agente": "codex",
++                    "teste": "python3 -m pytest tests/test_api.py -q",
++                }
++            ],
++        },
++        ensure_ascii=False,
++    )
++
++
++def test_planejar_devolve_plano_usando_driver_falso(tmp_path, monkeypatch):
++    _preparar_sprint(tmp_path)
++    _configurar_fake(monkeypatch, tmp_path, _resposta_valida())
++
++    plano = planejar(tmp_path, "Planeje uma API", "codex")
++
++    assert plano.titulo == "API planejada"
++    assert plano.tasks[0].id == "P01"
++    assert plano.prompt_original == "Planeje uma API"
++
++
++def test_planejar_grava_cada_prompt_e_resposta_no_sprint_mais_recente(
++    tmp_path, monkeypatch
++):
++    logs_antigos = _preparar_sprint(tmp_path, "DEVFACTORY-999")
++    logs = _preparar_sprint(tmp_path, "DEVFACTORY-1000")
++    primeira_resposta = _resposta_valida()
++    _configurar_fake(monkeypatch, tmp_path, primeira_resposta)
++
++    planejar(tmp_path, "Primeiro pedido auditável", "agy")
++
++    segunda_resposta = primeira_resposta.replace("API planejada", "API revisada")
++    _configurar_fake(monkeypatch, tmp_path, segunda_resposta)
++    planejar(tmp_path, "Segundo pedido auditável", "agy")
++
++    auditoria = (logs / "plano-agy.log").read_text(encoding="utf-8")
++    assert "Primeiro pedido auditável" in auditoria
++    assert primeira_resposta in auditoria
++    assert "Segundo pedido auditável" in auditoria
++    assert segunda_resposta in auditoria
++    assert not (logs_antigos / "plano-agy.log").exists()
++
++
++def test_planejar_propaga_cota_esgotada(tmp_path, monkeypatch):
++    _preparar_sprint(tmp_path)
++    spec = tmp_path / "quota.json"
++    spec.write_text(json.dumps({"acao": "quota"}), encoding="utf-8")
 +    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
 +    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
++
 +    with pytest.raises(CotaEsgotada):
-+        planejar(tmp_path, "pedido", "codex")
++        planejar(tmp_path, "Planeje sem esconder a cota", "codex")
 +
 +
-+def test_planejar_recusa_resposta_sem_json(tmp_path, monkeypatch):
-+    spec = tmp_path / "fake.json"
-+    spec.write_text(json.dumps({"acao": "echo", "texto": "resposta inválida"}))
++def test_planejar_nao_converte_falha_do_agente_em_plano_invalido(
++    tmp_path, monkeypatch
++):
++    _preparar_sprint(tmp_path)
++    spec = tmp_path / "crash.json"
++    spec.write_text(json.dumps({"acao": "crash"}), encoding="utf-8")
 +    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
 +    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
-+    with pytest.raises(PlanoInvalido, match="resposta inválida"):
-+        planejar(tmp_path, "pedido", "codex")
-diff --git a/autodev/plan_prompt.py b/autodev/plan_prompt.py
-new file mode 100644
-index 0000000..dd14f9c
---- /dev/null
-+++ b/autodev/plan_prompt.py
-@@ -0,0 +1,9 @@
-+PROMPT_PLANO = """Responda APENAS com um JSON contendo titulo, objetivo, repositorio e tasks.
-+Cada task deve conter id, titulo, criterios, deps, agente e teste.
-+Cada criterio deve mencionar um arquivo concreto ou um comando de teste concreto;
-+nao use criterios vagos. A ultima task deve ser sempre um teste de aceitacao ponta a ponta.
-+"""
++
++    with pytest.raises(RuntimeError, match=r"AGENT_CRASH.*exit_code=137"):
++        planejar(tmp_path, "Planeje", "codex")
 +
 +
-+def montar_prompt_plano(prompt_usuario: str) -> str:
-+    return f"{PROMPT_PLANO}\n\nPedido do usuario:\n{prompt_usuario}"
++def test_planejar_cita_inicio_da_resposta_sem_json(tmp_path, monkeypatch):
++    _preparar_sprint(tmp_path)
++    resposta = "INICIO DA RESPOSTA " + ("x" * 200) + " MARCADOR NO FIM"
++    _configurar_fake(monkeypatch, tmp_path, resposta)
++
++    with pytest.raises(PlanoInvalido) as capturada:
++        planejar(tmp_path, "Planeje", "codex")
++
++    mensagem = str(capturada.value)
++    assert "INICIO DA RESPOSTA" in mensagem
++    assert "MARCADOR NO FIM" not in mensagem
 diff --git a/autodev/planner.py b/autodev/planner.py
-new file mode 100644
-index 0000000..80987ac
---- /dev/null
+index 53976c5..5f74158 100644
+--- a/autodev/planner.py
 +++ b/autodev/planner.py
-@@ -0,0 +1,135 @@
-+from __future__ import annotations
-+
-+import json
+@@ -3,13 +3,15 @@
+ from __future__ import annotations
+ 
+ import json
 +import os
-+import re
-+import unicodedata
-+from dataclasses import dataclass, field
-+from pathlib import Path
-+
-+from . import agents
-+from .config import Config, ordem_topologica
-+from .errors import FailureClass
+ import re
+ from dataclasses import asdict, dataclass, field
+ from pathlib import Path
+ 
+ import yaml
+ 
+-from . import config
++from . import agents, config
 +from .plan_prompt import montar_prompt_plano
-+
-+PALAVRAS_VAGAS = ("melhorar", "otimizar", "refatorar", "revisar", "ajustar")
-+
-+
-+class PlanoInvalido(ValueError):
-+    pass
-+
-+
-+class SprintJaExiste(FileExistsError):
-+    pass
-+
-+
+ 
+ 
+ PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
+@@ -54,6 +56,61 @@ class SprintJaExiste(FileExistsError):
+     """Indica que o diretório de destino do sprint já existe."""
+ 
+ 
 +class CotaEsgotada(RuntimeError):
-+    pass
++    """Indica que o agente não pôde planejar por falta de cota."""
 +
 +
-+@dataclass
-+class TaskPlano:
-+    id: str
-+    titulo: str
-+    criterios: list[str]
-+    deps: list[str] = field(default_factory=list)
-+    agente: str = "codex"
-+    teste: str = ""
++def planejar(raiz: str | Path, prompt_usuario: str, agente: str) -> Plano:
++    """Solicita um plano somente-leitura ao agente e converte sua resposta."""
++    raiz = Path(raiz)
++    sprints = raiz / ".autodev" / "sprints"
++    candidatos = sorted(
++        (caminho
++        for caminho in sprints.glob("DEVFACTORY-[0-9]*")
++        if caminho.is_dir() and re.fullmatch(r"DEVFACTORY-\d+", caminho.name)),
++        key=lambda caminho: int(caminho.name.split("-")[-1]),
++    )
++    if not candidatos:
++        raise PlanoInvalido("nenhum sprint encontrado para registrar o planejamento")
 +
-+
-+@dataclass
-+class Plano:
-+    titulo: str
-+    objetivo: str
-+    repositorio: dict | str
-+    tasks: list[TaskPlano]
-+    prompt_original: str = ""
-+
-+
-+def _objeto_json(texto: str) -> dict:
-+    candidatos = [texto]
-+    candidatos += re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", texto, re.S)
-+    decoder = json.JSONDecoder()
-+    for candidato in candidatos:
-+        try:
-+            obj, _ = decoder.raw_decode(candidato.lstrip())
-+            if isinstance(obj, dict):
-+                return obj
-+        except (json.JSONDecodeError, ValueError):
-+            pass
-+    for match in re.finditer(r"\{", texto):
-+        try:
-+            obj, _ = decoder.raw_decode(texto[match.start():])
-+            if isinstance(obj, dict):
-+                return obj
-+        except json.JSONDecodeError:
-+            continue
-+    raise PlanoInvalido(f"resposta sem JSON reconhecivel: {texto[:200]}")
-+
-+
-+def parsear_plano(texto: str) -> Plano:
-+    obj = _objeto_json(texto)
-+    if "tasks" not in obj:
-+        raise PlanoInvalido("JSON do plano sem a chave tasks")
-+    try:
-+        tasks = [TaskPlano(id=t["id"], titulo=t["titulo"],
-+                           criterios=t["criterios"], deps=t.get("deps", []),
-+                           agente=t.get("agente", "codex"), teste=t.get("teste", ""))
-+                 for t in obj["tasks"]]
-+        return Plano(obj.get("titulo", ""), obj.get("objetivo", ""),
-+                     obj.get("repositorio", {}), tasks)
-+    except (KeyError, TypeError) as exc:
-+        raise PlanoInvalido(f"estrutura de task invalida: {exc}") from exc
-+
-+
-+def validar_plano(plano: Plano) -> list[str]:
-+    erros = []
-+    if not plano.tasks:
-+        erros.append("plano sem tasks")
-+    ids = [t.id for t in plano.tasks]
-+    if len(ids) != len(set(ids)):
-+        erros.append("ids duplicados")
-+    conhecidos = set(ids)
-+    for task in plano.tasks:
-+        if not task.criterios:
-+            erros.append(f"{task.id} sem criterios")
-+        for dep in task.deps:
-+            if dep not in conhecidos:
-+                erros.append(f"{task.id} depende de {dep}, que nao existe")
-+        for i, criterio in enumerate(task.criterios):
-+            if any(p in criterio.lower() for p in PALAVRAS_VAGAS) and not re.search(r"(?:\.|/|pytest|python\s*3|npm\s+test|make\s+test)", criterio, re.I):
-+                erros.append(f"{task.id} criterio {i} vago")
-+    try:
-+        ordem_topologica({"tasks": [{"id": t.id, "deps": t.deps} for t in plano.tasks]})
-+    except ValueError as exc:
-+        erros.append(str(exc))
-+    return erros
-+
-+
-+def validar_e_ordenar(plano: Plano) -> list[list[str]]:
-+    erros = validar_plano(plano)
-+    if erros:
-+        raise PlanoInvalido("plano invalido:\n" + "\n".join(erros))
-+    return ordem_topologica({"tasks": [{"id": t.id, "deps": t.deps} for t in plano.tasks]})
-+
-+
-+def _sprint_id(titulo: str) -> str:
-+    bruto = unicodedata.normalize("NFKD", titulo).encode("ascii", "ignore").decode()
-+    return re.sub(r"[^A-Z0-9]+", "-", bruto.upper()).strip("-")[:60] or "PLANO"
-+
-+
-+def planejar(raiz: Path, prompt_usuario: str, agente: str) -> Plano:
 +    prompt = montar_prompt_plano(prompt_usuario)
-+    sid = _sprint_id(prompt_usuario)
-+    log = Path(raiz) / ".autodev" / "sprints" / sid / "logs" / f"plano-{agente}.log"
-+    config_dir = Path(raiz) / ".autodev" / "config"
-+    cfg = Config.carregar(config_dir) if config_dir.exists() else Config.carregar()
-+    resultado = agents.invocar(agents.Invocacao(
-+        agente=agente, prompt=prompt, worktree=str(raiz), log_path=str(log),
-+        fake_script=os.environ.get("AUTODEV_FAKE_SPEC")), cfg)
-+    if resultado.failure_class == FailureClass.CODEX_QUOTA.value:
-+        raise CotaEsgotada("cota do Codex esgotada")
-+    plano = parsear_plano(resultado.stdout)
++    log_path = candidatos[-1] / "logs" / f"plano-{agente}.log"
++    historico = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
++    resultado = agents.invocar(
++        agents.Invocacao(
++            agente=agente,
++            prompt=prompt,
++            worktree=str(raiz),
++            edita=False,
++            timeout=int(os.environ.get("AUTODEV_AGENT_TIMEOUT", "900")),
++            log_path=str(log_path),
++            fake_script=os.environ.get("AUTODEV_FAKE_SPEC") or None,
++        ),
++        config.Config.carregar(),
++    )
++    if historico:
++        # O adaptador sobrescreve o log; preserve as invocações anteriores.
++        atual = log_path.read_text(encoding="utf-8")
++        log_path.write_text(historico + "\n" + atual, encoding="utf-8")
++
++    if resultado.failure_class == "CODEX_QUOTA":
++        raise CotaEsgotada("cota do Codex esgotada durante o planejamento")
++    if not resultado.ok:
++        raise RuntimeError(
++            f"falha do agente: {resultado.failure_class}; "
++            f"exit_code={resultado.exit_code}; {resultado.stderr or resultado.stdout}"
++        )
++
++    resposta = resultado.stdout or resultado.stderr
++    try:
++        plano = parsear_plano(resposta)
++    except PlanoInvalido as erro:
++        trecho = resposta[:160].replace("\n", " ")
++        raise PlanoInvalido(f"{erro}; início da resposta: {trecho!r}") from erro
 +    plano.prompt_original = prompt_usuario
-+    validar_e_ordenar(plano)
 +    return plano
++
++
+ def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
+     """Persiste um plano em um novo diretório sequencial de sprint."""
+     diretorio_sprints = Path(raiz) / ".autodev" / "sprints"
+@@ -136,8 +193,9 @@ def parsear_plano(texto: str) -> Plano:
+             tasks = [_construir_task(task) for task in tasks_brutas]
+             campos = {
+                 nome: dados[nome]
+-                for nome in ("titulo", "objetivo", "repositorio", "prompt_original")
++                for nome in ("titulo", "objetivo", "repositorio")
+             }
++            campos["prompt_original"] = dados.get("prompt_original", "")
+             for nome, valor in campos.items():
+                 if not isinstance(valor, str):
+                     raise TypeError(f"{nome} deve ser uma string")
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 53%]
-..............................................ss...............          [100%]
-133 passed, 2 skipped in 7.35s
+........................................................................ [ 40%]
+..............................................ss........................ [ 80%]
+....................................                                     [100%]
+178 passed, 2 skipped in 7.41s
 
 ```
 
@@ -262,10 +271,38 @@ Responda com um unico bloco JSON, nada antes e nada depois:
 ```
 
 
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
 ===== STDOUT =====
+```json
+{
+  "veredito": "APPROVE",
+  "confianca": 0.9,
+  "criterios_atendidos": [
+    {"criterio": "funcao planejar(raiz, prompt_usuario, agente) em autodev/planner.py devolvendo um Plano", "atende": true, "evidencia": "planner.py:63 define planejar(raiz, prompt_usuario, agente) -> Plano; retorna plano no final (linha 111)."},
+    {"criterio": "reusa agents.invocar em vez do binario", "atende": true, "evidencia": "planner.py:79 chama agents.invocar(agents.Invocacao(...)); nenhum subprocess direto no arquivo."},
+    {"criterio": "grava prompt e resposta em .autodev/sprints/<sprint_id>/logs/plano-<agente>.log", "atende": true, "evidencia": "planner.py:77-88 monta log_path e passa como log_path; agents.invocar grava via _gravar_log (agents.py:295-305) com PROMPT ENVIADO + STDOUT. Teste test_planejar_grava_cada_prompt_e_resposta_no_sprint_mais_recente confirma prompt e resposta no log."},
+    {"criterio": "CODEX_QUOTA propaga CotaEsgotada, sem virar plano vazio", "atende": true, "evidencia": "planner.py:59-60 define CotaEsgotada(RuntimeError); linha 96-97 checa failure_class=='CODEX_QUOTA' e levanta. Teste test_planejar_propaga_cota_esgotada cobre."},
+    {"criterio": "resposta sem JSON levanta PlanoInvalido citando o trecho inicial", "atende": true, "evidencia": "planner.py:107-109 captura PlanoInvalido e anexa 'início da resposta: {trecho!r}' com resposta[:160]. Teste test_planejar_cita_inicio_da_resposta_sem_json valida INICIO presente e MARCADOR NO FIM ausente."},
+    {"criterio": "teste usa driver falso via AUTODEV_FAKE_AGENT, sem cota real", "atende": true, "evidencia": "test_plan_agente.py:20-21 seta AUTODEV_FAKE_AGENT=1 e AUTODEV_FAKE_SPEC; nunca chama binario real."},
+    {"criterio": "testes em .autodev/tests/test_plan_agente.py", "atende": true, "evidencia": "arquivo existe com 112 linhas e 5 testes; 5 passed ao rodar isolado."},
+    {"criterio": "suite inteira verde", "atende": true, "evidencia": "python3 -m pytest .autodev/tests/ -q -> 180 passed (verificado na worktree do commit 642ba49). O report informava 178 passed + 2 skipped; a diferenca e ambiental (skips de agente real), mas a suite esta verde."},
+    {"criterio": "preservacao: nenhum arquivo de task anterior removido/reescrito", "atende": true, "evidencia": "git diff --name-status base..HEAD mostra apenas A .autodev/tests/test_plan_agente.py e M autodev/planner.py; nenhum teste de outra task alterado ou apagado."},
+    {"criterio": "mudanca aditiva em planner.py (Plano, TaskPlano, validar_plano preservados)", "atende": true, "evidencia": "base 4e9f322 ja tinha Plano, TaskPlano, PlanoInvalido, SprintJaExiste, escrever_sprint, parsear_plano, _construir_task, validar_plano, validar_e_ordenar; todos permanecem. Nada foi removido."}
+  ],
+  "findings": [
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 74, "descricao": "Ramificação 'nenhum sprint encontrado' (PlanoInvalido quando .autodev/sprints nao tem DEVFACTORY-N) nao é exercitada por nenhum teste.", "correcao_sugerida": "Adicionar um teste que chama planejar em um raiz sem diretorio de sprint e espera PlanoInvalido."},
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 198, "descricao": "parsear_plano foi alterado: prompt_original deixou de ser obrigatório (dados.get(..., '')). É mudança de comportamento em função existente, não remoção; necessária porque o prompt (plan_prompt.py) não solicita a chave prompt_original, e planejar sobrescreve o campo em seguida.", "correcao_sugerida": "Nenhuma obrigatória; apenas registrar que a suíte existente (test_planner/test_plan_parser) já cobre o novo comportamento e segue verde."},
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 85, "descricao": "Leitura de AUTODEV_AGENT_TIMEOUT (int(...)) nunca é exercitada por teste — valor inválido causaria ValueError não tratado.", "correcao_sugerida": "Opcional: teste de robustez para AUTODEV_AGENT_TIMEOUT inválido/ausente."},
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 77, "descricao": "O log do novo plano é gravado no diretório do sprint EXISTENTE mais recente (candidatos[-1]), não em um sprint novo. Semântica aceitável para P06 (o sprint ainda não foi criado) e coberta pelo teste, mas merece registro.", "correcao_sugerida": "Documentar a escolha no docstring ou confirmar que P07/P08 realocam o log para o sprint recém-criado."}
+  ],
+  "resumo": "Mudança aditiva, limpa e bem testada: planejar reusa agents.invocar, propaga CotaEsgotada e PlanoInvalido corretamente, e a suite inteira passa (180 passed), sem segredos, caminhos frágeis, dependência nova ou escrita fora do projeto."
+}
+```
 
 
 ===== STDERR =====
-error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h1m50s.
-AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 139h1m50s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"45576754-5e05-45f3-ae92-de8f65d675ef-9"}
 

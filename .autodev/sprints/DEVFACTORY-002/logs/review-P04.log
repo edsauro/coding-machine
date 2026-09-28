@@ -1,4 +1,4 @@
-# exit_code=0 duracao=245.7s modelo=deepseek-flash effort=(default) failure_class=None
+# exit_code=0 duracao=140.8s modelo=deepseek-v4-pro effort=(default) failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -22,192 +22,156 @@ P04: Validar o plano contra o DAG real e contra criterio vago
 ```diff
 diff --git a/.autodev/tests/test_plan_validacao.py b/.autodev/tests/test_plan_validacao.py
 new file mode 100644
-index 0000000..35eb022
+index 0000000..8bb10af
 --- /dev/null
 +++ b/.autodev/tests/test_plan_validacao.py
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,76 @@
 +import pytest
 +
-+from autodev.planner import (
-+    PALAVRAS_VAGAS,
-+    Plano,
-+    PlanoInvalido,
-+    TaskPlano,
-+    validar_e_ordenar,
-+)
++from autodev import planner
 +
 +
-+def plano(*tasks):
-+    return Plano(
-+        titulo="Sprint de teste",
-+        objetivo="Validar o plano",
-+        repositorio=".",
-+        tasks=list(tasks),
-+        prompt_original="pedido de teste",
-+    )
-+
-+
-+def task(task_id, *, deps=None, criterios=None):
-+    return TaskPlano(
++def task(task_id="P1", deps=None, criterios=None):
++    return planner.TaskPlano(
 +        id=task_id,
-+        titulo=f"Tarefa {task_id}",
-+        criterios=criterios or ["arquivo autodev/planner.py existe"],
-+        deps=deps or [],
-+        agente="codex",
++        titulo="Implementar validação",
++        criterios=["aceita JSON"] if criterios is None else criterios,
++        deps=[] if deps is None else deps,
 +        teste="python3 -m pytest",
 +    )
 +
 +
-+def test_devolve_ondas_do_dag_real():
-+    resultado = validar_e_ordenar(
-+        plano(
-+            task("T1"),
-+            task("T3", deps=["T1"]),
-+            task("T2", deps=["T1"]),
-+            task("T4", deps=["T2", "T3"]),
-+        )
-+    )
-+
-+    assert resultado == [["T1"], ["T2", "T3"], ["T4"]]
++def plano(tasks):
++    return planner.Plano("Validação", "Validar plano", ".", tasks, "validar")
 +
 +
-+def test_recusa_ciclo_citando_ids_envolvidos():
-+    ciclico = plano(
-+        task("T1", deps=["T2"]),
-+        task("T2", deps=["T1"]),
-+        task("T9"),
-+    )
++def test_devolve_ondas_com_dependencias_e_ordem_deterministica():
++    entrada = plano([
++        task("P4", ["P2", "P3"]), task("P3", ["P1"]),
++        task("P2", ["P1"]), task("P1"), task("P0"),
++    ])
 +
-+    with pytest.raises(PlanoInvalido) as erro:
-+        validar_e_ordenar(ciclico)
-+
-+    mensagem = str(erro.value)
-+    assert "T1" in mensagem
-+    assert "T2" in mensagem
-+    assert "T9" not in mensagem
++    assert planner.validar_e_ordenar(entrada) == [["P0", "P1"], ["P2", "P3"], ["P4"]]
 +
 +
-+@pytest.mark.parametrize("palavra", PALAVRAS_VAGAS)
-+def test_recusa_criterio_vago_citando_task_e_indice(palavra):
-+    invalido = plano(
-+        task(
-+            "T7",
-+            criterios=[
-+                "arquivo autodev/planner.py existe",
-+                f"{palavra.capitalize()} a qualidade do projeto",
-+            ],
-+        )
-+    )
-+
-+    with pytest.raises(PlanoInvalido) as erro:
-+        validar_e_ordenar(invalido)
-+
-+    mensagem = str(erro.value)
-+    assert "T7" in mensagem
-+    assert "indice 1" in mensagem
++@pytest.mark.parametrize("tasks, ids", [
++    ([task("P1", ["P2"]), task("P2", ["P3"]), task("P3", ["P1"])],
++     ["P1", "P2", "P3"]),
++    ([task("P1", ["P1"])], ["P1"]),
++])
++def test_recusa_ciclo_citando_ids(tasks, ids):
++    with pytest.raises(planner.PlanoInvalido, match="ciclo") as erro:
++        planner.validar_e_ordenar(plano(tasks))
++    assert all(task_id in str(erro.value) for task_id in ids)
 +
 +
-+@pytest.mark.parametrize(
-+    "criterio",
-+    [
-+        "refatorar autodev/planner.py preservando as APIs existentes",
-+        "otimizar a validação; testar com python3 -m pytest .autodev/tests/ -q",
-+    ],
-+)
-+def test_aceita_criterio_vago_quando_traz_evidencia_concreta(criterio):
-+    assert validar_e_ordenar(plano(task("T1", criterios=[criterio]))) == [["T1"]]
++@pytest.mark.parametrize("tasks", [
++    [], [task(criterios=[])], [task(), task()], [task(deps=["P9"])],
++])
++def test_recusa_estrutura_invalida(tasks):
++    with pytest.raises(planner.PlanoInvalido):
++        planner.validar_e_ordenar(plano(tasks))
 +
 +
-+@pytest.mark.parametrize(
-+    "criterio",
-+    [
-+        "melhorar o texto, ver 2.0 do manual",
-+        "revisar o modulo principal v1.2",
-+    ],
-+)
-+def test_recusa_numero_de_versao_como_evidencia_de_arquivo(criterio):
-+    with pytest.raises(PlanoInvalido):
-+        validar_e_ordenar(plano(task("T8", criterios=[criterio])))
++@pytest.mark.parametrize("verbo", ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"])
++def test_recusa_criterio_vago_com_id_e_indice_mesmo_com_teste_na_task(verbo):
++    entrada = plano([task("P7", criterios=["aceita JSON", f"{verbo.upper()} o código"])])
++    with pytest.raises(planner.PlanoInvalido, match=r"P7.*critério 2"):
++        planner.validar_e_ordenar(entrada)
++
++
++@pytest.mark.parametrize("criterio", [
++    "Melhorar autodev/planner.py para recusar ciclos",
++    "Revisar README.md para documentar as ondas",
++    "Ajustar Makefile para executar a suíte",
++    "Otimizar e verificar com python3 -m pytest",
++    "Refatorar e executar pytest -q",
++    "Revisar e executar npm test",
++    "Ajustar e executar go test ./...",
++    "Retorna três ondas para o DAG de exemplo",
++])
++def test_aceita_criterio_concreto(criterio):
++    assert planner.validar_e_ordenar(plano([task(criterios=[criterio])])) == [["P1"]]
++
++
++@pytest.mark.parametrize("criterio", [
++    "Melhorar o código. Depois validar.",
++    "Revisar os arquivos e testes",
++    "Ajustar a relação entrada/saída",
++])
++def test_prosa_sem_arquivo_ou_comando_nao_torna_criterio_concreto(criterio):
++    with pytest.raises(planner.PlanoInvalido, match="P1.*critério 1"):
++        planner.validar_e_ordenar(plano([task(criterios=[criterio])]))
 diff --git a/autodev/planner.py b/autodev/planner.py
-index d15b440..13c7e09 100644
+index d15b440..33f77dd 100644
 --- a/autodev/planner.py
 +++ b/autodev/planner.py
-@@ -3,8 +3,30 @@
+@@ -3,8 +3,26 @@
  from __future__ import annotations
  
  import json
 +import re
  from dataclasses import dataclass, field
  
-+from .config import ordem_topologica
++from . import config
 +
 +
 +PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
 +
-+
-+_ARQUIVO = re.compile(r"(?<!\w)(?:[\w.-]+/)*[\w.-]+\.[A-Za-z][A-Za-z0-9]*(?!\w)")
++# Referências textuais: o arquivo pode ainda ser criado pela sprint.
++_ARQUIVO = re.compile(
++    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+\.[A-Za-z][A-Za-z0-9]*\b"
++    r"|\b(?:Makefile|Dockerfile)\b"
++)
 +_COMANDO_TESTE = re.compile(
-+    r"\b(?:python3?\s+-m\s+pytest|pytest|npm\s+(?:run\s+)?test|"
-+    r"yarn\s+test|pnpm\s+test|go\s+test|cargo\s+test|mvn\s+test|"
-+    r"gradlew?\s+test)\b",
++    r"\b(?:pytest|(?:python(?:3)?\s+-m\s+unittest)|"
++    r"(?:npm|pnpm|yarn)\s+(?:run\s+)?test|"
++    r"(?:go|cargo)\s+test|make\s+test)\b",
 +    re.IGNORECASE,
 +)
-+
-+
-+def _criterio_vago(criterio: str) -> bool:
-+    palavras = "|".join(re.escape(palavra) for palavra in PALAVRAS_VAGAS)
-+    contem_palavra_vaga = re.search(rf"\b(?:{palavras})\b", criterio, re.IGNORECASE)
-+    contem_evidencia = _ARQUIVO.search(criterio) or _COMANDO_TESTE.search(criterio)
-+    return bool(contem_palavra_vaga and not contem_evidencia)
 +
  
  @dataclass
  class TaskPlano:
-@@ -115,6 +137,12 @@ def validar_plano(plano: Plano) -> list[str]:
-     for task in tasks:
-         if not task.criterios:
-             erros.append(f"task {task.id} sem criterios")
-+        for indice, criterio in enumerate(task.criterios):
-+            if _criterio_vago(criterio):
-+                erros.append(
-+                    f"task {task.id}, criterio de indice {indice} "
-+                    f"(posição {indice + 1}) é vago e não cita arquivo nem comando de teste"
-+                )
-         for dep in task.deps:
-             if dep not in conhecidos:
-                 erros.append(f"{task.id} depende de {dep}, que não existe no plano")
-@@ -135,3 +163,23 @@ def validar_plano(plano: Plano) -> list[str]:
+@@ -135,3 +153,30 @@ def validar_plano(plano: Plano) -> list[str]:
          if estado[task_id] == 0:
              visita(task_id)
      return erros
 +
 +
 +def validar_e_ordenar(plano: Plano) -> list[list[str]]:
-+    """Valida o plano e devolve suas ondas usando o ordenador do DAG real."""
-+    erros = validar_plano(plano)
-+    if erros:
-+        raise PlanoInvalido("plano inválido:\n  - " + "\n  - ".join(erros))
++    """Valida o DAG e os critérios e retorna ondas; índices começam em 1."""
++    dag = {"tasks": [
++        {"id": task.id, "titulo": task.titulo,
++         "criterios": task.criterios, "deps": task.deps}
++        for task in plano.tasks
++    ]}
++    erros = config.valida_dag(dag)
++    if not plano.tasks:
++        erros.append("plano sem tasks")
 +
-+    dag = {
-+        "tasks": [
-+            {
-+                "id": task.id,
-+                "titulo": task.titulo,
-+                "criterios": task.criterios,
-+                "deps": task.deps,
-+            }
-+            for task in plano.tasks
-+        ]
-+    }
-+    return ordem_topologica(dag)
++    for task in plano.tasks:
++        for indice, criterio in enumerate(task.criterios, start=1):
++            palavras = set(re.findall(r"\w+", criterio.casefold()))
++            if (palavras.intersection(PALAVRAS_VAGAS)
++                    and not _ARQUIVO.search(criterio)
++                    and not _COMANDO_TESTE.search(criterio)):
++                erros.append(
++                    f"task {task.id}: critério {indice} vago; "
++                    "cite um arquivo ou comando de teste"
++                )
++
++    if erros:
++        raise PlanoInvalido("Plano inválido:\n  - " + "\n  - ".join(erros))
++    return config.ordem_topologica(dag)
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 44%]
-..............................................ss........................ [ 89%]
-.................                                                        [100%]
-159 passed, 2 skipped in 7.57s
+........................................................................ [ 41%]
+..............................................ss........................ [ 83%]
+.............................                                            [100%]
+171 passed, 2 skipped in 7.52s
 
 ```
 
@@ -244,102 +208,28 @@ Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
 
 
 ===== STDOUT =====
+```json
 {
   "veredito": "APPROVE",
-  "confianca": 0.76,
+  "confianca": 0.93,
   "criterios_atendidos": [
-    {
-      "criterio": "existe a funcao validar_e_ordenar(plano) em autodev/planner.py que reusa ordem_topologica do modulo de config",
-      "atende": true,
-      "evidencia": "planner.py:9 importa ordem_topologica de .config e planner.py:185 a chama. Verifiquei em execucao (monkeypatch com contador): 1 chamada real por validacao, payload {'tasks':[{'id','titulo','criterios','deps'}]}. A ordem vem de config.py:198 (ondas ordenadas por sorted)."
-    },
-    {
-      "criterio": "devolve as ondas de execucao e recusa plano ciclico com mensagem citando os ids envolvidos",
-      "atende": true,
-      "evidencia": "Ondas reais: [['T1'],['T2','T3'],['T4']] para o DAG de 4 tasks. Ciclo: PlanoInvalido com 'plano inválido:\\n  - ciclo entre dependências envolvendo T2 e T1' (T9, fora do ciclo, nao aparece). Ressalva: em ciclo de 3 ids a mensagem cita apenas o par que fecha o ciclo (T3 e T1, omite T2) — finding baixa."
-    },
-    {
-      "criterio": "existe a lista PALAVRAS_VAGAS com termos como melhorar, otimizar, refatorar, revisar, ajustar",
-      "atende": true,
-      "evidencia": "planner.py:12 — imprimi a lista em execucao: ['melhorar','otimizar','refatorar','revisar','ajustar']. O criterio sobre o CONTEUDO da lista nao e provado pela suite (finding media: mutar a lista para ['melhorar','revisar'] mantem 158 passed)."
-    },
-    {
-      "criterio": "um criterio que usa PALAVRAS_VAGAS sem citar arquivo nem comando de teste e recusado com o id da task e o indice do criterio",
-      "atende": true,
-      "evidencia": "Mensagem real: 'plano inválido:\\n  - task T7, criterio de indice 1 (posição 2) é vago e não cita arquivo nem comando de teste' (planner.py:140-145). Case-insensitive: 'Melhorar o projeto (sem evidencia)' tambem e recusado."
-    },
-    {
-      "criterio": "um criterio concreto que cita arquivo ou comando de teste e aceito",
-      "atende": true,
-      "evidencia": "Probes diretos: 'melhorar a qualidade do README.md' -> aceito; 'melhorar o projeto, testar com pytest' -> aceito; 'ajustar o teste .autodev/tests/test_plan_validacao.py' -> aceito; 'otimizar; rodar cargo test no crates/engine' -> aceito; 'refatorar autodev/planner.py...' devolve [['T1']]."
-    },
-    {
-      "criterio": "os testes ficam em .autodev/tests/test_plan_validacao.py e provam as recusas e a aceitacao",
-      "atende": true,
-      "evidencia": "Arquivo novo (102 linhas, blob 35eb022, confere com o diff entregue). 11 testes executados: 1 ondas, 1 ciclo, 5 recusa-vago (parametrizados), 2 aceita-com-evidencia, 2 recusa-versao. Cobrem recusa e aceitacao, mas o parametrizado e tautologico (finding media)."
-    },
-    {
-      "criterio": "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
-      "atende": true,
-      "evidencia": "No worktree DEVFACTORY-002-P04-codex (HEAD 890e3d6): 161 passed, 0 skipped (usei /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q; o python3 do PATH nao tem pytest). O output fornecido (159P/2S) e de ambiente com bwrap indisponivel — mesmo total coletado (161)."
-    },
-    {
-      "criterio": "preservacao obrigatoria: nenhum arquivo de task anterior removido ou reescrito",
-      "atende": true,
-      "evidencia": "git diff --numstat 24eae62..HEAD = 102+/0- em test_plan_validacao.py (novo) e 48+/0- em planner.py: zero delecoes e nenhum outro arquivo. Os arquivos de outras tasks tocados pelo commit t8 (test_plan_parser.py, test_plan_prompt.py, plan_prompt.py) ficam com blobs IDENTICOS ao base (5da12e7/e7a3220/a59f887) — sem lesao liquida."
-    },
-    {
-      "criterio": "estender autodev/planner.py sem remover Plano, TaskPlano, validar_plano (mudanca aditiva)",
-      "atende": true,
-      "evidencia": "Li planner.py inteiro (185 linhas): TaskPlano (l.31), Plano (l.41), PlanoInvalido (l.50), parsear_plano (l.54), _construir_task (l.101), validar_plano (l.125) intactos; validar_plano apenas ganhou o bloco for/enumerate (l.140-145), que so ACRESCENTA erros."
-    }
+    {"criterio": "existe validar_e_ordenar(plano) em autodev/planner.py que reusa ordem_topologica do modulo de config", "atende": true, "evidencia": "autodev/planner.py:158-182 define validar_e_ordenar; linha 182 retorna config.ordem_topologica(dag). Import config na linha 9."},
+    {"criterio": "devolve as ondas de execucao e recusa plano ciclico com mensagem citando os ids envolvidos", "atende": true, "evidencia": "ordem_topologica devolve list[list[str]] (ondas); ciclo e detectado em config.valida_dag (linha 169, 'ciclo: P1 -> ...') e vira PlanoInvalido na linha 181. Teste test_recusa_ciclo_citando_ids valida ids P1/P2/P3 e self-loop P1."},
+    {"criterio": "existe a lista PALAVRAS_VAGAS com melhorar, otimizar, refatorar, revisar, ajustar", "atende": true, "evidencia": "autodev/planner.py:12 contem os cinco termos exatos."},
+    {"criterio": "criterio que usa PALAVRAS_VAGAS sem citar arquivo nem comando de teste e recusado com id da task e indice do criterio", "atende": true, "evidencia": "linhas 170-178: interseccao com PALAVRAS_VAGAS sem _ARQUIVO nem _COMANDO_TESTE gera 'task {id}: critério {indice} vago'. Teste test_recusa_criterio_vago_com_id_e_indice_mesmo_com_teste_na_task confere 'P7.*critério 2'."},
+    {"criterio": "criterio concreto que cita arquivo ou comando de teste e aceito", "atende": true, "evidencia": "test_aceita_criterio_concreto cobre arquivo (planner.py, README.md, Makefile) e comando (pytest, npm test, go test, make test) e aceita."},
+    {"criterio": "testes ficam em .autodev/tests/test_plan_validacao.py e provam recusas e aceitacao", "atende": true, "evidencia": "arquivo existe com 23 testes (parametrizados) cobrindo ondas, ciclos, estrutura invalida, recusa de vago e aceitacao de concreto."},
+    {"criterio": "suite inteira verde: python3 -m pytest .autodev/tests/ -q", "atende": true, "evidencia": "executado no worktree P04: 173 passed in 16.22s (test_plan_validacao.py: 23 passed). O prompt reportava 171 passed + 2 skipped; ambos verdes — a divergencia e so de ambiente/skip."},
+    {"criterio": "preservacao: nenhum arquivo de task anterior removido ou reescrito", "atende": true, "evidencia": "diff toca apenas autodev/planner.py (aditivo) e cria .autodev/tests/test_plan_validacao.py (arquivo novo). git status do worktree limpo."},
+    {"criterio": "mudanca aditiva em planner.py sem remover Plano, TaskPlano, validar_plano", "atende": true, "evidencia": "dataclasses Plano/TaskPlano e funcoes parsear_plano/validar_plano/_construir_task permanecem inalteradas; apenas adicoes de import re, import config, PALAVRAS_VAGAS, _ARQUIVO, _COMANDO_TESTE e validar_e_ordenar."}
   ],
   "findings": [
-    {
-      "severidade": "media",
-      "arquivo": "autodev/planner.py",
-      "linha": 26,
-      "descricao": "Degenerescencia com lista vazia: _criterio_vago monta o regex a cada chamada e, se PALAVRAS_VAGAS estiver vazia, o padrao vira r'\\b(?:)\\b', que casa QUALQUER string (confirmei: re.search casa 'qualquer criterio'), fazendo todo criterio sem arquivo/comando virar 'vago'. Reproduzi mutando PALAVRAS_VAGAS=[] via plugin pytest: a suite passa a reprovar plano valido de outra task (falha em .autodev/tests/test_planner.py:26) e o teste parametrizado vira skip ('got empty parameter set'), ou seja o modo de falha e explosivo e silencioso nos testes deste arquivo. Hoje a lista e uma constante de modulo com 5 itens e nada a muta, entao e bug latente, nao violacao dos criterios.",
-      "correcao_sugerida": "Recusar explicitamente a lista vazia e/ou compilar o regex uma vez no import: _VAGAS = re.compile(r'\\b(?:' + '|'.join(map(re.escape, PALAVRAS_VAGAS)) + r')\\b', re.I) com guarda 'if not PALAVRAS_VAGAS: return False' antes de usar."
-    },
-    {
-      "severidade": "media",
-      "arquivo": ".autodev/tests/test_plan_validacao.py",
-      "linha": 62,
-      "descricao": "O teste que deveria provar o criterio 'existe a lista PALAVRAS_VAGAS com termos como melhorar, otimizar, refatorar, revisar, ajustar' e tautologico: @pytest.mark.parametrize('palavra', PALAVRAS_VAGAS) itera a propria constante que deveria ser verificada. Prova empirica: com PALAVRAS_VAGAS reduzida a ['melhorar','revisar'] a suite inteira fica verde (158 passed); removendo so 'ajustar' tambem (160 passed). Ou seja otimizar, refatorar e ajustar podem desaparecer da lista sem nenhum teste falhar — e com a lista vazia o teste e reportado como SKIPPED, nao como falha.",
-      "correcao_sugerida": "Fixar o conteudo com literais: assert set(PALAVRAS_VAGAS) >= {'melhorar','otimizar','refatorar','revisar','ajustar'} (ou parametrizar com a lista literal de strings em vez da constante importada)."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": "autodev/planner.py",
-      "linha": 157,
-      "descricao": "A deteccao de ciclo roda em validar_plano (codigo pre-existente de P01) e reporta apenas o par que fecha o ciclo. Para T1->T2->T3->T1 a mensagem e 'ciclo entre dependências envolvendo T3 e T1' — T2, que faz parte do ciclo, nao e citado, o que e uma leitura estrita de 'citando os ids envolvidos'. Nenhum teste cobre ciclo de 3+ ids (so o caso de 2 ids).",
-      "correcao_sugerida": "Reportar o caminho completo (a pilha de visita ja existe) ou, no minimo, acrescentar um teste de ciclo de 3 ids que documente o comportamento aceito."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": "autodev/planner.py",
-      "linha": 15,
-      "descricao": "Heuristica de evidencia com falsos positivos/negativos nao cobertos por teste: o regex _ARQUIVO aceita dominios como arquivo ('otimizar o site exemplo.com.br' passa como concreto) e recusa caminho de diretorio sem extensao ('revisar o modulo em autodev/' e tratado como vago). Numeros de versao estao corretamente tratados ('revisar o guia 2.0' e recusado), mas esses dois extremos nao tem teste.",
-      "correcao_sugerida": "Adicionar casos ao teste (dominio nao conta como arquivo; diretorio com barra conta) e, se o comportamento for indesejado, exigir extensao plausivel ou exigir separador de caminho."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": "autodev/planner.py",
-      "linha": 174,
-      "descricao": "Payload morto: o dict entregue a ordem_topologica carrega 'titulo' e 'criterios', que config.ordem_topologica ignora (usa so id/deps) — confirmado no meu probe (payload keys ['criterios','deps','id','titulo']). Tambem nao ha reuso de um conversor existente Plano->dag. Sem TODOs nem implementacao pela metade; nenhum segredo, credencial, caminho absoluto ou escrita fora do repo no diff; nenhuma dependencia nova (apenas 're' da stdlib).",
-      "correcao_sugerida": "Reduzir o dict a {'id': task.id, 'deps': task.deps} (ou extrair um helper plano_para_dag) para nao sugerir que os outros campos sao consumidos."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": ".autodev/tests/test_plan_parser.py",
-      "linha": 0,
-      "descricao": "Somente informativo: o commit t8 (890e3d6) e um commit normal (pai unico 9338c32) que adiciona, alem dos dois arquivos da P04, arquivos de outras tasks (test_plan_parser.py, test_plan_prompt.py, autodev/plan_prompt.py) e ainda reescreve o test_plan_validacao.py criado pelo t7 (19+/2-). Comparados com o base 24eae62 os blobs sao identicos, entao nao houve lesao a entregas anteriores; mas vale confirmar que essa sincronizacao foi do orquestrador (integracao por onda) e nao escrita do agente em arquivo de outra task.",
-      "correcao_sugerida": "Nenhuma acao de codigo; registrar no log da task que os arquivos vieram de sincronizacao com a branch de integracao (blob-identicos ao base)."
-    }
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 165, "descricao": "validar_e_ordenar nao reusa a validacao estrutural ja existente em validar_plano (duplica checagem de ids duplicados/deps/empty em config.valida_dag). O criterio so exige reuso de ordem_topologica, entao nao e reprovacao, mas ha duas vias de validacao de DAG que podem divergir no futuro.", "correcao_sugerida": "Considerar centralizar a validacao estrutural em um unico ponto (ex.: validar_plano chamar config.valida_dag, ou validar_e_ordenar compor com validar_plano) para evitar drift."},
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 15, "descricao": "_COMANDO_TESTE usa re.IGNORECASE mas _ARQUIVO nao. Um criterio com extensao em maiusculas (ex.: 'Melhorar README.MD') seria recusado como vago mesmo citando arquivo. Caso de borda sem cobertura de teste.", "correcao_sugerida": "Adicionar re.IGNORECASE a _ARQUIVO, ou normalizar criterio com casefold() antes do search (ja casefolda so para a extracao de palavras)."}
   ],
-  "resumo": "A entrega cumpre todos os 9 criterios de aceitacao (verificados no worktree DEVFACTORY-002-P04-codex, HEAD 890e3d6: diff base..HEAD com 150 insercoes e zero delecoes, 161 testes verdes, ondas e mensagens de recusa conferidas em execucao), com dois pontos medios a endurecer depois: o regex de palavras vagas degenera e reprova plano valido se PALAVRAS_VAGAS ficar vazia, e o teste parametrizado e tautologico (prova so 2 dos 5 termos exigidos — otimizar, refatorar e ajustar podem sumir com a suite ainda verde)."
+  "resumo": "Todos os criterios de aceitacao sao atendidos por implementacao aditiva correta e coberta por testes reais; suite verde (173 passed) e sem regressao, com apenas duas observacoes de baixa severidade."
 }
+```
 
 
 ===== STDERR =====
