@@ -1,0 +1,53 @@
+sprint_id: DEVFACTORY-004
+titulo: Correcoes apontadas pela revisao retroativa da sprint 2
+objetivo: >
+  Corrigir, com o mesmo processo (task -> agente -> revisao -> integracao), o que a
+  revisao retroativa por LLM apontou na sprint 2: a secao '## Planejador' foi inserida
+  dentro de '## Como rodar' (rebaixando 'Ciclo de vida do sprint' e 'Conclusao por
+  evidencia' a subsecoes dela); o teste de documentacao corta a secao so no proximo
+  '## ' e por isso examina subsecoes que nao sao do Planejador (prova menos do que
+  anuncia); o README afirma coisas que o codigo nao sustenta (agente do planejador e
+  fixo em 'codex'; 'Suite do orquestrador: 123 testes' esta obsoleto); e os criterios
+  mandam 'python3 -m pytest', que nao roda nesta maquina fora do runner do motor. Nada
+  foi corrigido a mao no trabalho integrado - quem corrige e esta sprint, com teste
+  para cada correcao.
+
+status: PLANEJADO          # declaracao; o FATO esta em state.db (sprint_state.estado)
+data_encerramento: null
+resultado: null
+deadline: null
+max_tentativas: 5          # espelha policies.yaml
+
+# Depende de DEVFACTORY-002 (ENCERRADA, 10/10): os arquivos tocados existem em main.
+depende_de: DEVFACTORY-002
+
+# Comando de teste por task. Obrigatorio: o repositorio nao tem pyproject.toml nem
+# tests/ na raiz, entao a auto-deteccao devolveria "nenhum". Forma com o interpretador
+# do projeto: 'python3 -m pytest' so funciona dentro do runner do motor, que resolve o
+# interpretador — quem roda o comando literalmente falha nesta maquina (achado das duas
+# revisoes retroativas).
+aceitacao:
+  comando: ".venv/bin/python -m pytest .autodev/tests/ -q"
+  evidencia: ".autodev/sprints/DEVFACTORY-004/evidence/"
+
+# Politica de custo: comecar sempre no degrau mais barato (spec §9)
+modelo_inicial: gpt-5.6-luna
+effort_inicial: low
+
+repositorio:
+  raiz: .
+  branch_integracao: sprint/DEVFACTORY-004/integration
+  merge_em_main: false     # NUNCA. O trabalho fica no branch para revisao humana.
+
+# Portao de aprovacao (preenchido pelo `autodev aprovar <sprint> --por <nome>`):
+#   aprovacao:
+#     por: <nome>
+#     quando: "2026-09-28T12:00:00-03:00"
+#     hash_dag: <sha256 do dag.json>
+aprovacao: null
+
+ambiente:
+  detectado_em: "2026-09-28"
+  os: "Arch Linux 7.2.3-arch1-3"
+  python: "3.11.16"
+  sandbox: "bwrap (sem daemon, sem root)"
