@@ -1,0 +1,122 @@
+# exit_code=3 duracao=142.8s modelo=(default do agente) effort=(default) failure_class=CODEX_QUOTA
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P02: Criar autodev/plan_prompt.py com o prompt de planejamento
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe autodev/plan_prompt.py com a constante PROMPT_PLANO (string) e a funcao montar_prompt_plano(prompt_usuario)
+- montar_prompt_plano devolve uma string que CONTEM o prompt do usuario sem alteracao
+- o prompt exige que o agente responda APENAS um JSON com as chaves titulo, objetivo, repositorio e tasks
+- o prompt exige que cada task tenha id, titulo, criterios, deps, agente e teste
+- o prompt proibe criterio vago: exige que cada criterio mencione um arquivo ou um comando de teste concreto
+- o prompt exige que a ultima task seja sempre um teste de aceitacao ponta a ponta
+- os testes ficam em .autodev/tests/test_planner.py e provam que os elementos obrigatorios aparecem no prompt montado
+- a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+
+## Contexto do projeto
+# DEVFACTORY-002 — Planejador: do prompt ao plano executável
+
+## O que esta sprint entrega
+
+Um comando novo, `autodev plan "<pedido em texto livre>"`, que produz um sprint
+executável em disco (`spec.md` + `dag.json` + `sprint.yaml`), validado pelas
+mesmas regras que o `autodev` já aplica na carga do DAG.
+
+Hoje esse passo é manual: alguém escreve o `spec.md` e o `dag.json` à mão antes
+de o orquestrador fazer qualquer coisa. Esta sprint fecha essa metade.
+
+## CONTRATO DE INTERFACES (não invente outros nomes)
+
+Estas assinaturas são usadas por tasks de ondas diferentes. Se você precisa de
+algo que não está aqui, **use o que está aqui**; não crie uma variante.
+
+```
+autodev/planner.py
+  @dataclass Plano:      titulo, objetivo, repositorio, tasks, prompt_original
+  @dataclass TaskPlano:  id, titulo, criterios, deps, agente, teste
+  validar_plano(plano) -> list[str]            # vazio = válido
+  parsear_plano(texto) -> Plano
+  validar_e_ordenar(plano) -> list[list[str]]  # ondas; reusa ordem_topologica
+  escrever_sprint(raiz, plano) -> Path
+  planejar(raiz, prompt_usuario, agente) -> Plano
+  exceções: PlanoInvalido, SprintJaExiste, CotaEsgotada
+  constante: PALAVRAS_VAGAS
+
+autodev/plan_prompt.py
+  PROMPT_PLANO: str
+  montar_prompt_plano(prompt_usuario) -> str
+```
+
+## REGRAS DURAS PARA O AGENTE
+
+1. **Trabalhe SOMENTE no seu worktree.** Nunca faça `cd` para fora dele, nunca
+   toque no repositório principal, nunca faça merge nem push.
+2. **Rode os testes antes de terminar:**
+   `python3 -m pytest .autodev/tests/ -q`
+   A suíte inteira tem que ficar verde. `python3` aqui é resolvido pelo runner
+   para o interpretador do projeto — use exatamente esta forma.
+3. **Os testes novos vão nos arquivos já indicados nos seus critérios.** Não
+   crie um arquivo de teste novo se o critério nomeia um existente.
+4. **Não invente APIs do projeto.** Os módulos existentes e seus nomes reais:
+   `agents.invocar`, `config.ordem_topologica`, `state.StateStore`,
+   `testrunner.rodar`, `sandbox.rodar`, `worktree.WorktreeManager`,
+   `planner` (novo). Confira a assinatura no arquivo antes de chamar.
+5. **Não altere o comportamento existente** para fazer o seu teste passar. Se um
+   teste antigo falhar, o problema é o seu código.
+6. **Cada critério é verificável.** Se você não consegue provar um critério com
+   um teste ou com um comando, o critério não foi atendido.
+7. **Sem dados pessoais.** Nada de nomes, caminhos de HOME ou credenciais em
+   código, teste ou documentação.
+
+## Por que o
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-002-P02-agy
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 7: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+ral."}, {"severidade": "alta", "arquivo": ".autodev/tests/test_planner.py", "linha": 1, "descricao": "P02 cria .autodev/tests/test_planner.py como arquivo NOVO (git diff 98f42e1..HEAD mostra 'A'), mas esse caminho ja existe na integracao com 6 testes de validar_plano criados pela P01. 'git merge-tree 98f42e1 b963e0e 05bfaf6' devolve conflito add/add nesse arquivo. A integracao nao e automatica e, se resolvida pelo lado do P02, os 6 testes de validar_plano (ids duplicados, dependencia inexistente, ciclo, task sem criterios) desaparecem sem que nenhum teste acuse a perda de cobertura.", "correcao_sugerida": "Preservar os testes existentes do arquivo e ACRESCENTAR os de plan_prompt (o criterio nomeia esse arquivo, entao nao cabe criar outro). Na pratica isso exige que a base do worktree inclua as dependencias ja integradas, para o agente enxergar o arquivo em vez de recria-lo."}, {"severidade": "media", "arquivo": ".autodev/tests/test_planner.py", "linha": 21, "descricao": "A assercao que deveria provar o criterio 5 e vacua: \"assert 'arquivo' in prompt or 'comando de teste' in prompt\" tambem e satisfeita pela frase da ultima task (plan_prompt.py:12, 'arquivo e comando de teste concretos'), que nada diz sobre criterio vago. Prova empirica: numa copia em scratch removi de PROMPT_PLANO as linhas 8-9 (a exigencia de criterio concreto/proibicao de vago) e os 2 testes continuaram verdes (2 passed). O teste passa sem provar o comportamento que o criterio exige.", "correcao_sugerida": "Ancorar a assercao no trecho especifico da exigencia, p.ex. assert 'mencionar um arquivo ou um comando de teste' in prompt e assert 'vagos' in prompt, de modo que apagar a frase quebre o teste."}, {"severidade": "media", "arquivo": "autodev/plan_prompt.py", "linha": 3, "descricao": "Risco de integracao no mesmo caminho: autodev/plan_prompt.py tambem e criado por P06 (commit 349f7c5, PROMPT_PLANO = 'Responda APENAS com um JSON contendo titulo, objetivo, repositorio e tasks...') e por P07 (commit 10310ac, que pede YAML: 'Converta o pedido do usuario em YAML...'). Conferido com git grep nos branches. O contrato da sprint proibe variantes, mas a integracao tera add/add nesse arquivo e qual prompt vale passa a depender da resolucao do conflito - e o criterio 5 (proibir criterio vago) so esta textualmente atendido na versao do P02. Nao e defeito introduzido pelo codigo do P02, e sim do plano de ondas.", "correcao_sugerida": "Integrar P02 antes de P06/P07 (ou rebasear P06/P07 sobre a P02) e reusar a mesma PROMPT_PLANO, sem redefinir o arquivo."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_planner.py", "linha": 22, "descricao": "As duas ultimas assercoes usam lower() e casam texto deliberadamente desacentuado, o que fez o texto do prompt ser escrito para o teste e nao para o leitor: plan_prompt.py:9 diz 'proíba e não use critérios vagos' (imperativo sem destinatario claro - o agente deve REDIGIR criterio concreto, nao 'proibir') e a linha 10 repete a palavra com parentese: 'A ultima task (última tarefa)'. Assercoes de substring tambem nao verificam estrutura (nao checam que a exigencia esta vinculada a cada criterio, nem ordem/contagem).", "correcao_sugerida": "Redigir a instrucao como ordem direta ao agente ('Nunca use criterio vago; todo criterio deve citar um arquivo ou um comando de teste concreto') e asserir um trecho estavel desse texto, sem duplicacao nem dictacao de texto desacentuado."}, {"severidade": "baixa", "arquivo": "evidencia de testes anexada ao pedido de revisao", "linha": 0, "descricao": "A saida anexada (132 passed, 2 skipped in 18.84s) nao corresponde a arvore revisada: no worktree DEVFACTORY-002-P02-codex o comando de aceitacao devolveu 134 passed, 0 skipped (40.51s). Nao esta identificado em qual revisao a evidencia foi coletada, o que impede amarrar 'suite verde' ao commit revisado.", "correcao_sugerida": "Coletar a saida de 'python3 -m pytest .autodev/tests/ -q' dentro do worktree da task e anexa-la junto do sha revisado."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_planner.py
+  - autodev/plan_prompt.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #4.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 4a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+
+
+===== STDERR =====
+error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 122h47m57s.
+AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 122h47m57s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"f87d73dc-7e7c-4652-b766-eec6e5a77bb5-9"}
+

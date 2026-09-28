@@ -92,6 +92,10 @@ class Orquestrador:
         self.store = StateStore(self.raiz / ".autodev" / "state.db")
         self.wm = WorktreeManager(self.raiz, self.raiz / ".autodev" / "worktrees")
         self.disponiveis = agents.detectar(self.cfg)
+        # Agentes que estouraram cota NESTA rodada. Regra do autor (2026-09-27):
+        # não parar por agente que tem substituto — cota do agente secundário não
+        # estaciona a task por 5h10m.
+        self._sem_cota: set[str] = set()
         self.dag: dict = {}
         self._parar = False
         signal.signal(signal.SIGINT, self._sinal)
@@ -233,6 +237,22 @@ class Orquestrador:
         return commit_atual(self.raiz)
 
     # ------------------------------------------------------------ uma task
+    def _quarentena_cota(self, agente: str, task_id: str = "") -> None:
+        """Tira um agente secundário da rodada quando a cota dele estoura.
+
+        Marca a indisponibilidade em `self.disponiveis`, que é o que a escada de
+        revisão e a troca de agente consultam. Sem isto, cada task tentaria o agy
+        de novo (minutos por chamada) só para redescobrir a mesma cota estourada.
+        """
+        if agente in self._sem_cota:
+            return
+        self._sem_cota.add(agente)
+        info = self.disponiveis.get(agente)
+        if info is not None:
+            info.disponivel = False
+            info.erro = f"{info.erro} | cota esgotada nesta rodada".strip(" |")
+        self.log(f"{task_id or '-'}: {agente} FORA desta rodada (cota esgotada)")
+
     def executar_task(self, task_id: str) -> ResumoTask:
         spec = next(t for t in self.dag["tasks"] if t["id"] == task_id)
         criterios = spec["criterios"]
@@ -293,9 +313,19 @@ class Orquestrador:
                     return ResumoTask(task_id, "BLOCKED", n_tent, esperas,
                                       motivo=d.motivo)
                 if d.estrategia == retry.Estrategia.TROCAR_AGENTE and d.agente:
-                    agente = d.agente
-                    wt = self.wm.criar(self.sprint, task_id, agente, base=base)
-                    self.store.adquirir_worktree(str(wt.caminho), task_id, agente)
+                    alvo = d.agente
+                    if alvo in self._sem_cota:
+                        # Trocar para quem já estourou cota nesta rodada custaria
+                        # 5h10m de espera por um agente SECUNDÁRIO. Mantém quem
+                        # está funcionando — a sprint não para por revisor/agente
+                        # que tem substituto.
+                        self.log(f"{task_id}: {alvo} esta fora desta rodada (cota)"
+                                 f" — seguindo com {agente}")
+                        alvo = agente
+                    if alvo != agente:
+                        agente = alvo
+                        wt = self.wm.criar(self.sprint, task_id, agente, base=base)
+                        self.store.adquirir_worktree(str(wt.caminho), task_id, agente)
                 modelo_info = self.cfg.modelo_para_tentativa(d.tentativa_proxima)
             else:
                 d = None
@@ -359,6 +389,27 @@ class Orquestrador:
 
             # ---- cota do Codex: espera de RECURSO, não falha --------------------
             if res.failure_class == "CODEX_QUOTA":
+                if agente != "codex":
+                    # A espera de 5h10m protege a cota do agente PRIMÁRIO. Cota do
+                    # agente secundário (agy) não pode estacionar a task: o agy sai
+                    # da rodada, a tentativa é DEVOLVIDA (não conta) e o codex
+                    # reassume. `continue` reexecuta com quem funciona.
+                    self._quarentena_cota(agente, task_id)
+                    self.store.finalizar_tentativa(
+                        self.sprint, task_id, att, status="WAITING_RESOURCE",
+                        exit_code=res.exit_code, failure_class="QUOTA_AGENTE",
+                        test_result={"nota": f"cota do {agente} esgotada: agente fora"
+                                             " desta rodada, tentativa devolvida"})
+                    self.store.conn.execute(
+                        "UPDATE tasks SET tentativas=?, agente='codex', estado='QUEUED',"
+                        " atualizado_em=? WHERE sprint_id=? AND task_id=?",
+                        (n_tent, time.time(), self.sprint, task_id))
+                    self.store.conn.commit()
+                    self.store.liberar_worktree(str(wt.caminho))
+                    # a variável local também muda: só mexer no banco faria o laço
+                    # reexecutar o MESMO agente sem cota e girar para sempre.
+                    agente = "codex"
+                    continue
                 espera = self.cfg.espera_cota(self.modo_teste)
                 retry_after = time.time() + espera
                 esperas += 1
@@ -454,6 +505,8 @@ class Orquestrador:
             self.log(f"{task_id}: revisao por {rv.revisor} "
                      f"[{rv.origem or 'cruzada'}] -> {rv.veredito} "
                      f"({len(rv.findings)} findings)")
+            for ag_sem_cota in (rv.sem_cota or []):
+                self._quarentena_cota(ag_sem_cota, task_id)
             if not rv.aprovado:
                 fp = retry.fingerprint(task_id, "REVIEW_FAILURE", rv.resumo, alterados)
                 self.store.finalizar_tentativa(

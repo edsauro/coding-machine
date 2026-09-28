@@ -339,3 +339,32 @@ caminhos proibidos do `policies.yaml`.
 **Testes:** `test_sandbox_nao_copia_a_credencial_para_dentro_do_projeto`,
 `test_sandbox_monta_a_credencial_somente_leitura`,
 `test_limpeza_remove_copia_antiga_em_worktree`.
+
+## D-15 — Cota do agente SECUNDÁRIO não estaciona a task
+
+**Contexto (achado da 1ª rodada de retomada, 21:42):** com três reprovações de
+revisão, o motor aplicou a regra "4ª tentativa → troca de agente" e mandou P02
+para o **agy**. O agy está com a cota individual estourada → o motor classificou
+como `CODEX_QUOTA` e registrou **espera de recurso de 5h10m** para uma task que
+tem substituto pronto. Parada por um agente secundário.
+
+**Regra (do autor):** a espera de 5h10m protege a cota do agente **primário**. Se
+quem estourou cota foi o agente secundário: ele sai da rodada, a tentativa é
+**devolvida** (não consome o contador) e o codex reassume.
+
+**Implementado em:**
+* `orchestrator._quarentena_cota` — tira o agente de circulação e marca
+  `disponiveis[agente].disponivel = False`, que é o que a escada de revisão e a
+  troca de agente consultam (sem isso cada task gastaria minutos redescobrindo a
+  mesma cota);
+* ramo de cota para `agente != "codex"`: `failure_class = QUOTA_AGENTE`, contador
+  devolvido, `resolver_esperas` não é chamado, laço continua com o codex (a
+  variável local também muda — só mexer no banco faria o laço girar para sempre);
+* `review.Revisao.sem_cota` — a revisão denuncia quem estourou cota e o
+  orquestrador aplica a quarentena já na primeira task, em vez de repetir a
+  chamada perdida em todas as seguintes.
+
+**Testes:** `test_cota_do_agente_secundario_nao_estaciona_a_task` (aceitação, com
+o driver determinístico: nenhuma espera fica em nome do agy, a tentativa dele é
+devolvida e o agy sai da rodada), `test_reserva_entra_quando_o_revisor_da_escada_falha`
+(`sem_cota == ["agy"]`).

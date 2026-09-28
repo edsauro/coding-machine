@@ -153,6 +153,9 @@ def test_reserva_entra_quando_o_revisor_da_escada_falha(repo, cfg, monkeypatch):
     assert r.modelo == "deepseek-flash"
     assert r.origem.startswith("reserva")
     assert [c.agente for c in chamadas] == ["agy", "hermes"]
+    # a revisão denuncia quem estourou cota, para o orquestrador tirar de circulação
+    assert r.sem_cota == ["agy"]
+    assert r.to_dict()["sem_cota"] == ["agy"]
 
 
 def test_cadeia_de_reserva_atravessa_flash_e_pro_ate_revisar(repo, cfg,
@@ -288,6 +291,40 @@ def test_desbloquear_recusa_contador_no_teto(cfg):
 
 
 # ------------------------------------------------------------------ HAQ-001
+def test_cota_do_agente_secundario_nao_estaciona_a_task(tmp_path, monkeypatch):
+    """Regra "não parar": cota do agy devolve a tentativa e o codex reassume.
+
+    Antes desta correção: a task era trocada para o agy (4ª tentativa) e, com a
+    cota do agy estourada, ia para WAITING_RESOURCE com espera de 5h10m — parada
+    por um agente que tem substituto. Aqui a prova é: nenhuma espera de cota fica
+    registrada em nome do agy, a tentativa dele não consome o contador, e ele sai
+    da rodada.
+    """
+    from autodev.orchestrator import Orquestrador
+    from conftest import TASK_FIXTURE, criar_fixture, escreve_fake_spec, scaffold_sprint
+
+    fx = criar_fixture(tmp_path / "fixture")
+    scaffold_sprint(fx, SPRINT, [{**TASK_FIXTURE, "agente": "agy"}],
+                    objetivo="cota do agente secundario")
+    spec = escreve_fake_spec(tmp_path / "fake.json", {"acao": "quota"})
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(spec))
+
+    o = Orquestrador(fx, SPRINT, modo_teste=True)
+    o.rodar()
+
+    assert "agy" in o._sem_cota, "o agy deveria sair da rodada"
+    assert o.disponiveis["agy"].disponivel is False
+    esperas = o.store.conn.execute(
+        "SELECT agent FROM resource_waits WHERE sprint_id=?", (SPRINT,)).fetchall()
+    assert all(e["agent"] == "codex" for e in esperas), \
+        f"espera de cota em nome do agy: {[e['agent'] for e in esperas]}"
+    devolvidas = o.store.conn.execute(
+        "SELECT COUNT(*) c FROM attempts WHERE sprint_id=? AND"
+        " failure_class='QUOTA_AGENTE'", (SPRINT,)).fetchone()["c"]
+    assert devolvidas == 1, "a tentativa do agy precisa ficar registrada como devolvida"
+
+
 @pytest.mark.skipif(SOB_SANDBOX, reason="prepara o HOME do host, não do sandbox")
 def test_sandbox_nao_copia_a_credencial_para_dentro_do_projeto():
     home = sandbox.preparar_home()

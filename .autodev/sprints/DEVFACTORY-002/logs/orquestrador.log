@@ -205,3 +205,11 @@
 [21:30:01] P02 tentativa 6: codex gpt-5.6-luna/low
 [21:30:57] P02: testes exit=0 passed=132 failed=0 (configurado)
 [21:32:03] sinal de parada recebido — finalizando com checkpoint
+[21:33:32] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03', 'P04'], ['P05', 'P06'], ['P07'], ['P08', 'P09'], ['P10']]
+[21:33:32] P02 tentativa 7: codex gpt-5.6-sol/low
+[21:34:17] P02: testes exit=0 passed=132 failed=0 (configurado)
+[21:39:48] P02: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> REQUEST_CHANGES (6 findings)
+[21:39:48] P02 tentativa 8: agy (default)/(default)
+[21:42:11] P02: COTA ESGOTADA — aguardando 18600s (checkpoint em HEAD)
+[21:42:11] P03 tentativa 6: codex gpt-5.6-sol/low
+[21:43:02] P03: testes exit=0 passed=136 failed=0 (configurado)

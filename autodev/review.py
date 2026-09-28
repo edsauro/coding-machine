@@ -95,6 +95,7 @@ class Revisao:
     cru: str = ""
     erro: str = ""
     origem: str = ""            # de onde veio o revisor: escada/cruzada/reserva
+    sem_cota: list[str] = field(default_factory=list)   # agentes que estouraram cota
 
     @property
     def aprovado(self) -> bool:
@@ -104,7 +105,8 @@ class Revisao:
         return {"veredito": self.veredito, "revisor": self.revisor,
                 "modelo": self.modelo, "confianca": self.confianca,
                 "findings": self.findings, "criterios": self.criterios,
-                "resumo": self.resumo, "erro": self.erro, "origem": self.origem}
+                "resumo": self.resumo, "erro": self.erro, "origem": self.origem,
+                "sem_cota": self.sem_cota}
 
 
 def _extrai_json(txt: str) -> dict | None:
@@ -250,6 +252,9 @@ def revisar(*, worktree: str, base: str, task_id: str, titulo: str,
     # no portão determinístico. Regra do autor (2026-09-27): o revisor nunca
     # interrompe o sprint — troca de modelo é preferível a parar.
     motivos = [f"{revisor}: {motivo}"]
+    # Quem estourou cota não é reescolhido nesta rodada — o orquestrador recebe
+    # esta lista e tira o agente de circulação até a cota voltar (D-15).
+    sem_cota = [revisor] if "CODEX_QUOTA" in motivo else []
     if tentativa and hasattr(cfg, "revisor_reserva_cadeia"):
         for res in cfg.revisor_reserva_cadeia():
             ag_res = res.get("agente") or "hermes"
@@ -259,13 +264,17 @@ def revisar(*, worktree: str, base: str, task_id: str, titulo: str,
             if r2 is not None:
                 r2.origem = (f"reserva ({ag_res}/{res.get('modelo')}) — "
                              f"falhou antes: {'; '.join(motivos)}")
+                r2.sem_cota = sem_cota
                 return _aplica_piso(r2, worktree, base, criterios, testes)
             motivos.append(f"{ag_res}/{res.get('modelo')}: {motivo2}")
+            if "CODEX_QUOTA" in motivo2 and ag_res not in sem_cota:
+                sem_cota.append(ag_res)
 
     r = _revisao_deterministica(worktree, base, criterios, testes,
                                 motivo="revisores LLM esgotados — "
                                        + "; ".join(motivos))
     r.origem = origem
+    r.sem_cota = sem_cota
     return r
 
 
