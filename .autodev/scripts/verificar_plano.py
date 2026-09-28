@@ -17,7 +17,7 @@ Regras (ERRO bloqueia; AVISO exige justificativa no plano):
   E2 duas tasks da MESMA onda citam o mesmo arquivo
   E3 duas tasks citam o MESMO arquivo de teste (qualquer onda)  <- a armadilha D-16
   E4 task sem nenhum arquivo nomeado nos criterios (criterio nao verificavel)
-  E5 comando de teste deve ser `python3 -m pytest ...` (o worktree nao tem venv)
+  E5 invocacao pytest deve usar `python3 -m pytest ...`; teste sem venv relativo
   A1 arquivo compartilhado entre ondas diferentes (exige criterio de preservacao)
   A2 task que mexe em modulo de outra task sem depender dela
 
@@ -105,33 +105,24 @@ def _sentencas(texto: str) -> list[str]:
 
 def _comando_de_teste_incorreto(texto: str, *, campo_teste: bool) -> bool:
     """Reconhece comandos pytest afirmativos fora da forma do runner."""
-    if campo_teste:
-        if not texto.strip():
-            return False
-        for trecho in _sentencas(texto):
-            if CAMINHO_VENV_RELATIVO.search(trecho) and not NEGACOES_COMANDO.search(trecho):
-                return True
-        return COMANDO_PYTEST_CORRETO.search(texto) is None
-
     for trecho in _sentencas(texto):
         if NEGACOES_COMANDO.search(trecho):
             continue
-        contem_pytest = re.search(r"\bpytest\b", trecho) is not None
-        contem_venv = CAMINHO_VENV_RELATIVO.search(trecho) is not None
-        if not (contem_pytest or contem_venv):
-            continue
-        # Um caminho relativo de venv afirmativo e sempre um comando invalido,
-        # mesmo quando a frase tambem cita a forma correta.
-        if contem_venv:
+        contexto_teste = campo_teste or re.search(
+            r"-m\s+pytest\b|\btest\w*|\bsu[ií]te\b|\bpytest\s+-", trecho, re.I,
+        )
+        if CAMINHO_VENV_RELATIVO.search(trecho) and contexto_teste:
             return True
-        if COMANDO_PYTEST_CORRETO.search(trecho):
-            continue
-        # Nos criterios, uma simples referencia a pytest sem instrucao de
-        # execucao nao e um comando.
+        # Retire apenas a invocacao correta, nao a frase inteira: um segundo
+        # comando incorreto na mesma frase ainda precisa ser diagnosticado.
+        restante = COMANDO_PYTEST_CORRETO.sub("", trecho)
+        if re.search(r"\bpython[\d.]*\s+-m\s+pytest\b", restante):
+            return True
         if re.search(
-            r"\b(?:test\w*|rod\w*|execut\w*|su[ií]te|comando)\b|[:`>$]",
-            trecho,
-            re.I,
+            r"\bpytest\b(?=\s+(?:-|[\w./-]*[/\\]|test[\w.-]*\b))"
+            r"|(?:^|[&|`>$])\s*pytest\s*(?:$|[`;&|])"
+            r"|\b(?:rode|rodar|execute|executar)\s+pytest\b",
+            restante, re.I,
         ):
             return True
     return False
@@ -190,7 +181,15 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
         if _comando_de_teste_incorreto(teste, campo_teste=True) or criterio_incorreto:
             erros.append(
                 f"E5: {t['id']} usa comando de teste fora da forma exigida; "
-                "o worktree nao tem venv — use python3 -m pytest ..."
+                "use python3 -m pytest ..."
+                + ("; o worktree nao tem venv" if any(
+                    CAMINHO_VENV_RELATIVO.search(trecho)
+                    and _comando_de_teste_incorreto(trecho, campo_teste=campo)
+                    for texto, campo in [(teste, True)] + [
+                        (c, False) for c in t.get("criterios", [])
+                    ]
+                    for trecho in _sentencas(texto)
+                ) else "")
             )
 
     teste_de: dict[str, set[str]] = {i: {a for a in f if e_arquivo_de_teste(a)}

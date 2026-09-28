@@ -21,8 +21,8 @@ Não escreva critério vago. Cada critério deve mencionar pelo menos um arquivo
 específico ou um comando de teste concreto que permita verificar a entrega.
 A última task deve ser sempre um teste de aceitação ponta a ponta da entrega.
 
-Nos critérios e no campo "teste", use `python3 -m pytest ...`. Não use
-`.venv/bin/python` nem outro caminho de venv relativo: o worktree nao tem venv;
+Para testes pytest, nos critérios e no campo "teste", use `python3 -m pytest ...`.
+Não use `.venv/bin/python` nem outro caminho de venv relativo: o worktree nao tem venv;
 o runner do motor resolve o python3 para o interpretador do projeto.
 
 Pedido original do usuário:

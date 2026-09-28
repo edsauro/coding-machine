@@ -1,5 +1,4 @@
 import importlib.util
-import re
 from pathlib import Path
 
 import pytest
@@ -99,12 +98,11 @@ def test_prompt_exige_python3_com_pytest():
 
     texto = plan_prompt.PROMPT_PLANO
     assert "python3 -m pytest" in texto
-    assert re.search(r"\b(?:nao|não)\s+use\s+`?\.venv/bin/python", texto, re.I)
-    assert not re.search(
-        r"(?<!nao )(?<!não )\buse\s+`?\.venv/bin/python",
-        texto,
-        re.I,
-    )
+    linhas_venv = [linha.lower() for linha in texto.splitlines()
+                   if ".venv/bin/python" in linha]
+    assert linhas_venv
+    assert all(any(negacao in linha for negacao in ("não use", "nao use", "proibido", "nunca"))
+               for linha in linhas_venv)
     assert "worktree nao tem venv" in texto
     assert plan_prompt.montar_prompt_plano("pedido").endswith("pedido")
 
@@ -150,3 +148,36 @@ def test_preserva_regras_e2_e3_e4_a1_e_a2():
     assert any(erro.startswith("E4: P4") for erro in erros)
     assert any(aviso.startswith("A1:") for aviso in avisos)
     assert any(aviso.startswith("A2:") for aviso in avisos)
+
+
+@pytest.mark.parametrize("criterio", [
+    "os testes usam pytest e a suite roda em menos de 30 s",
+    "o arquivo de teste cobre o caso de pytest sem comando",
+    "rode .venv/bin/python autodev/cli.py plan --sprint X",
+])
+def test_mencoes_e_cli_nao_sao_comandos_de_teste(criterio):
+    erros, _ = verificar_plano.verificar(_dag(
+        "python3 -m pytest -q", criterio="edita autodev/alvo.py; " + criterio,
+    ), "X")
+    assert not any(e.startswith("E5:") for e in erros)
+
+
+@pytest.mark.parametrize("comando", [
+    "make test", "npm test", "python3 -m unittest discover -v",
+    "bash .autodev/scripts/rodar.sh", "go test ./...",
+])
+def test_outras_stacks_continuam_aceitas(comando):
+    erros, _ = verificar_plano.verificar(_dag(comando), "X")
+    assert not any(e.startswith("E5:") for e in erros)
+
+
+@pytest.mark.parametrize("comando", [
+    "pytest -q", "python -m pytest -q",
+    "python3 -m pytest -q && pytest tests/",
+])
+def test_invocacao_incorreta_tem_diagnostico_sem_culpar_venv(comando):
+    erros, _ = verificar_plano.verificar(_dag(comando), "X")
+    diagnosticos = [e for e in erros if e.startswith("E5:")]
+    assert diagnosticos
+    assert all("python3 -m pytest" in e and "worktree nao tem venv" not in e
+               for e in diagnosticos)
