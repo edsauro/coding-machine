@@ -1,4 +1,4 @@
-# exit_code=-15 duracao=64.3s modelo=deepseek-flash effort=(default) failure_class=UNKNOWN
+# exit_code=0 duracao=220.2s modelo=deepseek-flash effort=(default) failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -10,216 +10,214 @@ Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
 - levanta PlanoInvalido (definida em autodev/planner.py) quando nao ha JSON reconhecivel
 - levanta PlanoInvalido quando o JSON nao tem a chave tasks
 - importa as dataclasses de autodev/planner.py em vez de redefinir
-- os testes ficam em .autodev/tests/test_planner.py e cobrem os 3 formatos aceitos e 2 recusas
+- os testes ficam em .autodev/tests/test_plan_parser.py e cobrem os 3 formatos aceitos e 2 recusas
 - a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito (proibido apagar ou substituir arquivo de teste de outra task); a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q
+- estender autodev/planner.py sem remover as dataclasses e funcoes que ja existem (Plano, TaskPlano, validar_plano): mudanca aditiva
 
 ## Task
 P03: Parsear a resposta do agente de forma tolerante
 
-## Diff a revisar (base b963e0eb0ca2559ca98b10bfac2ec0d5203a4e7e -> HEAD)
+## Diff a revisar (base 726b575d897649f8cf0c751b1f5f676ad9c03af3 -> HEAD)
 ```diff
-diff --git a/.autodev/tests/test_planner.py b/.autodev/tests/test_planner.py
-index 615737d..a949d4b 100644
---- a/.autodev/tests/test_planner.py
-+++ b/.autodev/tests/test_planner.py
-@@ -1,46 +1,54 @@
--from autodev.planner import Plano, TaskPlano, validar_plano
+diff --git a/.autodev/tests/test_plan_parser.py b/.autodev/tests/test_plan_parser.py
+new file mode 100644
+index 0000000..5da12e7
+--- /dev/null
++++ b/.autodev/tests/test_plan_parser.py
+@@ -0,0 +1,90 @@
 +import json
 +
 +import pytest
 +
 +from autodev.planner import Plano, PlanoInvalido, TaskPlano, parsear_plano
- 
- 
--def task(task_id="T1", deps=None, criterios=None):
--    return TaskPlano(
--        id=task_id,
--        titulo=f"Tarefa {task_id}",
--        criterios=["entrega verificável"] if criterios is None else criterios,
--        deps=[] if deps is None else deps,
--        agente="codex",
--        teste="python3 -m pytest",
--    )
++
++
 +PLANO = {
-+    "titulo": "Sprint de teste",
-+    "objetivo": "Validar o parser",
-+    "repositorio": "projeto",
++    "titulo": "Sprint de parser",
++    "objetivo": "Interpretar a resposta do agente",
++    "repositorio": ".",
 +    "tasks": [
 +        {
-+            "id": "T01",
++            "id": "T1",
 +            "titulo": "Implementar parser",
 +            "criterios": ["aceita JSON"],
 +            "deps": [],
 +            "agente": "codex",
-+            "teste": "pytest",
++            "teste": "python3 -m pytest",
 +        }
 +    ],
++    "prompt_original": "crie o parser",
 +}
- 
- 
--def plano(tasks):
--    return Plano(
--        titulo="Sprint de teste",
--        objetivo="Validar o planejador",
--        repositorio=".",
--        tasks=tasks,
--        prompt_original="criar um planejador",
--    )
-+@pytest.mark.parametrize("texto", [
-+    json.dumps(PLANO),
-+    "```json\n" + json.dumps(PLANO) + "\n```",
-+    "Resposta do agente:\n" + json.dumps(PLANO) + "\nFim.",
-+])
-+def test_parseia_os_formatos_tolerados(texto):
-+    plano = parsear_plano(texto)
 +
-+    assert isinstance(plano, Plano)
-+    assert isinstance(plano.tasks[0], TaskPlano)
-+    assert plano.tasks[0].id == "T01"
-+    assert plano.prompt_original == texto
- 
- 
--def test_plano_valido_nao_tem_erros():
--    assert validar_plano(plano([task("T1"), task("T2", deps=["T1"])])) == []
-+def test_recusa_texto_sem_json():
-+    with pytest.raises(PlanoInvalido):
-+        parsear_plano("não há um plano aqui")
- 
- 
--def test_recusa_plano_sem_tasks():
--    assert validar_plano(plano([]))
-+def test_recusa_json_sem_tasks():
-+    with pytest.raises(PlanoInvalido):
-+        parsear_plano(json.dumps({"titulo": "incompleto"}))
- 
- 
--def test_recusa_task_sem_criterios():
--    assert validar_plano(plano([task(criterios=[])]))
-+def test_ignora_objeto_json_irrelevante_no_texto_explicativo():
-+    texto = "Metadados: {}\nPlano gerado:\n" + json.dumps(PLANO)
- 
-+    plano = parsear_plano(texto)
- 
--def test_recusa_ids_duplicados():
--    assert validar_plano(plano([task("T1"), task("T1")]))
--
--
--def test_recusa_dependencia_inexistente():
--    assert validar_plano(plano([task("T1", deps=["T9"])]))
--
--
--def test_recusa_ciclo_entre_dependencias():
--    assert validar_plano(plano([task("T1", deps=["T2"]), task("T2", deps=["T1"])]))
-+    assert plano.titulo == "Sprint de teste"
++
++@pytest.mark.parametrize(
++    "resposta",
++    [
++        json.dumps(PLANO),
++        f"```json\n{json.dumps(PLANO)}\n```",
++        f"Segue o plano solicitado:\n{json.dumps(PLANO)}\nEspero que ajude.",
++    ],
++    ids=["json-puro", "cerca-de-codigo", "texto-explicativo"],
++)
++def test_parseia_formatos_tolerados(resposta):
++    plano = parsear_plano(resposta)
++
++    assert plano == Plano(
++        titulo="Sprint de parser",
++        objetivo="Interpretar a resposta do agente",
++        repositorio=".",
++        tasks=[
++            TaskPlano(
++                id="T1",
++                titulo="Implementar parser",
++                criterios=["aceita JSON"],
++                deps=[],
++                agente="codex",
++                teste="python3 -m pytest",
++            )
++        ],
++        prompt_original="crie o parser",
++    )
++
++
++def test_recusa_texto_sem_json_reconhecivel():
++    with pytest.raises(PlanoInvalido, match="reconhecível"):
++        parsear_plano("O agente não devolveu um plano.")
++
++
++def test_recusa_json_sem_chave_tasks():
++    resposta = json.dumps({chave: valor for chave, valor in PLANO.items() if chave != "tasks"})
++
++    with pytest.raises(PlanoInvalido, match="tasks"):
++        parsear_plano(resposta)
++
++
++@pytest.mark.parametrize("campo", ["criterios", "deps"])
++def test_recusa_lista_nula_em_task(campo):
++    dados = json.loads(json.dumps(PLANO))
++    dados["tasks"][0][campo] = None
++
++    with pytest.raises(PlanoInvalido, match="estrutura do plano inválida"):
++        parsear_plano(json.dumps(dados))
++
++
++def test_ignora_metadados_extras_do_agente():
++    dados = json.loads(json.dumps(PLANO))
++    dados["versao"] = 1
++    dados["tasks"][0]["estimativa"] = "pequena"
++
++    plano = parsear_plano(json.dumps(dados))
++
++    assert plano.titulo == PLANO["titulo"]
++    assert plano.tasks[0].id == "T1"
++
++
++def test_recusa_resposta_nao_textual_com_erro_do_dominio():
++    with pytest.raises(PlanoInvalido, match="reconhecível"):
++        parsear_plano(None)
 diff --git a/autodev/planner.py b/autodev/planner.py
-index 11d35f1..403a12c 100644
+index 11d35f1..d15b440 100644
 --- a/autodev/planner.py
 +++ b/autodev/planner.py
-@@ -1,10 +1,14 @@
--"""Tipos e validação do plano de execução de uma sprint."""
--
-+"""Modelos e parsing tolerante da resposta do agente planejador."""
+@@ -2,6 +2,7 @@
+ 
  from __future__ import annotations
  
 +import json
  from dataclasses import dataclass, field
  
  
+@@ -24,6 +25,81 @@ class Plano:
+     prompt_original: str
+ 
+ 
 +class PlanoInvalido(ValueError):
-+    """Resposta do agente que não contém um plano reconhecível."""
++    """Indica que a resposta do agente não contém um plano reconhecível."""
 +
 +
- @dataclass
- class TaskPlano:
-     id: str
-@@ -21,41 +25,48 @@ class Plano:
-     objetivo: str
-     repositorio: str
-     tasks: list[TaskPlano]
--    prompt_original: str
-+    prompt_original: str = ""
- 
- 
--def validar_plano(plano: Plano) -> list[str]:
--    """Retorna todos os problemas estruturais encontrados no plano."""
--    erros: list[str] = []
--    tasks = plano.tasks
--    if not tasks:
--        return ["plano sem tasks"]
-+def _encontrar_json(texto: str) -> dict:
-+    decodificador = json.JSONDecoder()
-+    primeiro_objeto = None
++def parsear_plano(texto: str) -> Plano:
++    """Converte um objeto JSON com ``tasks`` encontrado no texto em ``Plano``."""
++    if not isinstance(texto, str):
++        raise PlanoInvalido("resposta sem JSON reconhecível")
++
++    decoder = json.JSONDecoder()
++    objetos: list[dict] = []
++
 +    for inicio, caractere in enumerate(texto):
 +        if caractere != "{":
 +            continue
 +        try:
-+            valor, _ = decodificador.raw_decode(texto[inicio:])
++            valor, _ = decoder.raw_decode(texto[inicio:])
 +        except json.JSONDecodeError:
 +            continue
 +        if isinstance(valor, dict):
-+            primeiro_objeto = primeiro_objeto or valor
-+            if "tasks" in valor:
-+                return valor
-+    if primeiro_objeto is not None:
-+        return primeiro_objeto
-+    raise PlanoInvalido("resposta não contém JSON reconhecível")
- 
--    ids = [task.id for task in tasks]
--    conhecidos = set(ids)
--    if len(ids) != len(conhecidos):
--        erros.append("ids duplicados no plano")
- 
--    for task in tasks:
--        if not task.criterios:
--            erros.append(f"task {task.id} sem criterios")
--        for dep in task.deps:
--            if dep not in conhecidos:
--                erros.append(f"{task.id} depende de {dep}, que não existe no plano")
-+def parsear_plano(texto: str) -> Plano:
-+    """Converte JSON puro ou embutido em texto em um :class:`Plano`."""
-+    try:
-+        dados = _encontrar_json(texto)
-+    except (TypeError, PlanoInvalido) as erro:
-+        if isinstance(erro, PlanoInvalido):
-+            raise
-+        raise PlanoInvalido("resposta não contém JSON reconhecível") from erro
- 
--    grafo = {task.id: task.deps for task in tasks}
--    estado: dict[str, int] = {task_id: 0 for task_id in grafo}
-+    if "tasks" not in dados:
-+        raise PlanoInvalido("JSON do plano não contém a chave tasks")
- 
--    def visita(task_id: str) -> None:
--        estado[task_id] = 1
--        for dep in grafo[task_id]:
--            if estado.get(dep) == 1:
--                erros.append(f"ciclo entre dependências envolvendo {task_id} e {dep}")
--            elif estado.get(dep) == 0:
--                visita(dep)
--        estado[task_id] = 2
--
--    for task_id in grafo:
--        if estado[task_id] == 0:
--            visita(task_id)
--    return erros
-+    try:
-+        tarefas = [TaskPlano(**task) for task in dados["tasks"]]
-+        return Plano(
-+            titulo=dados.get("titulo", ""),
-+            objetivo=dados.get("objetivo", ""),
-+            repositorio=dados.get("repositorio", ""),
-+            tasks= tarefas,
-+            prompt_original=texto,
-+        )
-+    except (TypeError, ValueError) as erro:
-+        raise PlanoInvalido("JSON do plano possui tasks inválidas") from erro
++            objetos.append(valor)
++
++    if not objetos:
++        raise PlanoInvalido("resposta sem JSON reconhecível")
++
++    candidatos = [objeto for objeto in objetos if "tasks" in objeto]
++    if not candidatos:
++        raise PlanoInvalido("JSON sem a chave tasks")
++
++    ultimo_erro: (TypeError | KeyError | ValueError) | None = None
++    for dados in candidatos:
++        try:
++            tasks_brutas = dados["tasks"]
++            if not isinstance(tasks_brutas, list):
++                raise TypeError("tasks deve ser uma lista")
++
++            tasks = [_construir_task(task) for task in tasks_brutas]
++            campos = {
++                nome: dados[nome]
++                for nome in ("titulo", "objetivo", "repositorio", "prompt_original")
++            }
++            for nome, valor in campos.items():
++                if not isinstance(valor, str):
++                    raise TypeError(f"{nome} deve ser uma string")
++            return Plano(**campos, tasks=tasks)
++        except (TypeError, KeyError, ValueError) as erro:
++            ultimo_erro = erro
++
++    raise PlanoInvalido(f"estrutura do plano inválida: {ultimo_erro}") from ultimo_erro
++
++
++def _construir_task(dados: object) -> TaskPlano:
++    """Valida os tipos de uma task e ignora metadados desconhecidos."""
++    if not isinstance(dados, dict):
++        raise TypeError("cada task deve ser um objeto")
++
++    campos = {
++        nome: dados[nome]
++        for nome in ("id", "titulo", "criterios")
++    }
++    campos["deps"] = dados.get("deps", [])
++    campos["agente"] = dados.get("agente", "codex")
++    campos["teste"] = dados.get("teste", "")
++
++    for nome in ("id", "titulo", "agente", "teste"):
++        if not isinstance(campos[nome], str):
++            raise TypeError(f"{nome} deve ser uma string")
++    for nome in ("criterios", "deps"):
++        valor = campos[nome]
++        if not isinstance(valor, list) or not all(isinstance(item, str) for item in valor):
++            raise TypeError(f"{nome} deve ser uma lista de strings")
++
++    return TaskPlano(**campos)
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 52%]
-..............................................ss..................       [100%]
-136 passed, 2 skipped in 22.04s
+........................................................................ [ 48%]
+..............................................ss........................ [ 96%]
+......                                                                   [100%]
+148 passed, 2 skipped in 17.62s
 
 ```
 
@@ -256,6 +254,95 @@ Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
 
 
 ===== STDOUT =====
+{
+  "veredito": "APPROVE",
+  "confianca": 0.87,
+  "criterios_atendidos": [
+    {
+      "criterio": "existe parsear_plano(texto) em autodev/planner.py devolvendo um Plano",
+      "atende": true,
+      "evidencia": "autodev/planner.py:32-76; probe: type(r) is autodev.planner.Plano == True, isinstance(r, Plano) == True; assinatura (texto: 'str') -> 'Plano'"
+    },
+    {
+      "criterio": "aceita JSON puro, JSON em cerca de crase tripla e JSON cercado por texto explicativo",
+      "atende": true,
+      "evidencia": "test_plan_parser.py:26-53 (ids json-puro, cerca-de-codigo, texto-explicativo) passam; probes extras: cerca ``` sem tag de linguagem, cerca ~~~ e prosa com '{' antes do JSON também retornam Plano"
+    },
+    {
+      "criterio": "levanta PlanoInvalido (definida em autodev/planner.py) quando não há JSON reconhecível",
+      "atende": true,
+      "evidencia": "autodev/planner.py:28 (class PlanoInvalido(ValueError)), raise em :35 e :51; probes: '', '42', '[1,2,3]', b'...' e None => PlanoInvalido('resposta sem JSON reconhecível')"
+    },
+    {
+      "criterio": "levanta PlanoInvalido quando o JSON não tem a chave tasks",
+      "atende": true,
+      "evidencia": "autodev/planner.py:53-55; probe '{}' => PlanoInvalido('JSON sem a chave tasks'); coberto por test_plan_parser.py:61-65"
+    },
+    {
+      "criterio": "importa as dataclasses de autodev/planner.py em vez de redefinir",
+      "atende": true,
+      "evidencia": "test_plan_parser.py:5 'from autodev.planner import Plano, PlanoInvalido, TaskPlano, parsear_plano'; nenhuma dataclass redefine no teste; a igualdade com o dataclass real é o que valida o retorno"
+    },
+    {
+      "criterio": "testes em .autodev/tests/test_plan_parser.py cobrindo 3 formatos aceitos e 2 recusas",
+      "atende": true,
+      "evidencia": "arquivo com 90 linhas (git show confere byte a byte com o diff); 3 aceitos parametrizados + 4 recusas (sem JSON, sem tasks, listas nulas, entrada não textual); execução local: 9 passed"
+    },
+    {
+      "criterio": "suite inteira verde: python3 -m pytest .autodev/tests/ -q",
+      "atende": true,
+      "evidencia": "no worktree DEVFACTORY-002-P03-codex com o venv do repo: '150 passed in 40.25s' (mesmo total de 150 testes da saída informada, que teve 2 skips por ambiente: bwrap/models_cache ausentes)"
+    },
+    {
+      "criterio": "preservação: nenhum arquivo de task anterior removido ou reescrito",
+      "atende": true,
+      "evidencia": "git diff --numstat 726b575..HEAD = '90 0 test_plan_parser.py' e '76 0 autodev/planner.py'; git diff --diff-filter=DR vazio (nenhuma deleção/renomeação); .autodev/tests/test_planner.py (P01) e os demais 6 arquivos de teste intactos; worktree limpo (git status vazio)"
+    },
+    {
+      "criterio": "estender autodev/planner.py sem remover Plano, TaskPlano e validar_plano (mudança aditiva)",
+      "atende": true,
+      "evidencia": "numstat 76 inserções / 0 remoções; o diff só acrescenta 'import json' e o bloco parsear_plano/_construir_task; probes: hasattr(planner,'validar_plano') e hasattr(planner,'TaskPlano') True, base tinha 61 linhas e o arquivo agora tem 137"
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/planner.py",
+      "linha": 65,
+      "descricao": "O parser exige as 4 chaves de texto do topo (titulo/objetivo/repositorio/prompt_original) além de 'tasks': um JSON com 'tasks' mas sem 'objetivo' vira PlanoInvalido('estrutura do plano inválida'). É mais estrito do que o critério escrito ('levanta PlanoInvalido quando o JSON não tem a chave tasks') e esse caso não está coberto por teste.",
+      "correcao_sugerida": "Ou aceitar defaults ('' / '.') para os campos de texto ausentes, ou adicionar um teste explícito 'recusa plano sem campo obrigatório do topo' para fixar a decisão."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/planner.py",
+      "linha": 53,
+      "descricao": "Como a busca é por qualquer objeto JSON com 'tasks' e o primeiro que valida vence, um exemplo de plano citado pelo agente antes do plano real seria aceito silenciosamente (inclusive objeto aninhado dentro de um wrapper). Tolerância é o requisito, mas a escolha do candidato não tem heurística de posição/último-objeto.",
+      "correcao_sugerida": "Preferir o maior/último objeto válido com 'tasks', ou documentar no docstring que o primeiro objeto válido encontrado é o escolhido."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/planner.py",
+      "linha": 40,
+      "descricao": "raw_decode é chamado para cada '{' do texto, o que é O(n·m) em entrada com muitas chaves e pouco JSON útil. Medido: 116 KB de código-ruído com JSON válido ao final => 0.05 s, portanto sem impacto prático hoje, apenas nota de complexidade.",
+      "correcao_sugerida": "Nada obrigatório; se a entrada crescer, pré-extrair blocos cercados por ``` antes de varrer chaves."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_parser.py",
+      "linha": 56,
+      "descricao": "A recusa 'sem JSON reconhecível' é testada só com prosa pura; o caminho em planner.py:50-51 (JSON válido, mas não-dict: '[1,2]', '42') não tem teste apesar de existir código dedicado a ele. Os testes existentes provam de verdade o comportamento (comparação com o dataclass real, defaults de deps/agente/teste), não são tautológicos.",
+      "correcao_sugerida": "Adicionar parametrização com '[1,2]' e '42' em test_recusa_texto_sem_json_reconhecivel."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/",
+      "linha": 0,
+      "descricao": "A saída de testes informada (148 passed, 2 skipped) difere da reprodução independente no worktree (150 passed, 0 skipped) e da suíte do repositório principal (159 passed). O total de 150 coincide; a diferença de skips vem do ambiente (bwrap e models_cache.json), não do código entregue.",
+      "correcao_sugerida": "Nenhuma ação no código; apenas registrar a condição de ambiente ao anexar evidência."
+    }
+  ],
+  "resumo": "Entrega correta e mínima: parsear_plano é aditivo em autodev/planner.py, cobre os 3 formatos e as recusas exigidas, sem remover arquivo de task anterior, sem dependência nova, segredo, caminho absoluto ou escrita fora do projeto, e a suíte roda verde (150 passed) - as ressalvas são apenas de rigor/cobertura, todas de baixa severidade."
+}
 
 
 ===== STDERR =====

@@ -223,14 +223,14 @@ def carregar(alvo: str) -> tuple[dict, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Verifica um plano de sprint (somente leitura)")
-    ap.add_argument("alvo", nargs="?", help="sprint_id ou caminho do dag.json")
+    ap.add_argument("alvo", nargs="*", help="sprint_id ou caminho do dag.json")
     ap.add_argument("--todos", action="store_true", help="verifica todas as sprints")
     args = ap.parse_args()
 
     if args.todos:
         alvos = sorted((RAIZ / ".autodev" / "sprints").glob("*/dag.json"))
     elif args.alvo:
-        alvos = [args.alvo]
+        alvos = list(args.alvo)
     else:
         ap.error("informe a sprint, o dag.json ou --todos")
 

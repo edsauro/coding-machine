@@ -357,10 +357,21 @@ class StateStore:
 
     def forcar_estado(self, sprint_id: str, task_id: str, novo: str,
                       motivo: str = "forcado") -> None:
-        """Só para recuperação de crash — ignora a máquina de transições."""
-        self.conn.execute(
-            "UPDATE tasks SET estado=?, atualizado_em=? WHERE sprint_id=? AND task_id=?",
-            (novo, time.time(), sprint_id, task_id))
+        """Só para recuperação de crash — ignora a máquina de transições.
+
+        Limpa o motivo do bloqueio ao sair de BLOCKED: task QUEUED carregando
+        "depende de [...]" é dado inconsistente e envenena quem lê o motivo depois
+        (foi assim que o rearme automático parecia não funcionar).
+        """
+        if novo == "BLOCKED":
+            self.conn.execute(
+                "UPDATE tasks SET estado=?, atualizado_em=? WHERE sprint_id=? AND task_id=?",
+                (novo, time.time(), sprint_id, task_id))
+        else:
+            self.conn.execute(
+                "UPDATE tasks SET estado=?, bloqueio=NULL, atualizado_em=?"
+                " WHERE sprint_id=? AND task_id=?",
+                (novo, time.time(), sprint_id, task_id))
         self.evento(sprint_id, task_id, "estado_forcado", {"para": novo, "motivo": motivo})
 
     def bloqueia(self, sprint_id: str, task_id: str, motivo: str) -> None:

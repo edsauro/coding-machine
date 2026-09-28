@@ -248,3 +248,41 @@
 [22:19:17] P02: agy esta fora desta rodada (cota) — seguindo com codex
 [22:19:17] P02 tentativa 14: codex gpt-5.6-sol/medium
 [22:19:52] sinal de parada recebido — finalizando com checkpoint
+[22:26:36] sprint DEVFACTORY-002: 10 tasks (0 novas) — ondas [['P01', 'P02'], ['P03'], ['P04'], ['P05'], ['P06'], ['P07'], ['P08'], ['P09'], ['P10']]
+[22:26:36] recuperacao: {'stale': ['P03#8'], 'requeued': [], 'resource': []}
+[22:26:36] P02 tentativa 15: codex gpt-5.6-sol/low
+[22:29:54] P02: testes exit=0 passed=139 failed=0 (configurado)
+[22:34:54] P02: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> APPROVE (4 findings)
+[22:34:54] P02: agy FORA desta rodada (cota esgotada)
+[22:34:54] P02: DONE em 15 tentativa(s) — commit bf87b53d
+[22:34:54] integrando 1 task(s) da onda 0
+[22:35:17]   portao build: OK
+[22:35:17]   portao testes: OK
+[22:35:17]   portao lint: OK
+[22:35:17]   portao seguranca: OK
+[22:35:17] branch atual do repo: b0753a71 (main intacta — merge automatico proibido)
+[22:35:17] P03 tentativa 9: codex gpt-5.6-sol/low
+[22:38:01] P03: testes exit=0 passed=141 failed=0 (configurado)
+[22:40:32] P03: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (6 findings)
+[22:40:32] P03: agy esta fora desta rodada (cota) — seguindo com codex
+[22:40:32] P03 tentativa 10: codex gpt-5.6-sol/medium
+[22:43:31] P03: testes exit=0 passed=148 failed=0 (configurado)
+[22:47:11] P03: revisao por hermes [escada (tentativa 4)] -> APPROVE (5 findings)
+[22:47:11] P03: DONE em 10 tentativa(s) — commit 4b49a5d1
+[22:47:11] integrando 1 task(s) da onda 1
+[22:47:34]   portao build: OK
+[22:47:34]   portao testes: OK
+[22:47:34]   portao lint: OK
+[22:47:34]   portao seguranca: OK
+[22:47:34] branch atual do repo: b0753a71 (main intacta — merge automatico proibido)
+[22:47:34] P04 tentativa 7: codex gpt-5.6-sol/low
+[22:49:45] P04: testes exit=0 passed=145 failed=0 (configurado)
+[22:52:42] P04: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (7 findings)
+[22:52:42] P04: agy esta fora desta rodada (cota) — seguindo com codex
+[22:52:42] P04 tentativa 8: codex gpt-5.6-sol/medium
+[22:58:10] P04: testes exit=0 passed=159 failed=0 (configurado)
+[23:02:16] P04: revisao por hermes [escada (tentativa 4)] -> APPROVE (6 findings)
+[23:02:16] P04: DONE em 8 tentativa(s) — commit 890e3d61
+[23:02:16] integrando 1 task(s) da onda 2
+[23:02:16] integracao P04: CONFLITO — devolvido para retry
+[23:02:16] branch atual do repo: dbc9ebe5 (main intacta — merge automatico proibido)

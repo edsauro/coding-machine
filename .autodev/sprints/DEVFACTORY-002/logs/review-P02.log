@@ -1,4 +1,4 @@
-# exit_code=0 duracao=164.0s modelo=deepseek-flash effort=(default) failure_class=None
+# exit_code=0 duracao=153.7s modelo=deepseek-flash effort=(default) failure_class=None
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -20,14 +20,85 @@ P02: Criar autodev/plan_prompt.py com o prompt de planejamento
 
 ## Diff a revisar (base b963e0eb0ca2559ca98b10bfac2ec0d5203a4e7e -> HEAD)
 ```diff
-(sem alteracoes)
+diff --git a/.autodev/tests/test_plan_prompt.py b/.autodev/tests/test_plan_prompt.py
+new file mode 100644
+index 0000000..e7a3220
+--- /dev/null
++++ b/.autodev/tests/test_plan_prompt.py
+@@ -0,0 +1,30 @@
++from autodev.plan_prompt import PROMPT_PLANO, montar_prompt_plano
++
++
++def test_prompt_plano_define_contrato_json_completo():
++    prompt = montar_prompt_plano("Crie uma funcionalidade")
++
++    assert isinstance(PROMPT_PLANO, str)
++    assert "APENAS um JSON" in prompt
++    for chave in ("titulo", "objetivo", "repositorio", "tasks"):
++        assert chave in prompt
++    for campo in ("id", "titulo", "criterios", "deps", "agente", "teste"):
++        assert campo in prompt
++
++
++def test_prompt_plano_exige_criterios_concretos_e_teste_ponta_a_ponta():
++    prompt = montar_prompt_plano("Planeje a entrega")
++
++    assert "critério vago" in prompt
++    assert "arquivo" in prompt
++    assert "comando de teste concreto" in prompt
++    assert "última task" in prompt
++    assert "teste de aceitação ponta a ponta" in prompt
++
++
++def test_prompt_plano_preserva_prompt_usuario_literalmente():
++    prompt_usuario = "  Implemente café ☕\nsem alterar ESTA linha.  "
++
++    prompt = montar_prompt_plano(prompt_usuario)
++
++    assert prompt_usuario in prompt
+diff --git a/autodev/plan_prompt.py b/autodev/plan_prompt.py
+new file mode 100644
+index 0000000..a59f887
+--- /dev/null
++++ b/autodev/plan_prompt.py
+@@ -0,0 +1,30 @@
++"""Prompt usado para transformar um pedido em um plano de sprint."""
++
++PROMPT_PLANO = """Você é um agente de planejamento de software.
++
++Responda APENAS um JSON válido, sem Markdown, comentários ou texto adicional.
++O objeto JSON deve ter exatamente as chaves de nível superior:
++- "titulo": string
++- "objetivo": string
++- "repositorio": string
++- "tasks": lista de objetos
++
++Cada item de "tasks" deve ter todas as chaves:
++- "id": string única
++- "titulo": string
++- "criterios": lista de strings
++- "deps": lista de ids de tasks
++- "agente": string
++- "teste": string com um comando executável de teste
++
++Não escreva critério vago. Cada critério deve mencionar pelo menos um arquivo
++específico ou um comando de teste concreto que permita verificar a entrega.
++A última task deve ser sempre um teste de aceitação ponta a ponta da entrega.
++
++Pedido original do usuário:
++"""
++
++
++def montar_prompt_plano(prompt_usuario: str) -> str:
++    """Acrescenta o pedido original, sem modificá-lo, às regras do planejador."""
++    return PROMPT_PLANO + prompt_usuario
 ```
 
 ## Saida dos testes
 ```
-........................................................................ [ 52%]
-..............................................ss..................       [100%]
-136 passed, 2 skipped in 24.22s
+........................................................................ [ 51%]
+..............................................ss.....................    [100%]
+139 passed, 2 skipped in 23.20s
 
 ```
 
@@ -64,104 +135,7 @@ Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
 
 
 ===== STDOUT =====
-```json
-{
-  "veredito": "REJECT",
-  "confianca": 0.93,
-  "criterios_atendidos": [
-    {
-      "criterio": "existe autodev/plan_prompt.py com PROMPT_PLANO (str) e montar_prompt_plano(prompt_usuario)",
-      "atende": false,
-      "evidencia": "O arquivo nao existe em HEAD. 'ls autodev/' em /home/saurus/Code/Coding_Machine (worktree DEVFACTORY-002-P02-codex, HEAD=b963e0e) nao lista plan_prompt.py; 'find /home/saurus -maxdepth 5 -name plan_prompt.py' so encontra em /home/saurus/Work/hermes-agent, ~/.hermes e scratch. A branch sprint/DEVFACTORY-002/P02-codex esta exatamente em b963e0e (base) e 'git diff b963e0e' no worktree esta vazio."
-    },
-    {
-      "criterio": "montar_prompt_plano devolve string que CONTEM o prompt do usuario sem alteracao",
-      "atende": false,
-      "evidencia": "Funcao inexistente em HEAD, portanto nao ha comportamento a verificar. Sem arquivo, nao ha teste de preservacao literal rodando na suite."
-    },
-    {
-      "criterio": "o prompt exige resposta APENAS um JSON com titulo, objetivo, repositorio e tasks",
-      "atende": false,
-      "evidencia": "Nenhuma string PROMPT_PLANO em HEAD; grep por 'plan_prompt|PROMPT_PLANO|montar_prompt_plano' fora de .venv/worktrees retorna apenas dag.json, spec.md e decisions.md (documentacao do proprio sprint), nada de codigo."
-    },
-    {
-      "criterio": "o prompt exige que cada task tenha id, titulo, criterios, deps, agente e teste",
-      "atende": false,
-      "evidencia": "Idem: sem PROMPT_PLANO no repositorio nao ha contrato de campos exigido por codigo algum."
-    },
-    {
-      "criterio": "o prompt proibe criterio vago (exige arquivo ou comando de teste concreto)",
-      "atende": false,
-      "evidencia": "Conteudo inexistente em HEAD; nenhuma assercao de anti-vagueza na suite (a suite coletada no worktree e 138 testes, todos anteriores a P02)."
-    },
-    {
-      "criterio": "o prompt exige que a ultima task seja sempre um teste de aceitacao ponta a ponta",
-      "atende": false,
-      "evidencia": "Idem. A unica versao que continha essas regras esta arquivada em refs/heads/arquivo/DEVFACTORY-002/P02-antes-D16 (4426372), nao entregue nesta task."
-    },
-    {
-      "criterio": "os testes ficam em .autodev/tests/test_plan_prompt.py e provam os elementos obrigatorios no prompt montado",
-      "atende": false,
-      "evidencia": ".autodev/tests/ no worktree P02-codex contem apenas conftest.py, test_acceptance.py, test_adapters.py, test_cli.py, test_core.py, test_git_sandbox.py e test_planner.py. Nao existe test_plan_prompt.py em nenhuma branch: 'git ls-tree -r --name-only' na branch arquivada 4426372 tambem nao o lista."
-    },
-    {
-      "criterio": "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q",
-      "atende": true,
-      "evidencia": "Verificado por mim: no worktree DEVFACTORY-002-P02-codex => '138 passed in 46.84s' (PYTHONDONTWRITEBYTECODE=1, -p no:cacheprovider); no repo principal (.venv/bin/python) => '157 passed in 47.68s'. Porem e evidencia VACUA para P02: nenhum dos testes coletados exercita plan_prompt.py (o worktree tem 0 arquivos da task)."
-    },
-    {
-      "criterio": "preservacao obrigatoria: nenhum arquivo de task anterior removido ou reescrito",
-      "atende": true,
-      "evidencia": "O worktree P02-codex esta limpo ('git status --short' vazio) e sem commits acima de b963e0e: nada foi removido ou reescrito. Atendido por OMISSAO — a task nao produziu mudanca alguma."
-    }
-  ],
-  "findings": [
-    {
-      "severidade": "alta",
-      "arquivo": "autodev/plan_prompt.py",
-      "linha": 0,
-      "descricao": "O entregavel principal da P02 nao existe. O diff revisado e literalmente '(sem alteracoes)' e nenhuma branch contem o arquivo: sprint/DEVFACTORY-002/P02-codex == b963e0e (base). Criterios 1 a 6 nao tem como ser atendidos sem o arquivo.",
-      "correcao_sugerida": "Implementar autodev/plan_prompt.py na branch sprint/DEVFACTORY-002/P02-codex com PROMPT_PLANO (str) e montar_prompt_plano(prompt_usuario) -> str que devolva PROMPT_PLANO + prompt do usuario literal, cobrindo JSON exclusivo (titulo, objetivo, repositorio, tasks), campos obrigatorios (id, titulo, criterios, deps, agente, teste), proibicao de criterio vago (exige arquivo ou comando concreto) e ultima task sempre E2E."
-    },
-    {
-      "severidade": "alta",
-      "arquivo": ".autodev/tests/test_plan_prompt.py",
-      "linha": 0,
-      "descricao": "Arquivo de teste exigido pelo criterio 7 nao existe em nenhuma branch (nem em HEAD nem na branch arquivada 4426372, que escreveu seus testes dentro de .autodev/tests/test_planner.py, arquivo da P01).",
-      "correcao_sugerida": "Criar .autodev/tests/test_plan_prompt.py importando 'from autodev.plan_prompt import PROMPT_PLANO, montar_prompt_plano' e assertando: isinstance(str), prompt_usuario in prompt (inclusive com acentos, chaves '{}', \\t e \\n), e a presenca de cada regra obrigatoria do contrato (JSON exclusivo, chaves exatas, campos por task, anti-vagueza, ultima task E2E)."
-    },
-    {
-      "severidade": "alta",
-      "arquivo": ".autodev/sprints/DEVFACTORY-002/evidence/P02-1790558003.txt",
-      "linha": 1,
-      "descricao": "A evidencia de aceitacao anexada a task e enganosa: mostra '136 passed, 2 skipped' rodados no worktree P02-codex, mas essa contagem e a suite pre-existente (coletei 138 testes no mesmo worktree, nenhum de plan_prompt). O verde nao prova nada sobre P02 e nao deveria ser aceito como prova do criterio 8.",
-      "correcao_sugerida": "So anexar evidencia de task cujo comando inclua pelo menos um teste que falhe sem o entregavel (ex.: rodar a suite apos 'git stash'/antes do arquivo, ou usar 'pytest .autodev/tests/test_plan_prompt.py'); manter o numero de testes e o arquivo-alvo no corpo da evidencia."
-    },
-    {
-      "severidade": "media",
-      "arquivo": ".autodev/sprints/DEVFACTORY-002/logs/P02-t3-codex.log",
-      "linha": 0,
-      "descricao": "A execucao nunca saiu do loop de aprovacao de design: o log termina com 'Voce aprova esse design para eu implementar?' e nenhum commit foi feito na branch (t1..t5 apenas relatam 'pytest nao instalado/No module named pytest' ou ajustes supostos em arquivo que nao existe mais). O review-P02.log registra failure_class=CODEX_QUOTA (exit_code=3).",
-      "correcao_sugerida": "Rodar a task com o python do projeto (.venv/bin/python -m pytest) para eliminar o falso bloqueio 'pytest nao instalado' e instruir explicitamente que o agente NAO deve pedir aprovacao de design: implementar e commitar na branch."
-    },
-    {
-      "severidade": "media",
-      "arquivo": ".autodev/tests/test_planner.py",
-      "linha": 1,
-      "descricao": "Higiene de preservacao: a implementacao arquivada da P02 (refs/heads/arquivo/DEVFACTORY-002/P02-antes-D16, commit 4426372) sobrescreveu .autodev/tests/test_planner.py — o arquivo de teste da P01 — trocando os testes do planner por testes de plan_prompt. Se essa branch for reaproveitada como base, ela viola o criterio 9 (proibicao de reescrever arquivo de teste de outra task) e apaga a cobertura do planner.",
-      "correcao_sugerida": "Nao reusar 4426372 como entrega: reaproveitar apenas autodev/plan_prompt.py dela e mover todo o seu conteudo de teste para .autodev/tests/test_plan_prompt.py, restaurando test_planner.py identico a b963e0e."
-    },
-    {
-      "severidade": "baixa",
-      "arquivo": "autodev/",
-      "linha": 0,
-      "descricao": "Nenhum consumidor do modulo: grep em codigo (fora de .venv/worktrees) nao encontra nenhum import de autodev.plan_prompt (o cli/comando 'autodev plan' que o consumiria vive nas tasks arquivadas P06/P07). Nao ha import quebrado hoje, mas tambem nao ha caminho exercitado em producao — o contrato so sera validavel quando o planejador consumir o prompt.",
-      "correcao_sugerida": "Aceitar apenas apos a task de integracao (P06/P07/P08) consumir montar_prompt_plano, e incluir na P02 no minimo um teste que garanta que o prompt montado termina com o pedido do usuario (prompt.endswith(prompt_usuario)) para nao quebrar o consumo por LLM."
-    }
-  ],
-  "resumo": "Nao ha entrega: o diff e vazio e nem autodev/plan_prompt.py nem .autodev/tests/test_plan_prompt.py existem em HEAD, de modo que os criterios 1-7 estao ausentes; a suite verde (138 testes no worktree, todos pre-existentes) e evidencia vacua e o criterio 9 so esta intacto porque a task nao produziu mudanca alguma."
-}
-```
+{"veredito": "APPROVE","confianca": 0.85,"criterios_atendidos": [{"criterio": "existe autodev/plan_prompt.py com a constante PROMPT_PLANO (string) e a funcao montar_prompt_plano(prompt_usuario)", "atende": true, "evidencia": "Arquivo novo no commit bf87b53 (30 linhas): PROMPT_PLANO = \"\"\"...\"\"\" na linha 3 e def montar_prompt_plano(prompt_usuario: str) -> str na linha 28; import real feito pelo teste prova que ambos existem e PROMPT_PLANO e str."}, {"criterio": "montar_prompt_plano devolve uma string que CONTEM o prompt do usuario sem alteracao", "atende": true, "evidencia": "Linha 30: `return PROMPT_PLANO + prompt_usuario` (concatenacao pura, sem strip/format/normalizacao). PROMPT_PLANO termina com quebra de linha, entao o pedido entra em linha propria. Verificado tambem por mutacao: trocar por `prompt_usuario.strip()` faz o teste 3 falhar."}, {"criterio": "o prompt exige que o agente responda APENAS um JSON com as chaves titulo, objetivo, repositorio e tasks", "atende": true, "evidencia": "Linha 5: 'Responda APENAS um JSON valido, sem Markdown, comentarios ou texto adicional'; linhas 6-10 listam exatamente as chaves de nivel superior titulo/objetivo/repositorio/tasks. Remover a frase 'APENAS um JSON' faz o teste 1 falhar (mutacao M1)."}, {"criterio": "o prompt exige que cada task tenha id, titulo, criterios, deps, agente e teste", "atende": true, "evidencia": "Linhas 12-18: bloco 'Cada item de \"tasks\" deve ter todas as chaves' com id, titulo, criterios, deps, agente e teste, cada um com tipo declarado."}, {"criterio": "o prompt proibe criterio vago: exige que cada criterio mencione um arquivo ou um comando de teste concreto", "atende": true, "evidencia": "Linhas 20-21: 'Nao escreva criterio vago. Cada criterio deve mencionar pelo menos um arquivo especifico ou um comando de teste concreto que permita verificar a entrega.' Remover esse bloco faz o teste 2 falhar (mutacao M2)."}, {"criterio": "o prompt exige que a ultima task seja sempre um teste de aceitacao ponta a ponta", "atende": true, "evidencia": "Linha 22: 'A ultima task deve ser sempre um teste de aceitacao ponta a ponta da entrega.' (o texto esta no prompt montado; o teste, porem, so verifica a presenca dos tokens - ver finding 1)."}, {"criterio": "os testes ficam em .autodev/tests/test_plan_prompt.py e provam que os elementos obrigatorios aparecem no prompt montado", "atende": true, "evidencia": "git show --numstat bf87b53: .autodev/tests/test_plan_prompt.py (30 linhas, A) e autodev/plan_prompt.py (30 linhas, A); o teste importa o modulo real e chama montar_prompt_plano antes de checar os tokens, entao trabalha sobre a saida do prompt montado, nao sobre a constante solta."}, {"criterio": "a suite inteira continua verde: python3 -m pytest .autodev/tests/ -q", "atende": true, "evidencia": "Execucao independente no worktree DEVFACTORY-002-P02-codex com o interpretador do projeto (.venv/bin/python -m pytest .autodev/tests/ -q -p no:cacheprovider): 141 passed in 40.87s, 0 failed. A evidencia gravada .autodev/sprints/DEVFACTORY-002/evidence/P02-1790558970.txt (139 passed, 2 skipped) bate com o mesmo comando; os 2 skips sao o skipif NAO_ANINHAVEL (bwrap aninhado, test_git_sandbox.py:28), que nao se aplicam a execucao fora do sandbox."}, {"criterio": "preservacao obrigatoria: nenhum arquivo entregue por task anterior pode ser removido ou reescrito", "atende": true, "evidencia": "git diff --name-status b963e0e HEAD retorna somente 'A .autodev/tests/test_plan_prompt.py' e 'A autodev/plan_prompt.py' - zero M/D/R. O teste da task anterior, .autodev/tests/test_planner.py (presente em b963e0e), continua intacto no worktree; `git status --porcelain` limpo."}],"findings": [{"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_prompt.py", "linha": 15, "descricao": "O teste 2 verifica presenca de substring, nao a direcao do requisito. Por teste de mutacao in-memory, trocar a linha 22 de plan_prompt.py por 'A ultima task NAO precisa ser um teste de aceitacao ponta a ponta' mantem os 3 testes verdes, e um PROMPT_PLANO reduzido a uma 'sopa de palavras' ('titulo objetivo repositorio tasks ... teste de aceitacao ponta a ponta', sem nenhuma exigencia) tambem passa nos 3. Ou seja: o teste prova que as palavras obrigatorias aparecem, mas nao que o prompt exige o comportamento - exatamente o risco que a spec descreve (o criterio vira o prompt do agente).", "correcao_sugerida": "Assertar as frases de exigencia em vez de tokens soltos: assert 'deve ser sempre um teste de aceitacao ponta a ponta' in prompt e assert 'deve mencionar pelo menos um arquivo' in prompt (e manter a checagem dos nomes de campo como linhas do contrato, ex. '- \"id\":')."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_prompt.py", "linha": 9, "descricao": "O contrato das chaves de nivel superior e checado por tokens soltos: 'tasks' aparece duas vezes no prompt (linha 10 e linha 12), entao renomear a chave obrigatoria para 'tarefas' na linha 10 de plan_prompt.py ainda passa em todos os testes (mutacao M6). O mesmo vale para 'id' vs. 'ids' na linha 16.", "correcao_sugerida": "Checar a forma declarada da chave, ex. assert '- \"tasks\": lista de objetos' in prompt e '- \"id\": string única' in prompt, para que a renomeacao de uma chave quebre o teste."}, {"severidade": "baixa", "arquivo": "autodev/plan_prompt.py", "linha": 6, "descricao": "O prompt manda o JSON ter 'exatamente as chaves de nivel superior' titulo/objetivo/repositorio/tasks, mas autodev/planner.py:24 exige Plano.prompt_original (nao presente nessa lista). Se P03 (parsear_plano(texto)) tentar tirar prompt_original do JSON, ha contradicao entre o prompt desta task e o tipo entregue por P01; o ajuste ficara a cargo de P09 (rastreabilidade). Nao quebra nenhum criterio de P02, mas e uma tensao de contrato entre tasks do mesmo sprint.", "correcao_sugerida": "Deixar explicito no prompt (ou em comentario no modulo) que prompt_original e preenchido pelo chamador a partir do pedido do usuario, e nao deve vir no JSON."}, {"severidade": "baixa", "arquivo": "autodev/plan_prompt.py", "linha": 28, "descricao": "Nenhum modulo de producao importa plan_prompt ainda (grep em todo o worktree: so o teste e a spec citam PROMPT_PLANO/montar_prompt_plano). Nao e codigo morto - e o contrato declarado na spec e sera consumido por P06 - mas a integracao fica sem cobertura neste diff. Nota adicional: o criterio 7 do dag.json ainda aponta '.autodev/tests/test_planner.py' enquanto o criterio da tarefa (e o arquivo entregue) e test_plan_prompt.py; a escolha do agente foi a correta (criar arquivo proprio em vez de reescrever o teste de P01), mas o dag.json ficou dessincronizado.", "correcao_sugerida": "Corrigir o criterio 7 no .autodev/sprints/DEVFACTORY-002/dag.json para test_plan_prompt.py; a integracao ja esta prevista em P06."}],"resumo": "Os 9 criterios de aceitacao estao atendidos com evidencia direta (arquivos, linhas e suite verde rodada por mim: 141 passed, 0 failed, sem remocao/reescrita de arquivo de task anterior); os unicos achados sao de baixa severidade, sobre testes que provam presenca de tokens sem provar a exigencia e sobre uma tensao de contrato com Plano.prompt_original."}
 
 
 ===== STDERR =====

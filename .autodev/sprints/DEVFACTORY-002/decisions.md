@@ -442,3 +442,42 @@ suíte pre-existente verde faz a tentativa parecer saudável.
 **Testes:** `test_prompt_de_task_proibe_perguntar_em_headless` e
 `test_entrega_vazia_falha_a_tentativa_sem_gastar_revisao` (base verde + agente que
 só pergunta → `SEM_ENTREGA`, zero revisão).
+
+## D-18 — O worktree da task nascia sem o código das dependências já integradas
+
+**Achado (rodada 22:26→23:02, P04 tentativa 8 aprovada):** P04 passou nos testes
+(159) e na revisão, e a **integração devolveu CONFLITO**: `autodev/planner.py` foi
+editado por P03 e por P04, e o merge não fechou. A rodada terminou em 3 de 9 e as
+dependentes (P05–P10) ficaram BLOCKED.
+
+**Causa:** `WorktreeManager.criar()` reusava a branch existente e **ignorava a base
+pedida** — `git worktree add <caminho> <branch>` não move a branch. O
+`_base_do_worktree()` (a correção D-07) garante que a base *é* o tip de integração,
+mas só vale quando a branch é criada na hora. A P04 tinha branch de rodada anterior
+(resetada para a base de 27/09 21:5x, antes de P02/P03): o DAG era respeitado para
+ORDEM e **violado em conteúdo** — exatamente o defeito que o próprio
+`_base_do_worktree` documenta.
+
+**Correção:**
+1. `criar()` **sempre** entrega o worktree na base atual: se a branch existe, o tip
+   antigo vai para `refs/arquivo/<branch>` e a branch volta para a base;
+2. se o worktree já existe e ficou para trás, faz **merge** da base dentro dele
+   (preserva os commits da própria task); se o merge conflita, o trabalho antigo foi
+   escrito contra um código que não existe mais — vai para `refs/arquivo/` e o
+   worktree volta para a base;
+3. o orquestrador registra `worktree_realinhado` no histórico quando isso acontece.
+
+**Correção 2 (mesma rodada) — a rodada parava no primeiro tropeço:** o laço
+percorre as ondas **uma vez**; com P04 em RETRY, as dependentes ficaram BLOCKED e o
+run terminou. Agora `run` roda em passadas (`--rodadas`, default 5) e cada passada:
+reabre o sprint que ficou em `FIM` (fim de UMA rodada, não do sprint) e rearma —
+via `rearmar_dependentes()` — apenas as tasks bloqueadas por dependência **já
+integrada**, preservando o contador da escada. Sem nada a rearmar, para na hora.
+`forcar_estado` passou a limpar o motivo do bloqueio ao sair de BLOCKED (task
+QUEUED carregando "depende de [...]" envenenava quem lia o motivo).
+
+**Testes:** 8 novos em `.autodev/tests/test_d18_worktree_e_rodadas.py` — branch de
+rodada anterior nasce da base atual, worktree atrasado recebe a base por merge,
+worktree conflitante volta para a base com arquivo de auditoria, base já contida não
+mexe em nada, rearme preserva o degrau, rearme não toca bloqueio humano, `run` dá
+passadas e rearma, `run` reabre sprint em FIM.

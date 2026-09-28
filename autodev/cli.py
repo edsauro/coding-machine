@@ -93,13 +93,48 @@ def cmd_status(args) -> int:
     return 0
 
 
+def _rodar_com_rodadas(o, args):
+    """Roda o sprint em passadas: uma passada percorre as ondas UMA vez.
+
+    Sem isto, a rodada acaba na primeira falha de integração (as dependentes ficam
+    BLOCKED) e o autor precisa rodar de novo na mão a cada susto — foi assim que a
+    primeira noite parou com 9 tasks bloqueadas. Cada passada extra rearma apenas
+    as tasks bloqueadas por dependência JÁ integrada; se nada for rearmável, para
+    na hora (nenhum custo por passada vazia). Não é laço infinito: o teto é o
+    número de passadas pedido, e cada passada continua respeitando o limite de 5
+    tentativas por task.
+    """
+    rodadas = max(1, getattr(args, "rodadas", 1) or 1)
+    r = None
+    for k in range(rodadas):
+        # Um `run` terminado grava 'FIM' no sprint_state: é o fim de UMA rodada, não
+        # do sprint — mas qualquer transição a partir de FIM é recusada pela máquina
+        # de estados. Enquanto isso era comando manual, a passada seguinte nascia
+        # morta; aqui ela simplesmente reabre (ENCERRADO/ABORTADO, que são decisão do
+        # autor, não são tocados).
+        store = getattr(o, "store", None)
+        if store is not None and store.estado_sprint(o.sprint) == "FIM":
+            store.reabrir_sprint(o.sprint, motivo=f"passada {k + 1} do run")
+        if k:
+            rearmadas = o.rearmar_dependentes()
+            if not rearmadas:
+                break
+            print(f"rodada {k + 1}: {len(rearmadas)} task(s) rearmada(s) por "
+                  f"dependencia integrada: {', '.join(rearmadas)}")
+        r = o.rodar(parar_em=getattr(args, "parar_em", None))
+        if r.parado_por:
+            break
+    return r
+
+
 def cmd_run(args) -> int:
     from .orchestrator import Orquestrador
     import os
     os.environ.setdefault("AUTODEV_AGENT_TIMEOUT", "900")
     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste,
                      deadline_s=args.deadline)
-    r = o.rodar(parar_em=args.parar_em)
+    r = _rodar_com_rodadas(o, args)
+    assert r is not None  # rodadas >= 1 sempre executa ao menos uma passada
     print(f"\n=== resumo ===\n  concluidas: {r.concluidas}/{len(r.tasks)}"
           f"\n  parado por: {r.parado_por or '-'}"
           f"\n  duracao: {r.duracao_s / 60:.1f} min")
@@ -291,6 +326,10 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("run")
     s.add_argument("--parar-em", dest="parar_em", default=None)
+    s.add_argument("--rodadas", type=int, default=5,
+                   help="passadas do laco; cada passada rearma as tasks bloqueadas "
+                        "por dependencia ja integrada e para quando nao ha o que "
+                        "rearmar (default: 5)")
     s.add_argument("--modo-teste", action="store_true",
                    help="usa o delay curto de cota (aceitacao); producao e 5h10m")
     s.add_argument("--deadline", type=float, default=None,

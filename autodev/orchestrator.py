@@ -291,6 +291,12 @@ class Orquestrador:
             return ResumoTask(task_id, "BLOCKED", len(tentativas), motivo=str(e))
 
         base = wt.base_commit
+        if getattr(wt, "realinhado", False):
+            self.log(f"{task_id}: worktree realinhado para a integracao atual "
+                     f"(base antiga {wt.base_antiga[:8] or '(vazia)'}) — a task estava "
+                     f"nascendo sem o codigo das dependencias ja integradas (D-18)")
+            self.store.evento(self.sprint, task_id, "worktree_realinhado",
+                              {"base_antiga": wt.base_antiga, "base_nova": wt.base_commit})
         historico: list[dict] = []
         esperas = 0
 
@@ -658,6 +664,36 @@ class Orquestrador:
             self.store.checkpoint(self.sprint, "FIM", {"parado_por": res.parado_por})
             haq.escrever(self.store, self.sprint, self.dir_sprint / "HAQ.md")
         return res
+
+    def rearmar_dependentes(self) -> list[str]:
+        """Reabre tasks bloqueadas SÓ por dependência que já foi integrada.
+
+        Uma passada do laço percorre as ondas UMA vez: quando uma task volta para
+        RETRY (conflito de merge, por exemplo) as dependentes ficam BLOCKED e a
+        rodada termina — foi assim que a primeira noite fechou com 9 tasks
+        bloqueadas. Aqui BLOCKED não foi decisão humana, foi ordem de execução.
+        Devolver essas tasks para QUEUED — preservando o contador da escada, ao
+        contrário de `desbloquear`, que rearma por decisão do autor — deixa a
+        rodada seguinte continuar de onde parou, sem comando na mão.
+        """
+        deps = {t["id"]: list(t.get("deps", [])) for t in self.dag.get("tasks", [])}
+        prontas = {t["task_id"] for t in self.store.tasks(self.sprint)
+                   if t["estado"] in ("DONE", "INTEGRATED")}
+        rearmadas: list[str] = []
+        for t in self.store.tasks(self.sprint):
+            if t["estado"] != "BLOCKED":
+                continue
+            if not (t["bloqueio"] or "").startswith("depende de"):
+                continue
+            faltando = [d for d in deps.get(t["task_id"], []) if d not in prontas]
+            if faltando:
+                continue
+            self.store.forcar_estado(self.sprint, t["task_id"], "QUEUED",
+                                     "dependencia integrada: rearmada automaticamente")
+            self.store.evento(self.sprint, t["task_id"], "rearmado_por_dependencia",
+                              {"deps_integradas": deps.get(t["task_id"], [])})
+            rearmadas.append(t["task_id"])
+        return rearmadas
 
     def integrar(self, tasks_done) -> None:
         integ = integration.Integrador(
