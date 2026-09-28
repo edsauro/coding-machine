@@ -101,13 +101,14 @@ class Config:
 
         1-3 = AGY Gemini 3.6/3.7/3.8 Flash; 4-5 = Hermes deepseek-flash/pro.
         Devolve {} quando não há escada configurada — aí vale a revisão cruzada
-        da spec §16, que é o comportamento antigo.
+        da spec §16, que é o comportamento antigo. Tentativa acima do último
+        degrau usa o ÚLTIMO degrau: revisor é o que menos pode faltar.
         """
-        escada = self.models.get("revisao") or {}
-        entrada = escada.get(tentativa)
-        if entrada is None:
-            entrada = escada.get(str(tentativa))
-        return dict(entrada) if isinstance(entrada, dict) else {}
+        escada = {int(k): v for k, v in (self.models.get("revisao") or {}).items()
+                  if str(k).isdigit() and isinstance(v, dict)}
+        if not escada or not tentativa:
+            return {}
+        return dict(escada[min(int(tentativa), max(escada))])
 
     def revisor_reserva(self) -> dict:
         """Revisor que entra quando o da tentativa não pode rodar."""

@@ -59,6 +59,24 @@ def test_cadeia_de_reserva_termina_no_hermes_pro(cfg):
         "deepseek-flash", "deepseek-v4-pro"]
 
 
+def test_retomada_no_terceiro_degrau_usa_sol_low_e_agy_38(cfg):
+    """Retomada da sprint 2: contador 2 => próxima tentativa é a 3ª da escada.
+
+    Bug real da 1ª tentativa de retomada: o modelo da primeira volta do laço era
+    fixo em `modelo_para_tentativa(1)` (luna/low), ignorando o contador da task.
+    """
+    prox = 2 + 1
+    m = cfg.modelo_para_tentativa(prox)
+    assert (m["slug"], m["effort"]) == ("gpt-5.6-sol", "low")
+    assert cfg.revisor_para_tentativa(prox)["modelo"] == "Gemini 3.8 Flash (Low)"
+
+
+def test_tentativa_fora_da_escada_usa_o_ultimo_degrau(cfg):
+    """Revisor é o que menos pode faltar: além do 5º degrau, usa o 5º."""
+    assert cfg.revisor_para_tentativa(9) == cfg.revisor_para_tentativa(5)
+    assert cfg.modelo_para_tentativa(9)["slug"] == "gpt-6-astra"
+
+
 def test_quem_implementa_nunca_revisa_nas_tentativas_hermes(cfg):
     """Codex implementa; nas tentativas 4 e 5 quem revisa é o Hermes, não o codex."""
     for n in (4, 5):

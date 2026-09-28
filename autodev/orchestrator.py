@@ -299,7 +299,11 @@ class Orquestrador:
                 modelo_info = self.cfg.modelo_para_tentativa(d.tentativa_proxima)
             else:
                 d = None
-                modelo_info = self.cfg.modelo_para_tentativa(1)
+                # O modelo da tentativa vem do CONTADOR DA TASK (n_tent + 1), não de
+                # um "1" fixo: numa retomada o contador pode já estar em 2 (a próxima
+                # tentativa é a 3ª da escada) — chumbar 1 fazia a sprint retomada
+                # voltar para o degrau mais barato, ignorando o desbloqueio.
+                modelo_info = self.cfg.modelo_para_tentativa(n_tent + 1)
 
             # ---- monta o prompt (com evidência nova, nunca o mesmo prompt) -----
             prompt = PROMPT_TASK.format(
@@ -446,7 +450,7 @@ class Orquestrador:
                 titulo=spec["titulo"], criterios=criterios,
                 testes=rt.saida[-3000:], agente_impl=agente, cfg=self.cfg,
                 disponiveis=self.disponiveis,
-                log_dir=str(self.dir_sprint / "logs"), tentativa=att)
+                log_dir=str(self.dir_sprint / "logs"), tentativa=n_tent + 1)
             self.log(f"{task_id}: revisao por {rv.revisor} "
                      f"[{rv.origem or 'cruzada'}] -> {rv.veredito} "
                      f"({len(rv.findings)} findings)")
