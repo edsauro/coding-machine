@@ -20,6 +20,16 @@ cota_codex:
 
 # --- Seções 10/11: escalonamento e prevenção de loop --------------------------
 retry:
+  # ATENÇÃO (revisão de processo de 29/09/2026): com a escada do Codex toda em
+  # `luna/low` (models.yaml), escalonar modelo deixou de existir. As tentativas
+  # 2..5 viraram tentativas do MESMO modelo, separadas só pela evidência nova.
+  # A recomendação da revisão é BAIXAR este número para 2 e parar na primeira
+  # falha REPETIDA (o motor já calcula isso em retry.mesmo_lugar, limiar 0.85,
+  # mas hoje só usa na 4ª tentativa e apenas para trocar de agente, nunca para
+  # parar). Evidência: 15 chamadas da DEVFACTORY-004 foram gastas DEPOIS de a
+  # falha já ter se repetido (P01: repetiu na 2ª e teve 9; P04: repetiu na 2ª
+  # e teve 10) — e a causa era defeito de CONTRATO (D-23), não de modelo.
+  # DECISÃO PENDENTE DO AUTOR — não alterado ainda.
   max_tentativas_implementacao: 5     # 5ª falha não resolvida -> BLOCK
   # --------------------------------------------------------------- estratégias
   # Decisão do autor em 29/09/2026 (P-15): cada task grava a estratégia com que COMEÇOU
