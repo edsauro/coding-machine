@@ -48,7 +48,7 @@ def _resposta_do_planejador() -> str:
                     "criterios": ["NOTAS.md descreve a entrega verificada"],
                     "deps": [],
                     "agente": "codex",
-                    "teste": "python3 -m pytest tests/test_stats.py -q",
+                    "teste": "python3 -m pytest tests/test_notas.py -q",
                 },
                 {
                     "id": "P03",
@@ -56,7 +56,7 @@ def _resposta_do_planejador() -> str:
                     "criterios": ["RESULTADO.md registra o resultado final"],
                     "deps": ["P01", "P02"],
                     "agente": "codex",
-                    "teste": "python3 -m pytest tests/test_stats.py -q",
+                    "teste": "python3 -m pytest tests/test_resultado.py -q",
                 },
             ],
         },

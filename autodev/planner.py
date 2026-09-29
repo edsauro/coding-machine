@@ -28,6 +28,28 @@ _COMANDO_TESTE = re.compile(
     re.IGNORECASE,
 )
 
+# Um caminho citado como dependência, import ou exemplo não é necessariamente
+# uma entrega da task.  Colisões de produção consideram somente critérios que
+# expressam intenção de edição; arquivos de teste são a exceção deliberada
+# (D-16), pois duas citações do mesmo teste já exigem coordenação explícita.
+_VERBOS_EDICAO = (
+    "existe", "criar", "cria", "crie", "estende", "estender", "edita",
+    "editar", "ganha", "atualiza", "adiciona", "remove", "reescreve",
+    "escreve", "implementa", "altera", "substitui", "move", "grava",
+    "ficam em", "fica em", "passa a", "novo arquivo", "novo modulo",
+    "registra em",
+)
+_PADRAO_EDICAO = re.compile(
+    r"\b(?:" + "|".join(re.escape(verbo) for verbo in _VERBOS_EDICAO) + r")\b",
+    re.IGNORECASE,
+)
+_NEGACOES_EDICAO = (
+    "nao cria", "não cria", "nao edita", "não edita", "nao altera",
+    "não altera", "nao remove", "não remove", "nao reescreve",
+    "não reescreve", "nao toca", "não toca", "sem editar", "sem alterar",
+    "sem remover", "sem tocar",
+)
+
 
 @dataclass
 class TaskPlano:
@@ -232,9 +254,36 @@ def _construir_task(dados: object) -> TaskPlano:
 
 
 def _arquivos_da_task(task: TaskPlano) -> set[str]:
-    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
+    """Extrai todos os caminhos mencionados nos critérios e no teste."""
     textos = [*task.criterios, task.teste]
-    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
+    return {
+        caminho.group(0).lstrip("./")
+        for texto in textos
+        for caminho in _ARQUIVO.finditer(texto)
+    }
+
+
+def _tem_intencao_de_edicao(texto: str) -> bool:
+    texto_normalizado = texto.casefold()
+    return (
+        not any(negacao in texto_normalizado for negacao in _NEGACOES_EDICAO)
+        and _PADRAO_EDICAO.search(texto) is not None
+    )
+
+
+def _arquivos_editados_da_task(task: TaskPlano) -> set[str]:
+    """Extrai arquivos que a task declara editar, não apenas mencionar."""
+    arquivos = {
+        caminho.group(0).lstrip("./")
+        for caminho in _ARQUIVO.finditer(task.teste)
+    }
+    for criterio in task.criterios:
+        if _tem_intencao_de_edicao(criterio):
+            arquivos.update(
+                caminho.group(0).lstrip("./")
+                for caminho in _ARQUIVO.finditer(criterio)
+            )
+    return arquivos
 
 
 def _arquivo_de_teste(caminho: str) -> bool:
@@ -244,30 +293,48 @@ def _arquivo_de_teste(caminho: str) -> bool:
     return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
 
 
+def _ondas_por_task(plano: Plano) -> dict[str, int] | None:
+    """Calcula ondas sem mascarar os erros de IDs duplicados ou ciclos."""
+    if len({task.id for task in plano.tasks}) != len(plano.tasks):
+        return None
+    try:
+        ondas = config.ordem_topologica({"tasks": [
+            {"id": task.id, "deps": task.deps} for task in plano.tasks
+        ]})
+    except ValueError:
+        return None
+    return {
+        task_id: indice + 1
+        for indice, onda in enumerate(ondas)
+        for task_id in onda
+    }
+
+
 def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
     """Retorna arquivos editados por mais de uma task no mesmo plano.
 
     Arquivos de produção só colidem quando as tasks estão na mesma onda;
     arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
     """
-    try:
-        ondas = config.ordem_topologica({"tasks": [
-            {"id": task.id, "deps": task.deps} for task in plano.tasks
-        ]})
-    except ValueError:
-        # O validador principal reporta ciclos; não esconda esse erro com uma
-        # exceção secundária ao tentar calcular as ondas.
+    onda_por_task = _ondas_por_task(plano)
+    if onda_por_task is None:
         return []
-    onda_por_task = {
-        task_id: indice + 1
-        for indice, onda in enumerate(ondas)
-        for task_id in onda
-    }
-    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
+    arquivos_mencionados = [_arquivos_da_task(task) for task in plano.tasks]
+    arquivos_editados = [_arquivos_editados_da_task(task) for task in plano.tasks]
     colisoes: list[dict[str, str | int]] = []
     for indice, task_a in enumerate(plano.tasks):
-        for task_b in plano.tasks[indice + 1:]:
-            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
+        for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+            arquivos_de_teste = {
+                arquivo
+                for arquivo in arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+                if _arquivo_de_teste(arquivo)
+            }
+            arquivos_de_producao = {
+                arquivo
+                for arquivo in arquivos_editados[indice] & arquivos_editados[indice_b]
+                if not _arquivo_de_teste(arquivo)
+            }
+            for arquivo in sorted(arquivos_de_teste | arquivos_de_producao):
                 onda_a = onda_por_task.get(task_a.id)
                 onda_b = onda_por_task.get(task_b.id)
                 if _arquivo_de_teste(arquivo) or onda_a == onda_b:
@@ -278,6 +345,30 @@ def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
                         "onda": onda_a if onda_a is not None else onda_b,
                     })
     return colisoes
+
+
+def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+    """Retorna arquivos de produção editados em ondas diferentes como avisos."""
+    onda_por_task = _ondas_por_task(plano)
+    if onda_por_task is None:
+        return []
+    arquivos_editados = [_arquivos_editados_da_task(task) for task in plano.tasks]
+    avisos: list[dict[str, str | int]] = []
+    for indice, task_a in enumerate(plano.tasks):
+        for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+            onda_a = onda_por_task[task_a.id]
+            onda_b = onda_por_task[task_b.id]
+            if onda_a == onda_b:
+                continue
+            for arquivo in sorted(arquivos_editados[indice] & arquivos_editados[indice_b]):
+                if not _arquivo_de_teste(arquivo):
+                    avisos.append({
+                        "task_a": task_a.id,
+                        "task_b": task_b.id,
+                        "arquivo": arquivo,
+                        "onda": onda_a,
+                    })
+    return avisos
 
 
 def validar_plano(plano: Plano) -> list[str]:
