@@ -1,3 +1,8 @@
+import pytest
+from dataclasses import asdict
+import importlib.util
+from pathlib import Path
+
 from autodev.planner import (
     Plano,
     TaskPlano,
@@ -157,22 +162,57 @@ def test_arquivo_de_teste_citado_no_criterio_colide_mesmo_sem_verbo_de_edicao():
     ]
 
 
-def test_modulo_de_producao_com_prefixo_test_nao_colide_entre_ondas():
+@pytest.mark.parametrize("arquivo", ["test_plano.py", "modulo_test.py", "conftest.py", "autodev/test_helpers.py"])
+def test_nome_de_arquivo_de_teste_colide_entre_ondas(arquivo):
     plano = plano_com(
-        task("P01", "altera autodev/test_helpers.py"),
-        task("P02", "altera autodev/test_helpers.py", deps=["P01"]),
+        task("P01", f"escreve {arquivo}"),
+        task("P02", f"altera {arquivo}", deps=["P01"]),
     )
-
-    assert colisoes_de_arquivo(plano) == []
-    assert avisos_de_colisao_de_arquivo(plano) == [
-        {
-            "task_a": "P01",
-            "task_b": "P02",
-            "arquivo": "autodev/test_helpers.py",
-            "onda": 1,
-            "onda_b": 2,
-        }
+    assert colisoes_de_arquivo(plano) == [
+        {"task_a": "P01", "task_b": "P02", "arquivo": arquivo, "onda": 1}
     ]
+    assert avisos_de_colisao_de_arquivo(plano) == []
+    assert any(arquivo in erro and "P01" in erro and "P02" in erro
+               for erro in validar_plano(plano))
+
+
+@pytest.mark.parametrize("outro, colide", [("autodev/modulo.py", True), ("modulo.py", False), ("outro/modulo.py", False)])
+def test_caminho_windows_preserva_diretorio(outro, colide):
+    plano = plano_com(task("P01", r"edita autodev\modulo.py"), task("P02", f"edita {outro}"))
+    assert bool(colisoes_de_arquivo(plano)) is colide
+
+
+def verificar_tasks(*tasks):
+    caminho = Path(__file__).resolve().parents[1] / "scripts/verificar_plano.py"
+    spec = importlib.util.spec_from_file_location("verificador_colisoes", caminho)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo.verificar({"tasks": [asdict(t) for t in tasks]}, "X")
+
+
+@pytest.mark.parametrize("criterio", [
+    "usa funcao importada de autodev/modulo.py em vez de reimplementar",
+    "nao altera autodev/modulo.py",
+])
+def test_a1_nao_confunde_mencao_com_edicao(criterio):
+    _, avisos = verificar_tasks(task("P01", "cria autodev/modulo.py"), task("P02", criterio, deps=["P01"]))
+    assert not any(a.startswith("A1:") for a in avisos)
+
+
+@pytest.mark.parametrize("arquivo", ["dag.json", "spec.md", "sprint.yaml", "decisions.md"])
+def test_a1_nao_exige_preservacao_de_metadados(arquivo):
+    _, avisos = verificar_tasks(task("P01", f"cria {arquivo}"), task("P02", f"altera {arquivo}", deps=["P01"]))
+    assert not any(a.startswith("A1:") for a in avisos)
+
+
+@pytest.mark.parametrize("preserva", [False, True])
+def test_a1_considera_preservacao_da_task_posterior_com_lista_invertida(preserva):
+    posterior = "altera autodev/modulo.py" + (" preservando funcoes existentes" if preserva else "")
+    _, avisos = verificar_tasks(task("P02", posterior, deps=["P01"]), task("P01", "cria autodev/modulo.py"))
+    a1 = [a for a in avisos if a.startswith("A1:")]
+    assert bool(a1) is not preserva
+    if a1:
+        assert "A1: P02" in a1[0]
 
 
 def test_cmd_plan_recusa_colisao_e_nao_escreve_sprint(monkeypatch, capsys, tmp_path):

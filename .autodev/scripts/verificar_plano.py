@@ -165,7 +165,7 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
         avisos.append(f"nao foi possivel rodar valida_dag do motor ({exc}); seguindo com a checagem local")
 
     arquivos = {t["id"]: extrair_arquivos(t) for t in tasks}      # mencoes (E4)
-    tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (A2)
+    tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (A1/A2)
     plano = planner.Plano(
         titulo=nome,
         objetivo="",
@@ -217,7 +217,7 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
         ia = str(colisao["task_a"])
         ib = str(colisao["task_b"])
         arq = str(colisao["arquivo"])
-        if planner._arquivo_de_teste(arq):
+        if planner.arquivo_de_teste(arq):
             erros.append(f"E3: {ia} e {ib} citam o MESMO arquivo de teste {arq} "
                          f"— cada task precisa do seu (armadilha D-16)")
         else:
@@ -263,9 +263,13 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
         primeiro = str(aviso["task_a"])
         posterior = str(aviso["task_b"])
         arq = str(aviso["arquivo"])
+        if not arq.endswith(".py") or arq not in (tocados[primeiro] & tocados[posterior]):
+            continue
+        if onda_de[primeiro] > onda_de[posterior]:
+            primeiro, posterior = posterior, primeiro
         txt = " ".join(tarefas_por_id[posterior].get("criterios", [])).lower()
         if "preserv" not in txt and "estend" not in txt and "nao remover" not in txt:
-            avisos.append(f"A1: {posterior} cita {arq} (citado por {primeiro}) sem "
+            avisos.append(f"A1: {posterior} edita {arq} (editado por {primeiro}) sem "
                           f"criterio explicito de preservacao/estender")
 
     return erros, avisos
