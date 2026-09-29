@@ -1,10 +1,10 @@
 {
- "total_codex": 92,
+ "total_codex": 94,
  "degraus": [
   {
    "degrau": 1,
    "chamadas": 15,
-   "pct_chamadas": 16.304347826086957,
+   "pct_chamadas": 15.957446808510639,
    "modelos": {
     "gpt-5.6-luna/low": 14,
     "(nenhum)/(nenhum)": 1
@@ -18,7 +18,7 @@
   {
    "degrau": 2,
    "chamadas": 12,
-   "pct_chamadas": 13.043478260869565,
+   "pct_chamadas": 12.76595744680851,
    "modelos": {
     "gpt-5.6-luna/medium": 5,
     "gpt-5.6-luna/low": 4,
@@ -33,12 +33,27 @@
   },
   {
    "degrau": 3,
-   "chamadas": 11,
-   "pct_chamadas": 11.956521739130435,
+   "chamadas": 12,
+   "pct_chamadas": 12.76595744680851,
    "modelos": {
     "gpt-5.6-luna/low": 7,
-    "gpt-5.6-terra/medium": 2,
-    "gpt-5.6-sol/low": 2
+    "gpt-5.6-sol/low": 3,
+    "gpt-5.6-terra/medium": 2
+   },
+   "status": {
+    "OK": 9,
+    "FAILED": 3
+   },
+   "ok": 9
+  },
+  {
+   "degrau": 4,
+   "chamadas": 11,
+   "pct_chamadas": 11.702127659574469,
+   "modelos": {
+    "gpt-5.6-luna/low": 7,
+    "gpt-5.6-sol/low": 2,
+    "gpt-5.6-sol/medium": 2
    },
    "status": {
     "OK": 9,
@@ -47,24 +62,9 @@
    "ok": 9
   },
   {
-   "degrau": 4,
-   "chamadas": 10,
-   "pct_chamadas": 10.869565217391305,
-   "modelos": {
-    "gpt-5.6-luna/low": 7,
-    "gpt-5.6-sol/low": 2,
-    "gpt-5.6-sol/medium": 1
-   },
-   "status": {
-    "OK": 8,
-    "FAILED": 2
-   },
-   "ok": 8
-  },
-  {
    "degrau": 5,
    "chamadas": 10,
-   "pct_chamadas": 10.869565217391305,
+   "pct_chamadas": 10.638297872340425,
    "modelos": {
     "gpt-5.6-luna/low": 5,
     "gpt-5.6-sol/low": 2,
@@ -80,7 +80,7 @@
   {
    "degrau": 6,
    "chamadas": 9,
-   "pct_chamadas": 9.782608695652174,
+   "pct_chamadas": 9.574468085106384,
    "modelos": {
     "gpt-5.6-sol/low": 4,
     "gpt-5.6-luna/low": 2,
@@ -98,7 +98,7 @@
   {
    "degrau": 7,
    "chamadas": 6,
-   "pct_chamadas": 6.521739130434782,
+   "pct_chamadas": 6.382978723404255,
    "modelos": {
     "gpt-5.6-sol/low": 3,
     "gpt-6-astra/low": 1,
@@ -115,7 +115,7 @@
   {
    "degrau": 8,
    "chamadas": 5,
-   "pct_chamadas": 5.434782608695652,
+   "pct_chamadas": 5.319148936170213,
    "modelos": {
     "gpt-5.6-sol/low": 2,
     "gpt-5.6-sol/medium": 2,
@@ -131,7 +131,7 @@
   {
    "degrau": 9,
    "chamadas": 5,
-   "pct_chamadas": 5.434782608695652,
+   "pct_chamadas": 5.319148936170213,
    "modelos": {
     "gpt-5.6-sol/low": 3,
     "gpt-6-astra/low": 1,
@@ -147,7 +147,7 @@
   {
    "degrau": 10,
    "chamadas": 4,
-   "pct_chamadas": 4.3478260869565215,
+   "pct_chamadas": 4.25531914893617,
    "modelos": {
     "gpt-6-astra/low": 2,
     "gpt-5.6-sol/low": 1,
@@ -162,7 +162,7 @@
   {
    "degrau": 11,
    "chamadas": 1,
-   "pct_chamadas": 1.0869565217391304,
+   "pct_chamadas": 1.0638297872340425,
    "modelos": {
     "gpt-5.6-sol/medium": 1
    },
@@ -174,7 +174,7 @@
   {
    "degrau": 12,
    "chamadas": 1,
-   "pct_chamadas": 1.0869565217391304,
+   "pct_chamadas": 1.0638297872340425,
    "modelos": {
     "gpt-6-astra/low": 1
    },
@@ -186,7 +186,7 @@
   {
    "degrau": 13,
    "chamadas": 1,
-   "pct_chamadas": 1.0869565217391304,
+   "pct_chamadas": 1.0638297872340425,
    "modelos": {
     "gpt-5.6-sol/low": 1
    },
@@ -198,7 +198,7 @@
   {
    "degrau": 14,
    "chamadas": 1,
-   "pct_chamadas": 1.0869565217391304,
+   "pct_chamadas": 1.0638297872340425,
    "modelos": {
     "gpt-5.6-sol/medium": 1
    },
@@ -210,7 +210,7 @@
   {
    "degrau": 15,
    "chamadas": 1,
-   "pct_chamadas": 1.0869565217391304,
+   "pct_chamadas": 1.0638297872340425,
    "modelos": {
     "gpt-5.6-sol/low": 1
    },
@@ -336,7 +336,9 @@
    },
    "P03": {
     "1": 1,
-    "2": 1
+    "2": 1,
+    "3": 1,
+    "4": 1
    },
    "P04": {
     "1": 1,
@@ -363,6 +365,7 @@
    "aprovacoes": 0,
    "reprovacoes": 0,
    "sem_avaliacao": 1,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": null,
    "modelo_que_aprovou": "",
    "infra": 0,
@@ -383,6 +386,7 @@
    "aprovacoes": 1,
    "reprovacoes": 0,
    "sem_avaliacao": 0,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 1,
    "modelo_que_aprovou": "gpt-5.6-luna/low",
    "infra": 0,
@@ -403,6 +407,7 @@
    "aprovacoes": 5,
    "reprovacoes": 5,
    "sem_avaliacao": 4,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 14,
    "modelo_que_aprovou": "gpt-5.6-sol/low",
    "infra": 3,
@@ -429,6 +434,7 @@
    "aprovacoes": 6,
    "reprovacoes": 2,
    "sem_avaliacao": 1,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 9,
    "modelo_que_aprovou": "gpt-5.6-sol/medium",
    "infra": 1,
@@ -453,6 +459,7 @@
    "aprovacoes": 6,
    "reprovacoes": 2,
    "sem_avaliacao": 1,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 9,
    "modelo_que_aprovou": "gpt-6-astra/low",
    "infra": 1,
@@ -477,6 +484,7 @@
    "aprovacoes": 4,
    "reprovacoes": 2,
    "sem_avaliacao": 0,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 6,
    "modelo_que_aprovou": "gpt-5.6-sol/low",
    "infra": 0,
@@ -500,6 +508,7 @@
    "aprovacoes": 5,
    "reprovacoes": 1,
    "sem_avaliacao": 1,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 7,
    "modelo_que_aprovou": "gpt-6-astra/low",
    "infra": 1,
@@ -523,6 +532,7 @@
    "aprovacoes": 4,
    "reprovacoes": 1,
    "sem_avaliacao": 1,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 6,
    "modelo_que_aprovou": "gpt-5.6-sol/low",
    "infra": 0,
@@ -546,6 +556,7 @@
    "aprovacoes": 4,
    "reprovacoes": 0,
    "sem_avaliacao": 0,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 4,
    "modelo_que_aprovou": "gpt-5.6-sol/low",
    "infra": 0,
@@ -567,6 +578,7 @@
    "aprovacoes": 4,
    "reprovacoes": 3,
    "sem_avaliacao": 2,
+   "reprov_em_janela": 3,
    "aprovada_na_chamada": 9,
    "modelo_que_aprovou": "gpt-6-astra/low",
    "infra": 1,
@@ -593,6 +605,7 @@
    "aprovacoes": 4,
    "reprovacoes": 1,
    "sem_avaliacao": 0,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 5,
    "modelo_que_aprovou": "gpt-5.6-sol/low",
    "infra": 0,
@@ -615,6 +628,7 @@
    "aprovacoes": 1,
    "reprovacoes": 2,
    "sem_avaliacao": 5,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 8,
    "modelo_que_aprovou": "gpt-5.6-sol/low",
    "infra": 0,
@@ -641,6 +655,7 @@
    "aprovacoes": 1,
    "reprovacoes": 0,
    "sem_avaliacao": 0,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 1,
    "modelo_que_aprovou": "gpt-5.6-luna/low",
    "infra": 0,
@@ -654,22 +669,25 @@
   {
    "sprint": "DEVFACTORY-004",
    "task": "P03",
-   "chamadas": 2,
-   "max_tentativa": 2,
+   "chamadas": 4,
+   "max_tentativa": 4,
    "min_tentativa": 1,
    "titulo": "Tirar do README o que nao bate com o codigo",
-   "aprovacoes": 0,
-   "reprovacoes": 1,
+   "aprovacoes": 1,
+   "reprovacoes": 2,
    "sem_avaliacao": 1,
-   "aprovada_na_chamada": null,
-   "modelo_que_aprovou": "",
+   "reprov_em_janela": 0,
+   "aprovada_na_chamada": 4,
+   "modelo_que_aprovou": "gpt-5.6-sol/medium",
    "infra": 1,
    "culpa_teste_plano": 0,
    "notas_culpa": [],
-   "do_modelo": 1,
+   "do_modelo": 3,
    "modelos": {
     "gpt-5.6-luna/low": 1,
-    "gpt-5.6-terra/low": 1
+    "gpt-5.6-terra/low": 1,
+    "gpt-5.6-sol/low": 1,
+    "gpt-5.6-sol/medium": 1
    }
   },
   {
@@ -682,6 +700,7 @@
    "aprovacoes": 1,
    "reprovacoes": 3,
    "sem_avaliacao": 6,
+   "reprov_em_janela": 0,
    "aprovada_na_chamada": 10,
    "modelo_que_aprovou": "gpt-6-astra/low",
    "infra": 0,

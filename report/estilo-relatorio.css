@@ -37,6 +37,11 @@ table {
 th { background: #eef3f9; color: #14395e; text-align: left; }
 th, td { border: 1px solid #c9d6e4; padding: .38em .6em; }
 tbody tr:nth-child(even) { background: #f8fafc; }
+/* tabela longa (a Tabela 1 já passa de uma página): o cabeçalho se repete e
+   nenhuma LINHA se parte entre páginas — antes a última linha saía como
+   fragmento órfão, só com a cauda da coluna de modelos. */
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
 
 code {
   background: #f1f3f6; padding: .1em .35em; border-radius: 3px;

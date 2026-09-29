@@ -4,10 +4,10 @@
 que tentativa cada uma aconteceu e com que modelo.
 **Fonte:** `.autodev/state.db`, tabela `attempts` (o próprio motor grava uma linha por
 invocação).
-**Janela:** 27/09/2026 02:03 a 28/09/2026 18:37 —
+**Janela:** 27/09/2026 02:03 a 28/09/2026 21:56 —
 DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 **Data do relatório:** 28/09/2026.
-**Total no período:** **92 chamadas do Codex**, 47 delas aprovadas
+**Total no período:** **94 chamadas do Codex**, 48 delas aprovadas
 (revisão + integração).
 
 ## Avisos
@@ -35,8 +35,8 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
    espera de cota escalona como qualquer falha. É um defeito de fiação, não uma intenção.
 6. **A partir da 5ª chamada o mapa satura no topo** (`min(tentativa, 5)` → `astra/low`):
    degraus 5 a 15 repetem o mesmo modelo. No período isso **não** virou desperdício: são
-   8 chamadas no topo (8.7%) contra
-   45 no degrau mais barato (48.9%) — a
+   8 chamadas no topo (8.5%) contra
+   45 no degrau mais barato (47.9%) — a
    cauda é curta porque a maioria dos pacotes aprovou antes do 5º degrau (tabela 3).
 7. **3 combinação(ões) fora da escada declarada:** `(nenhum)/(nenhum)`, `gpt-5.6-luna/medium`, `gpt-5.6-terra/medium`.
    As chamadas `luna/medium` e `terra/medium` aconteceram em 27/09 entre 03:13 e 04:07,
@@ -49,11 +49,11 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 
 ## O que os números dizem
 
-- **92 chamadas do Codex** em 15 pacotes com execução registrada. A
+- **94 chamadas do Codex** em 15 pacotes com execução registrada. A
   mediana é de 6 chamadas por pacote e a média
-  6.1.
-- **16.3% das chamadas são de 1ª tentativa** e
-  29.3% acontecem até a 2ª. Metade do gasto
+  6.3.
+- **16.0% das chamadas são de 1ª tentativa** e
+  28.7% acontecem até a 2ª. Metade do gasto
   (4ª tentativa em diante)
   está na cauda: são poucos pacotes que consumiram a escada inteira.
 - **3 pacote(s) resolveram com uma única chamada:**
@@ -65,12 +65,12 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 - **A cauda direita do gráfico 1 é o sintoma mais caro do período:** 5 chamadas em
   degraus 11 a 15, todas em pacotes que só destravaram quando o **defeito de motor** foi
   corrigido (D-19, D-24, D-25) — nenhuma delas é "o modelo errado tentando mais".
-- **27 das 92 chamadas (29.3%) foram gastas por defeito do
-  nosso teste/plano**, e 8 (8.7%) por infraestrutura (cota/crash).
-  Descontadas, sobram **57 chamadas (62.0%)** atribuíveis ao
+- **27 das 94 chamadas (28.7%) foram gastas por defeito do
+  nosso teste/plano**, e 8 (8.5%) por infraestrutura (cota/crash).
+  Descontadas, sobram **59 chamadas (62.8%)** atribuíveis ao
   trabalho do modelo — o denominador honesto para comparar modelos (seção "Descontando").
 - **Onde a escada se paga (tabela 3):** 2 pacote(s) aprovaram até a 3ª
-  chamada; 2 na 4ª–5ª; 9 da 6ª em diante.
+  chamada; 3 na 4ª–5ª; 9 da 6ª em diante.
   O degrau caro (`astra/low`) assinou 4 aprovação(ões) —
   sempre em pacote que carregava, junto, defeito de contrato nosso.
 
@@ -80,7 +80,7 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 
 Cada coluna é um pacote; a altura é quantas vezes o Codex foi chamado nele; a cor diz
 **em que altura da escada** a chamada aconteceu (verde = cedo, vermelho = fim da
-escada). Total: 92 chamadas.
+escada). Total: 94 chamadas.
 
 ## Tabela 1 — por pacote
 
@@ -90,23 +90,28 @@ naquele pacote (aprovado / reprovado / chamadas que nem chegaram a ser avaliadas
 `culpa teste/plano` separam o que **não era do modelo** (cota/crash e defeito de
 teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
 
-| sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | modelos usados |
-|---|---:|---:|---|---|---:|---:|---:|---:|---|
-| 001 | T15 | 1 | 0/0/1 | 1ª–1ª | — | 0 | 0 | 1 | (nenhum)/(nenhum) |
-| 002 | P01 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | gpt-5.6-luna/low |
-| 002 | P02 | 14 | 5/5/4 | 1ª–15ª ⚠ | 14ª (gpt-5.6-sol/low) | 3 | 5 | 6 | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P03 | 9 | 6/2/1 | 1ª–10ª ⚠ | 9ª (gpt-5.6-sol/medium) | 1 | 5 | 3 | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium |
-| 002 | P04 | 9 | 6/2/1 | 1ª–9ª | 9ª (gpt-6-astra/low) | 1 | 0 | 8 | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P05 | 6 | 4/2/0 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
-| 002 | P06 | 7 | 5/1/1 | 1ª–7ª | 7ª (gpt-6-astra/low) | 1 | 0 | 6 | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P07 | 6 | 4/1/1 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
-| 002 | P08 | 4 | 4/0/0 | 1ª–4ª | 4ª (gpt-5.6-sol/low) | 0 | 0 | 4 | gpt-5.6-luna/low, gpt-5.6-sol/low |
-| 002 | P09 | 9 | 4/3/2 | 1ª–10ª ⚠ | 9ª (gpt-6-astra/low) | 1 | 7 | 1 | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P10 | 5 | 4/1/0 | 1ª–5ª | 5ª (gpt-5.6-sol/low) | 0 | 0 | 5 | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low |
-| 004 | P01 | 8 | 1/2/5 | 1ª–9ª ⚠ | 8ª (gpt-5.6-sol/low) | 0 | 5 | 3 | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
-| 004 | P02 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | gpt-5.6-luna/low |
-| 004 | P03 | 2 | 0/1/1 | 1ª–2ª | — | 1 | 0 | 1 | gpt-5.6-luna/low, gpt-5.6-terra/low |
-| 004 | P04 | 10 | 1/3/6 | 1ª–10ª | 10ª (gpt-6-astra/low) | 0 | 5 | 5 | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
+`retrab. bruto` = **reprovações do aprovador ÷ aprovações do aprovador** (quanto a escada
+cobrou de volta por aprovação entregue); `retrab. ajust.` desconta as reprovações que foram
+culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem aprovação nenhuma fica
+`—`. No total: **24 reprovações ÷ 47 aprovações** = **51.1% bruto** e **44.7% ajustado** (a escada cobrou 3 reprovações que eram defeito do NOSSO teste/plano). Se o denominador for *chamadas avaliadas* em vez de aprovações — `reprov ÷ (aprov+reprov)` — os mesmos números ficam 33.8% e 30.9%.
+
+| sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados |
+|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---|
+| 001 | T15 | 1 | 0/0/1 | 1ª–1ª | — | 0 | 0 | 1 | — | — | (nenhum)/(nenhum) |
+| 002 | P01 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0% | 0% | gpt-5.6-luna/low |
+| 002 | P02 | 14 | 5/5/4 | 1ª–15ª ⚠ | 14ª (gpt-5.6-sol/low) | 3 | 5 | 6 | 100% | 100% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P03 | 9 | 6/2/1 | 1ª–10ª ⚠ | 9ª (gpt-5.6-sol/medium) | 1 | 5 | 3 | 33% | 33% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium |
+| 002 | P04 | 9 | 6/2/1 | 1ª–9ª | 9ª (gpt-6-astra/low) | 1 | 0 | 8 | 33% | 33% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P05 | 6 | 4/2/0 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | 50% | 50% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
+| 002 | P06 | 7 | 5/1/1 | 1ª–7ª | 7ª (gpt-6-astra/low) | 1 | 0 | 6 | 20% | 20% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P07 | 6 | 4/1/1 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | 25% | 25% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
+| 002 | P08 | 4 | 4/0/0 | 1ª–4ª | 4ª (gpt-5.6-sol/low) | 0 | 0 | 4 | 0% | 0% | gpt-5.6-luna/low, gpt-5.6-sol/low |
+| 002 | P09 | 9 | 4/3/2 | 1ª–10ª ⚠ | 9ª (gpt-6-astra/low) | 1 | 7 | 1 | 75% | 0% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P10 | 5 | 4/1/0 | 1ª–5ª | 5ª (gpt-5.6-sol/low) | 0 | 0 | 5 | 25% | 25% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low |
+| 004 | P01 | 8 | 1/2/5 | 1ª–9ª ⚠ | 8ª (gpt-5.6-sol/low) | 0 | 5 | 3 | 200% | 200% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
+| 004 | P02 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0% | 0% | gpt-5.6-luna/low |
+| 004 | P03 | 4 | 1/2/1 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 1 | 0 | 3 | 200% | 200% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low |
+| 004 | P04 | 10 | 1/3/6 | 1ª–10ª | 10ª (gpt-6-astra/low) | 0 | 5 | 5 | 300% | 300% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
 
 ## Tabela 3 — em que chamada a aprovação veio
 
@@ -117,7 +122,7 @@ que decide se a 4ª/5ª posição da escada se paga.
 |---|---:|---|---|
 | 1ª chamada | 2 | P01 (002), P02 (004) | gpt-5.6-luna/low |
 | 2ª–3ª | 0 | — | — |
-| 4ª–5ª | 2 | P08 (002), P10 (002) | gpt-5.6-sol/low |
+| 4ª–5ª | 3 | P08 (002), P10 (002), P03 (004) | gpt-5.6-sol/low, gpt-5.6-sol/medium |
 | 6ª–10ª | 8 | P03 (002), P04 (002), P05 (002), P06 (002), P07 (002), P09 (002), P01 (004), P04 (004) | gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
 | 11ª–15ª | 1 | P02 (002) | gpt-5.6-sol/low |
 
@@ -136,9 +141,9 @@ do agente o defeito do nosso teste.
 | 004 | P01 | 8 | 5 | 3 | D-23: critério mandava .venv dentro do worktree (chamadas 1–6) |
 | 004 | P04 | 10 | 5 | 5 | D-23: idem (chamadas 1–5) |
 
-No total: **27 chamadas (29.3%)** foram gastas por defeito do
-nosso teste/plano e **8 (8.7%) por infraestrutura** (cota, crash).
-Sobram **57 chamadas (62.0%)** atribuíveis ao trabalho do modelo —
+No total: **27 chamadas (28.7%)** foram gastas por defeito do
+nosso teste/plano e **8 (8.5%) por infraestrutura** (cota, crash).
+Sobram **59 chamadas (62.8%)** atribuíveis ao trabalho do modelo —
 esse é o único denominador honesto para comparar modelos.
 
 
@@ -150,19 +155,19 @@ esse é o único denominador honesto para comparar modelos.
 
 | tentativa | chamadas | % das chamadas | % acumulado | aprovadas | modelos usados |
 |---|---:|---:|---:|---:|---|
-| 1ª | 15 | 16.3% | 16.3% | 7 | gpt-5.6-luna/low (14), (nenhum)/(nenhum) (1) |
-| 2ª | 12 | 13.0% | 29.3% | 7 | gpt-5.6-luna/medium (5), gpt-5.6-luna/low (4), gpt-5.6-terra/low (3) |
-| 3ª | 11 | 12.0% | 41.3% | 9 | gpt-5.6-luna/low (7), gpt-5.6-terra/medium (2), gpt-5.6-sol/low (2) |
-| 4ª | 10 | 10.9% | 52.2% | 8 | gpt-5.6-luna/low (7), gpt-5.6-sol/low (2), gpt-5.6-sol/medium (1) |
-| 5ª | 10 | 10.9% | 63.0% | 6 | gpt-5.6-luna/low (5), gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-6-astra/low (1) |
-| 6ª | 9 | 9.8% | 72.8% | 2 | gpt-5.6-sol/low (4), gpt-5.6-luna/low (2), gpt-6-astra/low (2), gpt-5.6-sol/medium (1) |
-| 7ª | 6 | 6.5% | 79.3% | 1 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-luna/low (1), gpt-5.6-terra/low (1) |
-| 8ª | 5 | 5.4% | 84.8% | 1 | gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-5.6-terra/low (1) |
-| 9ª | 5 | 5.4% | 90.2% | 2 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-sol/medium (1) |
-| 10ª | 4 | 4.3% | 94.6% | 3 | gpt-6-astra/low (2), gpt-5.6-sol/low (1), gpt-5.6-sol/medium (1) |
+| 1ª | 15 | 16.0% | 16.0% | 7 | gpt-5.6-luna/low (14), (nenhum)/(nenhum) (1) |
+| 2ª | 12 | 12.8% | 28.7% | 7 | gpt-5.6-luna/medium (5), gpt-5.6-luna/low (4), gpt-5.6-terra/low (3) |
+| 3ª | 12 | 12.8% | 41.5% | 9 | gpt-5.6-luna/low (7), gpt-5.6-sol/low (3), gpt-5.6-terra/medium (2) |
+| 4ª | 11 | 11.7% | 53.2% | 9 | gpt-5.6-luna/low (7), gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2) |
+| 5ª | 10 | 10.6% | 63.8% | 6 | gpt-5.6-luna/low (5), gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-6-astra/low (1) |
+| 6ª | 9 | 9.6% | 73.4% | 2 | gpt-5.6-sol/low (4), gpt-5.6-luna/low (2), gpt-6-astra/low (2), gpt-5.6-sol/medium (1) |
+| 7ª | 6 | 6.4% | 79.8% | 1 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-luna/low (1), gpt-5.6-terra/low (1) |
+| 8ª | 5 | 5.3% | 85.1% | 1 | gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-5.6-terra/low (1) |
+| 9ª | 5 | 5.3% | 90.4% | 2 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-sol/medium (1) |
+| 10ª | 4 | 4.3% | 94.7% | 3 | gpt-6-astra/low (2), gpt-5.6-sol/low (1), gpt-5.6-sol/medium (1) |
 | 11ª | 1 | 1.1% | 95.7% | 0 | gpt-5.6-sol/medium (1) |
-| 12ª | 1 | 1.1% | 96.7% | 0 | gpt-6-astra/low (1) |
-| 13ª | 1 | 1.1% | 97.8% | 0 | gpt-5.6-sol/low (1) |
+| 12ª | 1 | 1.1% | 96.8% | 0 | gpt-6-astra/low (1) |
+| 13ª | 1 | 1.1% | 97.9% | 0 | gpt-5.6-sol/low (1) |
 | 14ª | 1 | 1.1% | 98.9% | 0 | gpt-5.6-sol/medium (1) |
 | 15ª | 1 | 1.1% | 100.0% | 1 | gpt-5.6-sol/low (1) |
 
@@ -182,7 +187,7 @@ O que a base mostra é diferente em pontos importantes, e por motivos conhecidos
    contador e ignora o tier da decisão. A intenção declarada ("espera de cota não gasta
    degrau") **não está fiada no código** — defeito registrado como pendência.
 3. **Saturação depois da 5ª** (aviso 6): o mapa tem 5 entradas, então degraus ≥5 usam
-   `astra/low`. No período o topo aparece em 8 das 92 chamadas.
+   `astra/low`. No período o topo aparece em 8 das 94 chamadas.
 4. **Buracos na numeração** (aviso 8) e **5 chamadas anteriores à padronização** da própria
    escada (aviso 7).
 

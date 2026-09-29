@@ -116,20 +116,29 @@ def carrega() -> tuple[dict, dict, dict]:
             c = tasks[tid]
             linhas_do_pacote = [l for l in linhas_codex
                                 if l["sprint_id"] == sprint and l["task_id"] == tid]
+            janelas = [CAUSA_TESTE_OU_PLANO.get((sprint, tid)),
+                       CAUSA_TESTE_OU_PLANO_EXTRA.get((sprint, tid))]
+
+            def _na_janela(linha) -> bool:
+                """A chamada cai numa janela de culpa nossa (teste/plano)?"""
+                return any(j and j[0][0] <= linha["attempt"] <= j[0][1]
+                           for j in janelas)
+
             vereditos = Counter()
+            reprov_janela = 0        # reprovações causadas pelo NOSSO teste/plano
             aprovada_em, modelo_aprovou = None, ""
             for i, l in enumerate(linhas_do_pacote, 1):
                 rv = json.loads(l["review_result"] or "{}")
                 v = rv.get("veredito")
                 vereditos[v or "sem avaliação"] += 1
+                if v in ("REQUEST_CHANGES", "REJECT") and _na_janela(l):
+                    reprov_janela += 1
                 if v == "APPROVE":
                     aprovada_em = i
                     modelo_aprovou = (f"{l['model']}/{l['effort']}" if l["model"]
                                       else "(sem modelo)")
             infra = sum(1 for l in linhas_do_pacote
                         if (l["failure_class"] or "") in CLASSES_INFRA)
-            janelas = [CAUSA_TESTE_OU_PLANO.get((sprint, tid)),
-                       CAUSA_TESTE_OU_PLANO_EXTRA.get((sprint, tid))]
             culpa, notas = 0, []
             for j in janelas:
                 if not j:
@@ -151,6 +160,7 @@ def carrega() -> tuple[dict, dict, dict]:
                 "reprovacoes": (vereditos.get("REQUEST_CHANGES", 0)
                                 + vereditos.get("REJECT", 0)),
                 "sem_avaliacao": vereditos.get("sem avaliação", 0),
+                "reprov_em_janela": reprov_janela,
                 "aprovada_na_chamada": aprovada_em,
                 "modelo_que_aprovou": modelo_aprovou,
                 "infra": infra,
@@ -342,6 +352,19 @@ def escreve_relatorio(dados: dict) -> Path:
             f"{acumulado:.1f}% | {x['ok']} | {mods} |")
     tabela_degraus = "\n".join(linhas_degrau)
 
+    def _retrab(p, ajustado: bool) -> str:
+        """% de retrabalho = reprovações do aprovador ÷ aprovações do aprovador.
+
+        `ajustado` desconta as reprovações causadas pelo NOSSO teste/plano (a mesma
+        janela curada da coluna `culpa teste/plano`) — nunca as do codificador.
+        Pacote sem nenhuma aprovação fica '—' (o denominador não existiria).
+        """
+        aprov = p["aprovacoes"]
+        if not aprov:
+            return "—"
+        reprov = p["reprovacoes"] - (p["reprov_em_janela"] if ajustado else 0)
+        return f"{100.0 * reprov / aprov:.0f}%"
+
     linhas_pacote = []
     for s in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-004"):
         c = d["chamadas_por_sprint_pacote"].get(s, {})
@@ -360,8 +383,28 @@ def escreve_relatorio(dados: dict) -> Path:
                 f"{p['aprovacoes']}/{p['reprovacoes']}/{p['sem_avaliacao']} | "
                 f"{tent[0]}ª–{tent[-1]}ª{buraco} | {aprov} | "
                 f"{p['infra']} | {p['culpa_teste_plano']} | {p['do_modelo']} | "
+                f"{_retrab(p, False)} | {_retrab(p, True)} | "
                 f"{mods} |")
     tabela_pacotes = "\n".join(linhas_pacote)
+
+    # ---- retrabalho: números globais (bruto e ajustado, nas duas leituras) -----
+    tot_aprov = sum(p["aprovacoes"] for p in d["pacotes"])
+    tot_reprov = sum(p["reprovacoes"] for p in d["pacotes"])
+    tot_reprov_jan = sum(p["reprov_em_janela"] for p in d["pacotes"])
+
+    def _pct(a, b) -> str:
+        return f"{100.0 * a / b:.1f}%" if b else "—"
+
+    retrab_global = (
+        f"No total: **{tot_reprov} reprovações ÷ {tot_aprov} aprovações** = "
+        f"**{_pct(tot_reprov, tot_aprov)} bruto** e "
+        f"**{_pct(tot_reprov - tot_reprov_jan, tot_aprov)} ajustado** (a escada cobrou "
+        f"{tot_reprov_jan} reprovações que eram defeito do NOSSO teste/plano). "
+        f"Se o denominador for *chamadas avaliadas* em vez de aprovações — "
+        f"`reprov ÷ (aprov+reprov)` — os mesmos números ficam "
+        f"{_pct(tot_reprov, tot_aprov + tot_reprov)} e "
+        f"{_pct(tot_reprov - tot_reprov_jan, tot_aprov + tot_reprov - tot_reprov_jan)}."
+    )
 
     # ---- desconto da culpa: o que NÃO era do modelo ---------------------------
     tot_infra = sum(p["infra"] for p in d["pacotes"])
@@ -498,8 +541,13 @@ naquele pacote (aprovado / reprovado / chamadas que nem chegaram a ser avaliadas
 `culpa teste/plano` separam o que **não era do modelo** (cota/crash e defeito de
 teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
 
-| sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | modelos usados |
-|---|---:|---:|---|---|---:|---:|---:|---:|---|
+`retrab. bruto` = **reprovações do aprovador ÷ aprovações do aprovador** (quanto a escada
+cobrou de volta por aprovação entregue); `retrab. ajust.` desconta as reprovações que foram
+culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem aprovação nenhuma fica
+`—`. {retrab_global}
+
+| sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados |
+|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---|
 {tabela_pacotes}
 
 ## Tabela 3 — em que chamada a aprovação veio
