@@ -17,11 +17,12 @@ RAIZ = Path(__file__).resolve().parent.parent
 AUTODEV = RAIZ / ".autodev"
 CONFIG = AUTODEV / "config"
 
-# Referências textuais a arquivos.  O planejador e o validador do motor usam a
-# mesma regra para que um plano aprovado não mude de significado no `init`.
+# Referências textuais a arquivos. O planejador e o validador do motor usam a
+# mesma regra de extração para que um caminho não mude de significado no `init`.
 _EXTENSOES_ARQUIVO = (
-    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
-    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
+    "bash|c|cc|cfg|conf|cpp|css|csv|db|go|h|hpp|html|ini|ipynb|java|js|json|"
+    "jsx|kt|lock|log|md|pdf|php|png|py|rb|rs|sh|sql|svelte|svg|toml|ts|tsx|"
+    "txt|vue|xml|yaml|yml"
 )
 _ARQUIVO = re.compile(
     rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
@@ -206,20 +207,28 @@ def normalizar_caminho(caminho: str) -> str:
     caminho = caminho.replace("\\", "/")
     while caminho.startswith("./"):
         caminho = caminho[2:]
-    return PurePosixPath(caminho).as_posix().lstrip("/")
-
-
-# Compatibilidade para consumidores antigos; código novo usa a API pública.
-_normalizar_caminho = normalizar_caminho
+    partes: list[str] = []
+    for parte in PurePosixPath(caminho).parts:
+        if parte in ("/", "."):
+            continue
+        if parte == ".." and partes and partes[-1] != "..":
+            partes.pop()
+        else:
+            partes.append(parte)
+    return "/".join(partes)
 
 
 def registro_compartilhado(caminho: str) -> bool:
     """Indica arquivos append-only que tasks paralelas podem compartilhar."""
     partes = PurePosixPath(normalizar_caminho(caminho)).parts
+    minusculas = tuple(parte.casefold() for parte in partes)
+    if len(minusculas) < 4 or minusculas[:2] != (".autodev", "sprints"):
+        return False
+    nome = minusculas[-1]
     return bool(
-        partes
-        and (partes[-1].casefold() == "decisions.md"
-             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
+        nome == "decisions.md"
+        or (set(minusculas[3:-1]) & {"logs", "evidence"}
+            and PurePosixPath(nome).suffix in {".log", ".md", ".txt"})
     )
 
 

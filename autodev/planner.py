@@ -379,7 +379,7 @@ def validar_e_ordenar(plano: Plano) -> list[list[str]]:
         for indice, criterio in enumerate(task.criterios, start=1):
             palavras = set(re.findall(r"\w+", criterio.casefold()))
             if (palavras.intersection(PALAVRAS_VAGAS)
-                    and not _ARQUIVO.search(criterio)
+                    and not config._ARQUIVO.search(criterio)
                     and not _COMANDO_TESTE.search(criterio)):
                 erros.append(
                     f"task {task.id}: critério {indice} vago; "

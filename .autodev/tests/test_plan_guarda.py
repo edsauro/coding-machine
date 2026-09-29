@@ -4,7 +4,12 @@ import pytest
 
 from autodev import cli
 from autodev.config import valida_dag
-from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+from autodev.planner import (
+    Plano,
+    TaskPlano,
+    avisos_de_colisao_de_arquivo,
+    validar_e_ordenar,
+)
 
 
 def dag_com(*tasks):
@@ -44,6 +49,16 @@ def test_valida_dag_detecta_caminhos_equivalentes_na_mesma_onda():
                for erro in erros)
 
 
+def test_valida_dag_colapsa_segmento_pai_de_caminho_na_mesma_onda():
+    erros = valida_dag(dag_com(
+        task("P01", "altera src/../autodev/config.py"),
+        task("P02", "altera autodev/config.py"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and "autodev/config.py" in erro
+               for erro in erros)
+
+
 @pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
 def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
     erros = valida_dag(dag_com(
@@ -52,6 +67,17 @@ def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
     ))
 
     assert erros == []
+
+
+@pytest.mark.parametrize("arquivo", [".autodev/state.db", "report/x.png"])
+def test_valida_dag_reconhece_extensoes_usadas_pelo_projeto(arquivo):
+    erros = valida_dag(dag_com(
+        task("P01", f"altera {arquivo}"),
+        task("P02", f"altera {arquivo}"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and arquivo in erro
+               for erro in erros)
 
 
 @pytest.mark.parametrize("arquivo", [
@@ -66,6 +92,17 @@ def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
     ))
 
     assert erros == []
+
+
+@pytest.mark.parametrize("arquivo", ["src/evidence/coleta.py", "logs/rotacao.py"])
+def test_valida_dag_nao_isenta_codigo_fora_dos_registros_do_sprint(arquivo):
+    erros = valida_dag(dag_com(
+        task("P01", f"altera {arquivo}"),
+        task("P02", f"altera {arquivo}"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and arquivo in erro
+               for erro in erros)
 
 
 def test_valida_dag_numera_primeira_onda_como_um():
@@ -92,6 +129,15 @@ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
         "task_a": "P01", "task_b": "P02", "arquivo": "autodev/config.py",
         "onda": 1, "onda_b": 2,
     }]
+
+
+def test_validar_e_ordenar_reconhece_arquivo_em_criterio_vago():
+    plano = Plano(
+        titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+        tasks=[TaskPlano("P01", "primeira", ["melhorar autodev/config.py"])],
+    )
+
+    assert validar_e_ordenar(plano) == [["P01"]]
 
 
 def test_init_recusa_dag_com_colisao_na_mesma_onda(tmp_path, monkeypatch, capsys):
