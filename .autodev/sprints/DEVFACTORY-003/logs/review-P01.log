@@ -1,4 +1,4 @@
-# exit_code=3 duracao=167.3s modelo=Gemini 3.6 Flash (Low) effort=(default) failure_class=CODEX_QUOTA tokens=nao medido(-)
+# exit_code=0 duracao=396.8s modelo=deepseek-v4-pro effort=(default) failure_class=None tokens=nao medido(-)
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -16,15 +16,206 @@ Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
 ## Task
 P01: Detectar colisao de arquivo entre tasks do plano
 
-## Diff a revisar (base 2620abadd90bfde25461f2924637570fbbb68eb2 -> HEAD)
+## Diff a revisar (base 0a05eb162b46968aaf68310500e232fb494535fd -> HEAD)
 ```diff
+diff --git a/.autodev/scripts/verificar_plano.py b/.autodev/scripts/verificar_plano.py
+index 3abd1f8..b6f600d 100644
+--- a/.autodev/scripts/verificar_plano.py
++++ b/.autodev/scripts/verificar_plano.py
+@@ -34,6 +34,8 @@ from pathlib import Path
+ RAIZ = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(RAIZ))
+ 
++from autodev import planner
++
+ ARQUIVO = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|md|json|ya?ml|toml|sh|txt|cfg|ini)")
+ IGNORAR = (".venv/", "site-packages/")
+ COMANDO_PYTEST_CORRETO = re.compile(r"(?<![A-Za-z0-9_./-])python3\s+-m\s+pytest\b")
+@@ -128,11 +130,6 @@ def _comando_de_teste_incorreto(texto: str, *, campo_teste: bool) -> bool:
+     return False
+ 
+ 
+-def e_arquivo_de_teste(caminho: str) -> bool:
+-    nome = Path(caminho).name
+-    return nome.startswith("test_") or "/tests/" in caminho or caminho.startswith("tests/")
+-
+-
+ def ondas_lista(dag: dict) -> list[list[str]]:
+     """Ondas de execucao — usa o motor real quando a sprint ja e conhecida."""
+     try:
+@@ -168,7 +165,24 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
+         avisos.append(f"nao foi possivel rodar valida_dag do motor ({exc}); seguindo com a checagem local")
+ 
+     arquivos = {t["id"]: extrair_arquivos(t) for t in tasks}      # mencoes (E4)
+-    tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (E2/E3/A1/A2)
++    tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (A1/A2)
++    plano = planner.Plano(
++        titulo=nome,
++        objetivo="",
++        repositorio=".",
++        prompt_original="",
++        tasks=[
++            planner.TaskPlano(
++                id=t["id"],
++                titulo=t.get("titulo", t["id"]),
++                criterios=list(t.get("criterios", [])),
++                deps=list(t.get("deps", [])),
++                agente=t.get("agente", "codex"),
++                teste=t.get("teste", "") or "",
++            )
++            for t in tasks
++        ],
++    )
+ 
+     # E5 — o runner resolve `python3` para o interpretador do projeto. Um
+     # caminho de venv relativo aponta para o worktree, onde esse venv não existe.
+@@ -192,33 +206,23 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
+                 ) else "")
+             )
+ 
+-    teste_de: dict[str, set[str]] = {i: {a for a in f if e_arquivo_de_teste(a)}
+-                                     for i, f in tocados.items()}
+     onda_de: dict[str, int] = {}
+     for n, onda in enumerate(ondas_lista(dag)):
+         for i in onda:
+             onda_de[i] = n
+ 
+-    # E2 — mesmo arquivo na mesma onda (conflito de merge garantido)
++    # E2/E3 — a implementação canônica fica no planner usado pelo motor.
+     ids = [t["id"] for t in tasks]
+-    for a in range(len(ids)):
+-        for b in range(a + 1, len(ids)):
+-            ia, ib = ids[a], ids[b]
+-            if onda_de.get(ia) != onda_de.get(ib):
+-                continue
+-            comum = tocados[ia] & tocados[ib]
+-            for arq in sorted(comum):
+-                erros.append(f"E2: {ia} e {ib} estao na MESMA onda {onda_de.get(ia)} "
+-                             f"e editam {arq} — serialize (adicione deps) ou separe o arquivo")
+-
+-    # E3 — mesmo ARQUIVO DE TESTE em tasks diferentes (a armadilha D-16)
+-    for a in range(len(ids)):
+-        for b in range(a + 1, len(ids)):
+-            ia, ib = ids[a], ids[b]
+-            comum = teste_de[ia] & teste_de[ib]
+-            for arq in sorted(comum):
+-                erros.append(f"E3: {ia} e {ib} escrevem no MESMO arquivo de teste {arq} "
+-                             f"— cada task precisa do seu (armadilha D-16)")
++    for colisao in planner.colisoes_de_arquivo(plano):
++        ia = str(colisao["task_a"])
++        ib = str(colisao["task_b"])
++        arq = str(colisao["arquivo"])
++        if planner.arquivo_de_teste(arq):
++            erros.append(f"E3: {ia} e {ib} citam o MESMO arquivo de teste {arq} "
++                         f"— cada task precisa do seu (armadilha D-16)")
++        else:
++            erros.append(f"E2: {ia} e {ib} estao na MESMA onda {colisao['onda']} "
++                         f"e citam {arq} — serialize (adicione deps) ou separe o arquivo")
+ 
+     # E4 + A2
+     def alcanca(origem: str, alvo: str, grafo: dict[str, list[str]],
+@@ -253,22 +257,20 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
+                 avisos.append(f"A2: {tid} mexe em {sorted(tocados[tid] & tocados[outro])} "
+                               f"que {outro} entrega antes, mas nao depende de {outro}")
+ 
+-    # A1 — arquivo compartilhado em ondas diferentes: exige preservacao explicita
+-    for arq in sorted({a for f in tocados.values() for a in f}):
+-        donos = [i for i in ids if arq in tocados[i]]
+-        if len(donos) < 2 or not arq.endswith(".py"):
++    # A1 — arquivo compartilhado em ondas diferentes: exige preservacao explicita.
++    tarefas_por_id = {t["id"]: t for t in tasks}
++    for aviso in planner.avisos_de_colisao_de_arquivo(plano):
++        primeiro = str(aviso["task_a"])
++        posterior = str(aviso["task_b"])
++        arq = str(aviso["arquivo"])
++        if not arq.endswith(".py") or arq not in (tocados[primeiro] & tocados[posterior]):
+             continue
+-        ondas_distintas = {onda_de.get(i) for i in donos}
+-        if len(ondas_distintas) > 1 and not e_arquivo_de_teste(arq):
+-            primeiro = min(donos, key=lambda i: onda_de.get(i, 0))
+-            for i in donos:
+-                if i == primeiro:
+-                    continue
+-                txt = " ".join(" ".join(t.get("criterios", [])) for t in tasks
+-                               if t["id"] == i).lower()
+-                if "preserv" not in txt and "estend" not in txt and "nao remover" not in txt:
+-                    avisos.append(f"A1: {i} edita {arq} (entregue por {primeiro}) sem "
+-                                  f"criterio explicito de preservacao/estender")
++        if onda_de[primeiro] > onda_de[posterior]:
++            primeiro, posterior = posterior, primeiro
++        txt = " ".join(tarefas_por_id[posterior].get("criterios", [])).lower()
++        if "preserv" not in txt and "estend" not in txt and "nao remover" not in txt:
++            avisos.append(f"A1: {posterior} edita {arq} (editado por {primeiro}) sem "
++                          f"criterio explicito de preservacao/estender")
+ 
+     return erros, avisos
+ 
+diff --git a/.autodev/tests/test_plan_aceitacao.py b/.autodev/tests/test_plan_aceitacao.py
+index c50ae67..aa0169d 100644
+--- a/.autodev/tests/test_plan_aceitacao.py
++++ b/.autodev/tests/test_plan_aceitacao.py
+@@ -48,7 +48,7 @@ def _resposta_do_planejador() -> str:
+                     "criterios": ["NOTAS.md descreve a entrega verificada"],
+                     "deps": [],
+                     "agente": "codex",
+-                    "teste": "python3 -m pytest tests/test_stats.py -q",
++                    "teste": "python3 -m pytest tests/test_notas.py -q",
+                 },
+                 {
+                     "id": "P03",
+@@ -56,7 +56,7 @@ def _resposta_do_planejador() -> str:
+                     "criterios": ["RESULTADO.md registra o resultado final"],
+                     "deps": ["P01", "P02"],
+                     "agente": "codex",
+-                    "teste": "python3 -m pytest tests/test_stats.py -q",
++                    "teste": "python3 -m pytest tests/test_resultado.py -q",
+                 },
+             ],
+         },
+@@ -72,7 +72,23 @@ def _escrever_spec_fake(caminho: Path, conteudo: dict) -> None:
+ def test_aceitacao_do_planejador(tmp_path, monkeypatch, capsys):
+     raiz = criar_fixture(tmp_path / "projeto")
+     (raiz / "src/stats.py").write_text(STATS_CORRIGIDO, encoding="utf-8")
+-    subprocess.run(["git", "add", "src/stats.py"], cwd=raiz, check=True)
++    (raiz / "tests/test_notas.py").write_text(
++        "from pathlib import Path\n\n"
++        "def test_notas_registradas():\n"
++        "    assert Path('NOTAS.md').exists()\n",
++        encoding="utf-8",
++    )
++    (raiz / "tests/test_resultado.py").write_text(
++        "from pathlib import Path\n\n"
++        "def test_resultado_consolidado():\n"
++        "    assert Path('RESULTADO.md').exists()\n",
++        encoding="utf-8",
++    )
++    subprocess.run(
++        ["git", "add", "src/stats.py", "tests/test_notas.py", "tests/test_resultado.py"],
++        cwd=raiz,
++        check=True,
++    )
+     subprocess.run(
+         ["git", "commit", "-q", "-m", "fixture verde"], cwd=raiz, check=True
+     )
 diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
 new file mode 100644
-index 0000000..e691bd0
+index 0000000..4e59df6
 --- /dev/null
 +++ b/.autodev/tests/test_plan_colisoes.py
-@@ -0,0 +1,56 @@
-+from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
+@@ -0,0 +1,258 @@
++import pytest
++from dataclasses import asdict
++import importlib.util
++from pathlib import Path
++
++from autodev.planner import (
++    Plano,
++    TaskPlano,
++    avisos_de_colisao_de_arquivo,
++    colisoes_de_arquivo,
++    validar_plano,
++)
++from autodev import cli
 +
 +
 +def plano_com(*tasks):
@@ -55,6 +246,23 @@ index 0000000..e691bd0
 +    assert colisoes_de_arquivo(plano) == []
 +
 +
++def test_arquivo_de_producao_em_ondas_diferentes_vira_aviso():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert avisos_de_colisao_de_arquivo(plano) == [
++        {
++            "task_a": "P01",
++            "task_b": "P02",
++            "arquivo": "autodev/modulo.py",
++            "onda": 1,
++            "onda_b": 2,
++        }
++    ]
++
++
 +def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
 +    plano = plano_com(
 +        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
@@ -79,83 +287,349 @@ index 0000000..e691bd0
 +
 +    erros = validar_plano(plano)
 +
-+    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/modulo.py (onda 1)"
++    ]
++
++
++def test_negacao_so_afeta_a_mencao_negada():
++    plano = plano_com(
++        task("P01", "cria autodev/novo.py e nao altera autodev/modulo.py"),
++        task("P02", "altera autodev/novo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/novo.py", "onda": 1}
++    ]
++
++
++def test_basename_igual_em_diretorios_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_cmd_plan_exibe_aviso_de_colisao_entre_ondas(monkeypatch, capsys, tmp_path):
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    monkeypatch.setattr("autodev.planner.planejar", lambda *_: plano)
++    monkeypatch.setattr("autodev.planner.validar_e_ordenar", lambda *_: [["P01"], ["P02"]])
++    monkeypatch.setattr("autodev.planner.escrever_sprint", lambda *_: tmp_path / "DEVFACTORY-999")
++
++    assert cli.main(["plan", "pedido"]) == 0
++    saida = capsys.readouterr().out
++    assert "aviso: colisão de arquivo entre P01 (onda 1) e P02 (onda 2): autodev/modulo.py" in saida
++
++
++def test_mencao_do_mesmo_arquivo_na_mesma_onda_colide():
++    plano = plano_com(
++        task("P01", "usa colisoes importada de autodev/modulo.py sem reimplementar"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_ids_duplicados_nao_geram_colisao_da_task_com_ela_mesma():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P01", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_ciclo_nao_levanta_ao_calcular_colisoes():
++    plano = plano_com(
++        task("P01", "altera autodev/primeiro.py", deps=["P02"]),
++        task("P02", "altera autodev/segundo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_arquivo_de_teste_citado_no_criterio_colide_mesmo_sem_verbo_de_edicao():
++    plano = plano_com(
++        task("P01", "confira a cobertura em tests/test_plano.py"),
++        task("P02", "consulte tests/test_plano.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++@pytest.mark.parametrize("arquivo", ["test_plano.py", "modulo_test.py", "conftest.py", "autodev/test_helpers.py"])
++def test_nome_de_arquivo_de_teste_colide_entre_ondas(arquivo):
++    plano = plano_com(
++        task("P01", f"escreve {arquivo}"),
++        task("P02", f"altera {arquivo}", deps=["P01"]),
++    )
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": arquivo, "onda": 1}
++    ]
++    assert avisos_de_colisao_de_arquivo(plano) == []
++    assert any(arquivo in erro and "P01" in erro and "P02" in erro
++               for erro in validar_plano(plano))
++
++
++@pytest.mark.parametrize("outro, colide", [("autodev/modulo.py", True), ("modulo.py", False), ("outro/modulo.py", False)])
++def test_caminho_windows_preserva_diretorio(outro, colide):
++    plano = plano_com(task("P01", r"edita autodev\modulo.py"), task("P02", f"edita {outro}"))
++    assert bool(colisoes_de_arquivo(plano)) is colide
++
++
++def verificar_tasks(*tasks):
++    caminho = Path(__file__).resolve().parents[1] / "scripts/verificar_plano.py"
++    spec = importlib.util.spec_from_file_location("verificador_colisoes", caminho)
++    modulo = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(modulo)
++    return modulo.verificar({"tasks": [asdict(t) for t in tasks]}, "X")
++
++
++@pytest.mark.parametrize("criterio", [
++    "usa funcao importada de autodev/modulo.py em vez de reimplementar",
++    "nao altera autodev/modulo.py",
++])
++def test_a1_nao_confunde_mencao_com_edicao(criterio):
++    _, avisos = verificar_tasks(task("P01", "cria autodev/modulo.py"), task("P02", criterio, deps=["P01"]))
++    assert not any(a.startswith("A1:") for a in avisos)
++
++
++@pytest.mark.parametrize("arquivo", ["dag.json", "spec.md", "sprint.yaml", "decisions.md"])
++def test_a1_nao_exige_preservacao_de_metadados(arquivo):
++    _, avisos = verificar_tasks(task("P01", f"cria {arquivo}"), task("P02", f"altera {arquivo}", deps=["P01"]))
++    assert not any(a.startswith("A1:") for a in avisos)
++
++
++@pytest.mark.parametrize("preserva", [False, True])
++def test_a1_considera_preservacao_da_task_posterior_com_lista_invertida(preserva):
++    posterior = "altera autodev/modulo.py" + (" preservando funcoes existentes" if preserva else "")
++    _, avisos = verificar_tasks(task("P02", posterior, deps=["P01"]), task("P01", "cria autodev/modulo.py"))
++    a1 = [a for a in avisos if a.startswith("A1:")]
++    assert bool(a1) is not preserva
++    if a1:
++        assert "A1: P02" in a1[0]
++
++
++def test_cmd_plan_recusa_colisao_e_nao_escreve_sprint(monkeypatch, capsys, tmp_path):
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++    escrita = []
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    monkeypatch.setattr("autodev.planner.planejar", lambda *_: plano)
++    monkeypatch.setattr(
++        "autodev.planner.escrever_sprint", lambda *_: escrita.append(True)
++    )
++
++    assert cli.main(["plan", "pedido"]) == 1
++    saida = capsys.readouterr().out
++    assert "P01" in saida
++    assert "P02" in saida
++    assert "autodev/modulo.py" in saida
++    assert escrita == []
++
++
++@pytest.mark.parametrize("deps", [[], ["P01"]])
++def test_colisao_preserva_nome_de_teste_com_varios_pontos(deps):
++    plano = plano_com(
++        task("P01", "cria tests/plano.spec.ts"),
++        task("P02", "edita tests/plano.spec.ts", deps=deps),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/plano.spec.ts", "onda": 1}
++    ]
++    assert any("tests/plano.spec.ts" in erro for erro in validar_plano(plano))
++
++
++def test_arquivos_com_extensoes_distintas_nao_colidem():
++    plano = plano_com(
++        task("P01", "cria tests/plano.spec.ts"),
++        task("P02", "cria tests/plano.spec.js"),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++    assert validar_plano(plano) == []
+diff --git a/.autodev/tests/test_plan_prompt.py b/.autodev/tests/test_plan_prompt.py
+index e7a3220..cba09e0 100644
+--- a/.autodev/tests/test_plan_prompt.py
++++ b/.autodev/tests/test_plan_prompt.py
+@@ -28,3 +28,10 @@ def test_prompt_plano_preserva_prompt_usuario_literalmente():
+     prompt = montar_prompt_plano(prompt_usuario)
+ 
+     assert prompt_usuario in prompt
++
++
++def test_prompt_evitar_colisao_de_arquivos_de_teste():
++    prompt = montar_prompt_plano("Planeje")
++
++    assert "arquivo de teste" in prompt
++    assert "não podem citar o mesmo arquivo de teste" in prompt
+diff --git a/.autodev/tests/test_plano_comando.py b/.autodev/tests/test_plano_comando.py
+index 547215a..413f7b0 100644
+--- a/.autodev/tests/test_plano_comando.py
++++ b/.autodev/tests/test_plano_comando.py
+@@ -150,6 +150,25 @@ def test_preserva_regras_e2_e3_e4_a1_e_a2():
+     assert any(aviso.startswith("A2:") for aviso in avisos)
+ 
+ 
++def test_verificador_usa_mesma_regra_de_citacao_do_planner():
++    dag = {"tasks": [
++        {"id": "P1", "criterios": ["consulta autodev/compartilhado.py"],
++         "teste": "python3 -m pytest tests/test_p1.py -q", "deps": []},
++        {"id": "P2", "criterios": ["valida autodev/compartilhado.py"],
++         "teste": "python3 -m pytest tests/test_p2.py -q", "deps": []},
++    ]}
++
++    erros, _ = verificar_plano.verificar(dag, "X")
++
++    assert any(
++        erro.startswith("E2:")
++        and "P1" in erro
++        and "P2" in erro
++        and "autodev/compartilhado.py" in erro
++        for erro in erros
++    )
++
++
+ @pytest.mark.parametrize("criterio", [
+     "os testes usam pytest e a suite roda em menos de 30 s",
+     "o arquivo de teste cobre o caso de pytest sem comando",
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 6d11bdc..a9c26e7 100644
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -340,6 +340,11 @@ def cmd_plan(args) -> int:
+             for erro in erros:
+                 print(erro)
+             return 1
++        for aviso in planner.avisos_de_colisao_de_arquivo(plano):
++            print(
++                f"aviso: colisão de arquivo entre {aviso['task_a']} (onda {aviso['onda']}) "
++                f"e {aviso['task_b']} (onda {aviso['onda_b']}): {aviso['arquivo']}"
++            )
+         planner.validar_e_ordenar(plano)
+         destino = planner.escrever_sprint(RAIZ, plano)
+     except planner.PlanoInvalido as erro:
+diff --git a/autodev/plan_prompt.py b/autodev/plan_prompt.py
+index 8c3b510..23bc6b6 100644
+--- a/autodev/plan_prompt.py
++++ b/autodev/plan_prompt.py
+@@ -20,6 +20,8 @@ Cada item de "tasks" deve ter todas as chaves:
+ Não escreva critério vago. Cada critério deve mencionar pelo menos um arquivo
+ específico ou um comando de teste concreto que permita verificar a entrega.
+ A última task deve ser sempre um teste de aceitação ponta a ponta da entrega.
++Cada task deve citar seu próprio arquivo de teste.
++Duas tasks não podem citar o mesmo arquivo de teste; se precisarem dele, agrupe-as.
+ 
+ Para testes pytest, nos critérios e no campo "teste", use `python3 -m pytest ...`.
+ Não use `.venv/bin/python` nem outro caminho de venv relativo: o worktree nao tem venv;
 diff --git a/autodev/planner.py b/autodev/planner.py
-index f2015d4..3ab6876 100644
+index f2015d4..9fff066 100644
 --- a/autodev/planner.py
 +++ b/autodev/planner.py
-@@ -231,6 +231,55 @@ def _construir_task(dados: object) -> TaskPlano:
+@@ -6,7 +6,7 @@ import json
+ import os
+ import re
+ from dataclasses import asdict, dataclass, field
+-from pathlib import Path
++from pathlib import Path, PurePosixPath
+ 
+ import yaml
+ 
+@@ -18,7 +18,7 @@ PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
+ 
+ # Referências textuais: o arquivo pode ainda ser criado pela sprint.
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+\.[A-Za-z][A-Za-z0-9]*\b"
++    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+     r"|\b(?:Makefile|Dockerfile)\b"
+ )
+ _COMANDO_TESTE = re.compile(
+@@ -231,6 +231,108 @@ def _construir_task(dados: object) -> TaskPlano:
      return TaskPlano(**campos)
  
  
 +def _arquivos_da_task(task: TaskPlano) -> set[str]:
-+    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    """Extrai todos os caminhos mencionados nos critérios e no teste."""
 +    textos = [*task.criterios, task.teste]
-+    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++    return {
++        _normalizar_caminho(caminho.group(0))
++        for texto in textos
++        for caminho in _ARQUIVO.finditer(texto.replace("\\", "/"))
++    }
 +
 +
-+def _arquivo_de_teste(caminho: str) -> bool:
-+    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
-+    nome = Path(caminho).name.casefold()
-+    partes = {parte.casefold() for parte in Path(caminho).parts}
-+    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++def _normalizar_caminho(caminho: str) -> str:
++    """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
++    caminho = caminho.replace("\\", "/")
++    while caminho.startswith("./"):
++        caminho = caminho[2:]
++    return PurePosixPath(caminho).as_posix().lstrip("/")
 +
 +
-+def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
-+    """Retorna arquivos editados por mais de uma task no mesmo plano.
++def arquivo_de_teste(caminho: str) -> bool:
++    """Reconhece diretórios de testes e nomes convencionais de testes Python."""
++    caminho = PurePosixPath(_normalizar_caminho(caminho))
++    partes = {parte.casefold() for parte in caminho.parts[:-1]}
++    nome = caminho.name.casefold()
++    return bool(
++        partes & {"tests", "test"}
++        or nome == "conftest.py"
++        or (nome.endswith(".py") and (nome.startswith("test_") or nome.endswith("_test.py")))
++    )
 +
-+    Arquivos de produção só colidem quando as tasks estão na mesma onda;
-+    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
-+    """
++
++def _ondas_por_task(plano: Plano) -> dict[str, int] | None:
++    """Calcula ondas sem mascarar os erros de IDs duplicados ou ciclos."""
++    if len({task.id for task in plano.tasks}) != len(plano.tasks):
++        return None
 +    try:
 +        ondas = config.ordem_topologica({"tasks": [
 +            {"id": task.id, "deps": task.deps} for task in plano.tasks
 +        ]})
 +    except ValueError:
-+        # O validador principal reporta ciclos; não esconda esse erro com uma
-+        # exceção secundária ao tentar calcular as ondas.
-+        return []
-+    onda_por_task = {
++        return None
++    return {
 +        task_id: indice + 1
 +        for indice, onda in enumerate(ondas)
 +        for task_id in onda
 +    }
-+    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos citados por tasks conflitantes no mesmo plano.
++
++    Na mesma onda, qualquer arquivo comum colide. Arquivos de
++    teste colidem em qualquer onda para evitar a sobrescrita observada no D-16.
++    """
++    onda_por_task = _ondas_por_task(plano)
++    if onda_por_task is None:
++        return []
++    arquivos_mencionados = [_arquivos_da_task(task) for task in plano.tasks]
 +    colisoes: list[dict[str, str | int]] = []
 +    for indice, task_a in enumerate(plano.tasks):
-+        for task_b in plano.tasks[indice + 1:]:
-+            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
-+                onda_a = onda_por_task.get(task_a.id)
-+                onda_b = onda_por_task.get(task_b.id)
-+                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
-+                    colisoes.append({
-+                        "task_a": task_a.id,
-+                        "task_b": task_b.id,
-+                        "arquivo": arquivo,
-+                        "onda": onda_a if onda_a is not None else onda_b,
-+                    })
-+    return colisoes
-+
-+
- def validar_plano(plano: Plano) -> list[str]:
-     """Retorna todos os problemas estruturais encontrados no plano."""
-     erros: list[str] = []
-@@ -265,6 +314,11 @@ def validar_plano(plano: Plano) -> list[str]:
-     for task_id in grafo:
-         if estado[task_id] == 0:
-             visita(task_id)
-+    for colisao in colisoes_de_arquivo(plano):
-+        erros.append(
-+            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
-+            f"{colisao['arquivo']} (onda {colisao['onda']})"
-+        )
-     return erros
++        for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
++            onda_a = onda_por_task[task_a.id]
++            onda_b = onda_p
+... [diff truncado em 24000 chars]
 ```
 
 ## Saida dos testes
 ```
-....                                                                     [100%]
-4 passed in 0.02s
+...............................                                          [100%]
+31 passed in 0.15s
 
 ```
 
@@ -186,10 +660,33 @@ Responda com um unico bloco JSON, nada antes e nada depois:
 ```
 
 
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
 ===== STDOUT =====
+```json
+{
+  "veredito": "APPROVE",
+  "confianca": 0.92,
+  "criterios_atendidos": [
+    {"criterio": "colisoes_de_arquivo(plano) existe em autodev/planner.py devolvendo lista de dicts com task_a, task_b, arquivo e onda", "atende": true, "evidencia": "autodev/planner.py:281 define colisoes_de_arquivo retornando list[dict] com exatamente essas 4 chaves; test_detecta_colisao_de_arquivo_na_mesma_onda asserta o dict completo"},
+    {"criterio": "duas tasks da MESMA onda citando o mesmo arquivo produzem colisao", "atende": true, "evidencia": "colisoes_de_arquivo compara onda_a == onda_b e emite colisao; test_detecta_colisao_de_arquivo_na_mesma_onda e test_mencao_do_mesmo_arquivo_na_mesma_onda_colide cobrem"},
+    {"criterio": "mesmo arquivo em ondas DIFERENTES nao vira colisao de mesma onda (vira aviso)", "atende": true, "evidencia": "test_arquivo_de_producao_em_ondas_diferentes_nao_colide (colisoes==[]) e test_arquivo_de_producao_em_ondas_diferentes_vira_aviso (avisos com onda/onda_b); cli.py imprime aviso sem bloquear (test_cmd_plan_exibe_aviso_de_colisao_entre_ondas)"},
+    {"criterio": "mesmo arquivo de TESTE colide em qualquer onda (armadilha D-16)", "atende": true, "evidencia": "colisoes_de_arquivo trata arquivo_de_teste() como colisao independente de onda; test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes e test_nome_de_arquivo_de_teste_colide_entre_ondas (test_, _test, conftest, dir tests/)"},
+    {"criterio": "validar_plano inclui colisoes citando os dois ids e o caminho", "atende": true, "evidencia": "autodev/planner.py:370-374 anexa 'colisão de arquivo entre {task_a} e {task_b}: {arquivo} (onda N)'; test_validar_plano_inclui_ids_e_arquivo_da_colisao asserta a string exata"},
+    {"criterio": "testes em .autodev/tests/test_plan_colisoes.py provando os tres casos", "atende": true, "evidencia": "arquivo criado com 31 testes (mesma onda, ondas diferentes, arquivo de teste); suite focada passou 31/31 e a suite completa 358 passed"},
+    {"criterio": "estende planner.py preservando Plano, TaskPlano, validar_plano, parsear_plano, validar_e_ordenar, escrever_sprint sem remover/renomear", "atende": true, "evidencia": "todas as dataclasses e funcoes mantidas com as mesmas assinaturas; apenas acrescentadas _arquivos_da_task, _normalizar_caminho, arquivo_de_teste, _ondas_por_task, colisoes_de_arquivo, avisos_de_colisao_de_arquivo"}
+  ],
+  "findings": [
+    {"severidade": "baixa", "arquivo": ".autodev/scripts/verificar_plano.py", "linha": 39, "descricao": "Duas regras de extracao diferentes convivem: E2/E3 delegam a planner.colisoes_de_arquivo (regex amplo, qualquer extensao), mas E4/A1/A2 usam o ARQUIVO local com lista fechada de extensoes (.py|.md|.json|yaml|toml|sh|txt|cfg|ini). Uma task que so cita um arquivo .ts (ex.: tests/plano.spec.ts) seria flagrada como E4 'nao cita nenhum arquivo concreto' ao mesmo tempo em que o mesmo arquivo e reconhecido para colisao E2/E3. Inconsistencia pre-existente, nao introduzida pelo diff, sem impacto pratico (projeto e Python).", "correcao_sugerida": "Unificar a extracao: extrair_arquivos/extrair_tocados passarem a usar planner._ARQUIVO (ou expor um helper publico) em vez do regex local."},
+    {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 304, "descricao": "Para colisao de arquivo de TESTE entre ondas distintas, o campo 'onda' guarda apenas onda_a (a onda da primeira task na lista). A mensagem de validar_plano fica '(onda 1)' para uma colisao que na verdade cruza ondas 1 e 2 — levemente enganosa, mas o criterio 5 (citar os dois ids e o caminho) segue atendido.", "correcao_sugerida": "Opcional: para colisoes entre ondas distintas, reportar a faixa (onda min..max) ou incluir onda_b como avisos_de_colisao_de_arquivo ja faz."}
+  ],
+  "resumo": "Implementacao correta e completa: os 7 criterios de aceitacao estao atendidos, a suite completa passa (358 testes) sem regressao, e nao ha segredo, dependencia nova, caminho fragil nem escrita fora do repo."
+}
+```
 
 
 ===== STDERR =====
-error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 97h27m12s.
-AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 97h27m12s.","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"9842dda8-ef29-4181-b229-3af25009ab72-9"}
 

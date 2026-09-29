@@ -4,10 +4,11 @@
 que tentativa cada uma aconteceu e com que modelo.
 **Fonte:** `.autodev/state.db`, tabela `attempts` (o próprio motor grava uma linha por
 invocação).
-**Janela:** 27/09/2026 02:03 a 28/09/2026 22:02 —
-DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
-**Data do relatório:** 28/09/2026.
-**Total no período:** **94 chamadas do Codex**, 48 delas aprovadas
+**Janela:** 27/09/2026 02:03 a 28/09/2026 00:06 —
+DEVFACTORY-001, 002, 003 e 004 (a 003 entrou em execução em 28/09 22:58: até aqui só a
+P01 dela tem chamadas).
+**Data do relatório:** 29/09/2026.
+**Total no período:** **102 chamadas do Codex**, 49 delas aprovadas
 (revisão + integração).
 
 ## Avisos
@@ -18,10 +19,10 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
    retroativo** (agente `retroativo`, inserido em 27/09 02:03 para reconstruir o
    histórico) — **não são chamadas de API**. Só o T15 tem uma chamada real, e sem
    modelo registrado. É por isso que 14 colunas da sprint 001 estão vazias.
-3. **A sprint 003 não aparece no gráfico:** 7 pacotes planejados, nenhum executado.
-4. **A sprint 004 está em andamento** (4 de 4
-   pacotes já com chamadas; a P03 está aguardando cota do Codex) — os números dela
-   ainda vão mudar.
+3. **A sprint 003 aparece com 1 de 7 pacotes:** ela entrou em execução em 28/09 22:58 e a
+   P01 fechou em 6 chamadas (aprovada no 5º degrau, `astra/low`); as outras 6 ainda não
+   rodaram.
+4. **A sprint 004 está fechada** (4/4 integradas em 28/09) — os números dela não mudam mais.
 5. **"Nª tentativa" não é o degrau da escada de modelos — são dois contadores.** O número
    nas tabelas é a **chamada** (`attempt`, sequência do banco, sempre `max+1`); o modelo vem
    do **contador da task** (`tentativas`), pelo mapa `1ª→luna/low … 5ª+→astra/low`. Quando o
@@ -35,8 +36,8 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
    espera de cota escalona como qualquer falha. É um defeito de fiação, não uma intenção.
 6. **A partir da 5ª chamada o mapa satura no topo** (`min(tentativa, 5)` → `astra/low`):
    degraus 5 a 15 repetem o mesmo modelo. No período isso **não** virou desperdício: são
-   8 chamadas no topo (8.5%) contra
-   45 no degrau mais barato (47.9%) — a
+   10 chamadas no topo (9.8%) contra
+   47 no degrau mais barato (46.1%) — a
    cauda é curta porque a maioria dos pacotes aprovou antes do 5º degrau (tabela 3).
 7. **3 combinação(ões) fora da escada declarada:** `(nenhum)/(nenhum)`, `gpt-5.6-luna/medium`, `gpt-5.6-terra/medium`.
    As chamadas `luna/medium` e `terra/medium` aconteceram em 27/09 entre 03:13 e 04:07,
@@ -49,11 +50,11 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 
 ## O que os números dizem
 
-- **94 chamadas do Codex** em 15 pacotes com execução registrada. A
+- **102 chamadas do Codex** em 17 pacotes com execução registrada. A
   mediana é de 6 chamadas por pacote e a média
-  6.3.
-- **16.0% das chamadas são de 1ª tentativa** e
-  28.7% acontecem até a 2ª. Metade do gasto
+  6.0.
+- **16.7% das chamadas são de 1ª tentativa** e
+  30.4% acontecem até a 2ª. Metade do gasto
   (4ª tentativa em diante)
   está na cauda: são poucos pacotes que consumiram a escada inteira.
 - **3 pacote(s) resolveram com uma única chamada:**
@@ -65,13 +66,13 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 - **A cauda direita do gráfico 1 é o sintoma mais caro do período:** 5 chamadas em
   degraus 11 a 15, todas em pacotes que só destravaram quando o **defeito de motor** foi
   corrigido (D-19, D-24, D-25) — nenhuma delas é "o modelo errado tentando mais".
-- **27 das 94 chamadas (28.7%) foram gastas por defeito do
-  nosso teste/plano**, e 8 (8.5%) por infraestrutura (cota/crash).
-  Descontadas, sobram **59 chamadas (62.8%)** atribuíveis ao
+- **27 das 102 chamadas (26.5%) foram gastas por defeito do
+  nosso teste/plano**, e 8 (7.8%) por infraestrutura (cota/crash).
+  Descontadas, sobram **67 chamadas (65.7%)** atribuíveis ao
   trabalho do modelo — o denominador honesto para comparar modelos (seção "Descontando").
 - **Onde a escada se paga (tabela 3):** 2 pacote(s) aprovaram até a 3ª
-  chamada; 3 na 4ª–5ª; 9 da 6ª em diante.
-  O degrau caro (`astra/low`) assinou 4 aprovação(ões) —
+  chamada; 3 na 4ª–5ª; 10 da 6ª em diante.
+  O degrau caro (`astra/low`) assinou 5 aprovação(ões) —
   sempre em pacote que carregava, junto, defeito de contrato nosso.
 
 ## Gráfico 1 — chamadas por pacote, empilhadas pela tentativa
@@ -80,7 +81,7 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 
 Cada coluna é um pacote; a altura é quantas vezes o Codex foi chamado nele; a cor diz
 **em que altura da escada** a chamada aconteceu (verde = cedo, vermelho = fim da
-escada). Total: 94 chamadas.
+escada). Total: 102 chamadas.
 
 ## Tabela 1 — por pacote
 
@@ -94,7 +95,7 @@ teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
 `2x` significa duas reprovações para cada aprovação entregue (não é porcentagem de nada —
 pode passar de 1x, e é por isso que vai em `x` e não em `%`); `retrab. ajust.` desconta as
 reprovações que foram culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem
-aprovação nenhuma fica `—`. No total: **24 reprovações ÷ 47 aprovações** = **0,5x bruto** e **0,4x ajustado** (a escada cobrou 3 reprovações que eram defeito do NOSSO teste/plano). Se o denominador for *chamadas avaliadas* em vez de aprovações — `reprov ÷ (aprov+reprov)`, aí sim uma fatia — os mesmos números ficam 33.8% e 30.9%.
+aprovação nenhuma fica `—`. No total: **30 reprovações ÷ 48 aprovações** = **0,6x bruto** e **0,6x ajustado** (a escada cobrou 3 reprovações que eram defeito do NOSSO teste/plano). Se o denominador for *chamadas avaliadas* em vez de aprovações — `reprov ÷ (aprov+reprov)`, aí sim uma fatia — os mesmos números ficam 38.5% e 36.0%.
 
 | sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados |
 |---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---|
@@ -109,6 +110,8 @@ aprovação nenhuma fica `—`. No total: **24 reprovações ÷ 47 aprovações*
 | 002 | P08 | 4 | 4/0/0 | 1ª–4ª | 4ª (gpt-5.6-sol/low) | 0 | 0 | 4 | 0x | 0x | gpt-5.6-luna/low, gpt-5.6-sol/low |
 | 002 | P09 | 9 | 4/3/2 | 1ª–10ª ⚠ | 9ª (gpt-6-astra/low) | 1 | 7 | 1 | 0,8x | 0x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
 | 002 | P10 | 5 | 4/1/0 | 1ª–5ª | 5ª (gpt-5.6-sol/low) | 0 | 0 | 5 | 0,2x | 0,2x | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low |
+| 003 | P01 | 6 | 1/5/0 | 1ª–6ª | 6ª (gpt-6-astra/low) | 0 | 0 | 6 | 5x | 5x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
+| 003 | P02 | 2 | 0/1/1 | 1ª–2ª | — | 0 | 0 | 2 | — | — | gpt-5.6-luna/low, gpt-5.6-terra/low |
 | 004 | P01 | 8 | 1/2/5 | 1ª–9ª ⚠ | 8ª (gpt-5.6-sol/low) | 0 | 5 | 3 | 2x | 2x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
 | 004 | P02 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0x | 0x | gpt-5.6-luna/low |
 | 004 | P03 | 4 | 1/2/1 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 1 | 0 | 3 | 2x | 2x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low |
@@ -124,7 +127,7 @@ que decide se a 4ª/5ª posição da escada se paga.
 | 1ª chamada | 2 | P01 (002), P02 (004) | gpt-5.6-luna/low |
 | 2ª–3ª | 0 | — | — |
 | 4ª–5ª | 3 | P08 (002), P10 (002), P03 (004) | gpt-5.6-sol/low, gpt-5.6-sol/medium |
-| 6ª–10ª | 8 | P03 (002), P04 (002), P05 (002), P06 (002), P07 (002), P09 (002), P01 (004), P04 (004) | gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 6ª–10ª | 9 | P03 (002), P04 (002), P05 (002), P06 (002), P07 (002), P09 (002), P01 (003), P01 (004), P04 (004) | gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
 | 11ª–15ª | 1 | P02 (002) | gpt-5.6-sol/low |
 
 ## Descontando o que não era do modelo
@@ -142,9 +145,9 @@ do agente o defeito do nosso teste.
 | 004 | P01 | 8 | 5 | 3 | D-23: critério mandava .venv dentro do worktree (chamadas 1–6) |
 | 004 | P04 | 10 | 5 | 5 | D-23: idem (chamadas 1–5) |
 
-No total: **27 chamadas (28.7%)** foram gastas por defeito do
-nosso teste/plano e **8 (8.5%) por infraestrutura** (cota, crash).
-Sobram **59 chamadas (62.8%)** atribuíveis ao trabalho do modelo —
+No total: **27 chamadas (26.5%)** foram gastas por defeito do
+nosso teste/plano e **8 (7.8%) por infraestrutura** (cota, crash).
+Sobram **67 chamadas (65.7%)** atribuíveis ao trabalho do modelo —
 esse é o único denominador honesto para comparar modelos.
 
 
@@ -156,21 +159,21 @@ esse é o único denominador honesto para comparar modelos.
 
 | tentativa | chamadas | % das chamadas | % acumulado | aprovadas | modelos usados |
 |---|---:|---:|---:|---:|---|
-| 1ª | 15 | 16.0% | 16.0% | 7 | gpt-5.6-luna/low (14), (nenhum)/(nenhum) (1) |
-| 2ª | 12 | 12.8% | 28.7% | 7 | gpt-5.6-luna/medium (5), gpt-5.6-luna/low (4), gpt-5.6-terra/low (3) |
-| 3ª | 12 | 12.8% | 41.5% | 9 | gpt-5.6-luna/low (7), gpt-5.6-sol/low (3), gpt-5.6-terra/medium (2) |
-| 4ª | 11 | 11.7% | 53.2% | 9 | gpt-5.6-luna/low (7), gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2) |
-| 5ª | 10 | 10.6% | 63.8% | 6 | gpt-5.6-luna/low (5), gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-6-astra/low (1) |
-| 6ª | 9 | 9.6% | 73.4% | 2 | gpt-5.6-sol/low (4), gpt-5.6-luna/low (2), gpt-6-astra/low (2), gpt-5.6-sol/medium (1) |
-| 7ª | 6 | 6.4% | 79.8% | 1 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-luna/low (1), gpt-5.6-terra/low (1) |
-| 8ª | 5 | 5.3% | 85.1% | 1 | gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-5.6-terra/low (1) |
-| 9ª | 5 | 5.3% | 90.4% | 2 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-sol/medium (1) |
-| 10ª | 4 | 4.3% | 94.7% | 3 | gpt-6-astra/low (2), gpt-5.6-sol/low (1), gpt-5.6-sol/medium (1) |
-| 11ª | 1 | 1.1% | 95.7% | 0 | gpt-5.6-sol/medium (1) |
-| 12ª | 1 | 1.1% | 96.8% | 0 | gpt-6-astra/low (1) |
-| 13ª | 1 | 1.1% | 97.9% | 0 | gpt-5.6-sol/low (1) |
-| 14ª | 1 | 1.1% | 98.9% | 0 | gpt-5.6-sol/medium (1) |
-| 15ª | 1 | 1.1% | 100.0% | 1 | gpt-5.6-sol/low (1) |
+| 1ª | 17 | 16.7% | 16.7% | 7 | gpt-5.6-luna/low (16), (nenhum)/(nenhum) (1) |
+| 2ª | 14 | 13.7% | 30.4% | 7 | gpt-5.6-luna/medium (5), gpt-5.6-terra/low (5), gpt-5.6-luna/low (4) |
+| 3ª | 13 | 12.7% | 43.1% | 9 | gpt-5.6-luna/low (7), gpt-5.6-sol/low (4), gpt-5.6-terra/medium (2) |
+| 4ª | 12 | 11.8% | 54.9% | 9 | gpt-5.6-luna/low (7), gpt-5.6-sol/medium (3), gpt-5.6-sol/low (2) |
+| 5ª | 11 | 10.8% | 65.7% | 6 | gpt-5.6-luna/low (5), gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-6-astra/low (2) |
+| 6ª | 10 | 9.8% | 75.5% | 3 | gpt-5.6-sol/low (4), gpt-6-astra/low (3), gpt-5.6-luna/low (2), gpt-5.6-sol/medium (1) |
+| 7ª | 6 | 5.9% | 81.4% | 1 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-luna/low (1), gpt-5.6-terra/low (1) |
+| 8ª | 5 | 4.9% | 86.3% | 1 | gpt-5.6-sol/low (2), gpt-5.6-sol/medium (2), gpt-5.6-terra/low (1) |
+| 9ª | 5 | 4.9% | 91.2% | 2 | gpt-5.6-sol/low (3), gpt-6-astra/low (1), gpt-5.6-sol/medium (1) |
+| 10ª | 4 | 3.9% | 95.1% | 3 | gpt-6-astra/low (2), gpt-5.6-sol/low (1), gpt-5.6-sol/medium (1) |
+| 11ª | 1 | 1.0% | 96.1% | 0 | gpt-5.6-sol/medium (1) |
+| 12ª | 1 | 1.0% | 97.1% | 0 | gpt-6-astra/low (1) |
+| 13ª | 1 | 1.0% | 98.0% | 0 | gpt-5.6-sol/low (1) |
+| 14ª | 1 | 1.0% | 99.0% | 0 | gpt-5.6-sol/medium (1) |
+| 15ª | 1 | 1.0% | 100.0% | 1 | gpt-5.6-sol/low (1) |
 
 ## A escada declarada × o que aconteceu
 
@@ -188,7 +191,7 @@ O que a base mostra é diferente em pontos importantes, e por motivos conhecidos
    contador e ignora o tier da decisão. A intenção declarada ("espera de cota não gasta
    degrau") **não está fiada no código** — defeito registrado como pendência.
 3. **Saturação depois da 5ª** (aviso 6): o mapa tem 5 entradas, então degraus ≥5 usam
-   `astra/low`. No período o topo aparece em 8 das 94 chamadas.
+   `astra/low`. No período o topo aparece em 10 das 102 chamadas.
 4. **Buracos na numeração** (aviso 8) e **5 chamadas anteriores à padronização** da própria
    escada (aviso 7).
 
@@ -198,6 +201,73 @@ degrau barato quando a falha foi de infraestrutura/harness. A tabela 3 dá a med
 lado pesa: os pacotes que aprovaram até a 3ª chamada mostram quanto trabalho se resolve sem
 sair do degrau mais barato.
 
+## Gráfico 3 — custo estimado por pacote
+
+![Custo estimado por pacote do backlog: barra sólida é o token medido, hachurada é a estimativa](report/custo-por-pacote.png)
+
+**O que é medido e o que é estimado.** O motor só começou a gravar tokens em 28/09 (P-10,
+lendo o rodapé do Codex): **12 das 102 chamadas (11.8%)** têm token medido. A parte **sólida** da barra é
+essa medição; a **hachurada** são as chamadas sem medição, estimadas pela régua de tokens
+por chamada do modelo — a média **medida no próprio motor** para aquele modelo/esforço
+(5 modelo(s)) e, só para o que o motor nunca viu, a prévia do A/B de
+28/09 (4 modelo(s)). Chamada sem régua nenhuma usa a **mediana** das
+medidas (54,069 tokens). Nada aqui vem de tabela de preço de terceiro.
+
+**O preço é o da sua assinatura:** US$ 20/mês = 4 blocos semanais de 100% → **US$ 0,05 por
+ponto da janela semanal**; a régua medida é 118.096 tokens por ponto → **US$ 0,423 por
+milhão de tokens**. Pela janela de 5h a leitura daria US$ 0,37/Mtok (as duas estão no
+relatório de eficiência; a semanal é a que limita).
+
+**Total estimado: US$ 2.22** para as 102 chamadas do Codex — sendo
+**US$ 0.27 de token medido** e o resto estimativa. Os pacotes mais caros:
+**P02** (sprint 002) US$ 0,314; **P04** (sprint 004) US$ 0,218; **P09** (sprint 002) US$ 0,201. A sprint 001 não entra no gráfico: os 15 pacotes dela são registro
+retroativo, sem chamada de API (só o T15 tem uma chamada, e sem token).
+
+## Objetivos dos pacotes (todas as sprints planejadas até agora)
+
+Uma linha por pacote, com o objetivo como está no `dag.json` de cada sprint — lido do
+**plano**, não escrito à mão. É o mapa do que cada pacote do backlog pedia, para ler as
+tabelas acima sabendo o que estava sendo pedido em cada um.
+
+| sprint | pacote | objetivo (título do pacote no plano) |
+|---|---|---|
+| 001 | T01 | Detectar agentes de codigo instalados |
+| 001 | T02 | Definir schemas de Sprint e de task |
+| 001 | T03 | Implementar store de estado em SQLite |
+| 001 | T04 | Implementar gerente de worktrees Git |
+| 001 | T05 | Implementar adaptador do Codex |
+| 001 | T06 | Implementar adaptador do Antigravity/AGY |
+| 001 | T07 | Implementar isolamento de execucao (sandbox) |
+| 001 | T08 | Implementar runner de testes deterministico |
+| 001 | T09 | Implementar revisor independente entre agentes |
+| 001 | T10 | Implementar logica de retry e recuperacao |
+| 001 | T11 | Implementar Fila de Acao Humana (HAQ) |
+| 001 | T12 | Implementar branch de integracao do Sprint |
+| 001 | T13 | Implementar geracao do relatorio do Sprint |
+| 001 | T14 | Criar projeto-fixture ponta a ponta |
+| 001 | T15 | Executar teste de aceitacao autonomo |
+| 002 | P01 | Criar autodev/planner.py com os tipos do plano e validacao de schema |
+| 002 | P02 | Criar autodev/plan_prompt.py com o prompt de planejamento |
+| 002 | P03 | Parsear a resposta do agente de forma tolerante |
+| 002 | P04 | Validar o plano contra o DAG real e contra criterio vago |
+| 002 | P05 | Escrever o sprint planejado em disco |
+| 002 | P06 | Invocar o agente em modo planejamento |
+| 002 | P07 | Adicionar o comando autodev plan na CLI |
+| 002 | P08 | Provar a aceitacao: do prompt ao sprint executavel |
+| 002 | P09 | Registrar a rastreabilidade do prompt ao plano |
+| 002 | P10 | Documentar o planejador e fechar a documentacao |
+| 003 | P01 | Detectar colisao de arquivo entre tasks do plano |
+| 003 | P02 | Barrar colisao na mesma onda no validador do motor |
+| 003 | P03 | Relatorio de impacto do plano em modulo proprio |
+| 003 | P04 | Comando autodev prever: impacto do plano antes de rodar |
+| 003 | P05 | Portao de aprovacao humana do plano |
+| 003 | P06 | Aceitacao ponta a ponta do portao do plano |
+| 003 | P07 | Documentar o portao do plano e o checklist derivado do D-16 |
+| 004 | P01 | Restaurar a hierarquia de secoes do README |
+| 004 | P02 | Fazer o teste de documentacao isolar a secao do Planejador |
+| 004 | P03 | Tirar do README o que nao bate com o codigo |
+| 004 | P04 | Comando de teste nos criterios tem de rodar nesta maquina |
+
 ## Arquivos gerados e proveniência
 
 | arquivo | o que é |
@@ -205,6 +275,7 @@ sair do degrau mais barato.
 | `REPORT-TENTATIVAS-CODEX.md` | este relatório |
 | `report/histograma-tentativas.png` | gráfico 1 |
 | `report/distribuicao-tentativas.png` | gráfico 2 |
+| `report/custo-por-pacote.png` | gráfico 3 (custo estimado: medido × estimado) |
 | `report/dados.json` | agregação crua usada no texto e nos gráficos |
 | `report/gerar_relatorio_tentativas.py` | gera os três a partir de `.autodev/state.db` |
 | `report/relatorio-tentativas.html` / `.pdf` | HTML autocontido e PDF A4 |

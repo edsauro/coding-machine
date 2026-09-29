@@ -55,27 +55,30 @@ papeis:
   revisor_de_codex:  {agente: agy,     modelo: null}
   revisor_de_agy:    {agente: codex,   modelo: gpt-5.6-luna, effort: low, sandbox: read-only}
 
-# --- Escada de REVISÃO por tentativa (matriz do autor, 2026-09-27) --------------
+# --- Escada de REVISÃO por tentativa (matriz do autor) -------------------------
 #   1ª  codex luna/low    & agy Gemini 3.6 Flash (Low)
 #   2ª  codex terra/low   & agy Gemini 3.7 Flash (Low)
 #   3ª  codex sol/low     & agy Gemini 3.8 Flash (Low)
-#   4ª  codex sol/medium  & Hermes deepseek-flash
-#   5ª  codex astra/low   & Hermes deepseek-v4-pro   (última sem intervenção humana)
+#   4ª  codex sol/medium  & Hermes deepseek-flash/high
+#   5ª  codex astra/low   & Hermes deepseek-flash/high   (última sem intervenção humana)
+# MUDANÇA DO AUTOR em 28/09/2026 (~23h55): o 5º degrau era `deepseek-v4-pro` (matriz
+# de 27/09) e passou a `deepseek-flash` com esforço `high`. O revisor é sempre o
+# deepseek mais barato da família — padrão "DeepSeek sempre no `high`" (28/09).
 # Quem implementa continua nunca revisando a própria entrega: nas tentativas 4 e 5
 # o revisor é o Hermes, que não codifica nenhuma task do sprint.
 revisao:
   1: {agente: agy,    modelo: "Gemini 3.6 Flash (Low)"}
   2: {agente: agy,    modelo: "Gemini 3.7 Flash (Low)"}
   3: {agente: agy,    modelo: "Gemini 3.8 Flash (Low)"}
-  4: {agente: hermes, modelo: deepseek-flash}
-  5: {agente: hermes, modelo: deepseek-v4-pro}
+  4: {agente: hermes, modelo: deepseek-flash, effort: high}
+  5: {agente: hermes, modelo: deepseek-flash, effort: high}
   # Quem entra no lugar quando o revisor da tentativa não pode rodar (cota do AGY
   # esgotada, wrapper ausente, saída ilegível). É uma CADEIA, e a regra do autor
   # (2026-09-27) é: o revisor nunca é motivo de parada do sprint — tenta o próximo
   # da cadeia e, no pior caso, o portão determinístico decide. Cada troca fica
   # REGISTRADA na tentativa (`origem` da revisão), nunca em silêncio, e jamais
-  # vira "aprovado por padrão".
+  # vira "aprovado por padrão". A cadeia tem UM degrau de propósito: repetir o mesmo
+  # modelo logo abaixo não traz revisor DIFERENTE, só atrasa a decisão.
   reserva_cadeia:
-    - {agente: hermes, modelo: deepseek-flash}
-    - {agente: hermes, modelo: deepseek-v4-pro}
-  reserva: {agente: hermes, modelo: deepseek-flash}
+    - {agente: hermes, modelo: deepseek-flash, effort: high}
+  reserva: {agente: hermes, modelo: deepseek-flash, effort: high}

@@ -150,8 +150,13 @@ def _disponivel(nome: str, disponiveis: dict) -> bool:
 
 def _escolhe_revisor(cfg, agente_impl: str, disponiveis: dict,
                      tentativa: int | None,
-                     modelo_revisor: str | None) -> tuple[str, str | None, str]:
-    """(agente, modelo, origem) do revisor desta tentativa."""
+                     modelo_revisor: str | None) -> tuple[str, str | None, str | None, str]:
+    """(agente, modelo, effort, origem) do revisor desta tentativa.
+
+    O `effort` sai daqui porque ele ERA decorativo: a matriz declarava o degrau do
+    revisor e a chamada revisor passava `effort=None` fixo (28/09/2026). Esforço
+    declarado que não chega ao processo é promessa, não configuração.
+    """
     if tentativa:
         try:
             spec = cfg.revisor_para_tentativa(tentativa)
@@ -160,22 +165,27 @@ def _escolhe_revisor(cfg, agente_impl: str, disponiveis: dict,
         if spec:
             ag = spec.get("agente") or "hermes"
             if _disponivel(ag, disponiveis):
-                return ag, spec.get("modelo"), f"escada (tentativa {tentativa})"
+                return (ag, spec.get("modelo"), spec.get("effort"),
+                        f"escada (tentativa {tentativa})")
             res = cfg.revisor_reserva() if hasattr(cfg, "revisor_reserva") else {}
             if res:
                 return (res.get("agente") or "hermes", res.get("modelo"),
+                        res.get("effort"),
                         f"reserva (revisor da escada '{ag}' indisponivel)")
-    return escolher_revisor(agente_impl, disponiveis), modelo_revisor, "cruzada"
+    return escolher_revisor(agente_impl, disponiveis), modelo_revisor, None, "cruzada"
 
 
-def _revisar_por_llm(agente: str, modelo: str | None, prompt: str, worktree: str,
-                     cfg, log_dir: str | None,
+def _revisar_por_llm(agente: str, modelo: str | None, effort: str | None, prompt: str,
+                     worktree: str, cfg, log_dir: str | None,
                      task_id: str) -> tuple[Revisao | None, str]:
     """Invoca um revisor LLM. Devolve (Revisao, "") ou (None, motivo da falha)."""
     if log_dir:
         Path(log_dir).mkdir(parents=True, exist_ok=True)
+    # `effort` vem da matriz do revisor (`models.yaml`) e é REPASSADO: até 28/09/2026
+    # ele ia fixo em None, então o esforço declarado nunca chegava ao processo — o
+    # revisor rodava sempre no default do provedor.
     inv = Invocacao(agente=agente, prompt=prompt, worktree=worktree,
-                    modelo=modelo, effort=None, edita=False, timeout=900,
+                    modelo=modelo, effort=effort, edita=False, timeout=900,
                     log_path=str(Path(log_dir) / f"review-{task_id}.log")
                     if log_dir else None)
     res = invocar(inv, cfg)
@@ -223,7 +233,7 @@ def revisar(*, worktree: str, base: str, task_id: str, titulo: str,
             seguranca: str = "sem sudo/root, sem credenciais, sem escrita fora do repo",
             modelo_revisor: str | None = None,
             tentativa: int | None = None) -> Revisao:
-    revisor, modelo_revisor, origem = _escolhe_revisor(
+    revisor, modelo_revisor, effort_revisor, origem = _escolhe_revisor(
         cfg, agente_impl, disponiveis, tentativa, modelo_revisor)
     prompt = PROMPT.format(
         criterios="\n".join(f"- {c}" for c in criterios),
@@ -242,8 +252,8 @@ def revisar(*, worktree: str, base: str, task_id: str, titulo: str,
     if revisor == "hermes":
         prompt += PROMPT_SO_LEITURA
 
-    r, motivo = _revisar_por_llm(revisor, modelo_revisor, prompt, worktree, cfg,
-                                 log_dir, task_id)
+    r, motivo = _revisar_por_llm(revisor, modelo_revisor, effort_revisor, prompt,
+                                 worktree, cfg, log_dir, task_id)
     if r is not None:
         r.origem = origem
         return _aplica_piso(r, worktree, base, criterios, testes)
@@ -259,11 +269,12 @@ def revisar(*, worktree: str, base: str, task_id: str, titulo: str,
         for res in cfg.revisor_reserva_cadeia():
             ag_res = res.get("agente") or "hermes"
             prompt_res = prompt + (PROMPT_SO_LEITURA if ag_res == "hermes" else "")
-            r2, motivo2 = _revisar_por_llm(ag_res, res.get("modelo"), prompt_res,
-                                           worktree, cfg, log_dir, task_id)
+            r2, motivo2 = _revisar_por_llm(ag_res, res.get("modelo"), res.get("effort"),
+                                           prompt_res, worktree, cfg, log_dir, task_id)
             if r2 is not None:
-                r2.origem = (f"reserva ({ag_res}/{res.get('modelo')}) — "
-                             f"falhou antes: {'; '.join(motivos)}")
+                r2.origem = (f"reserva ({ag_res}/{res.get('modelo')}"
+                             + (f"/{res['effort']}" if res.get("effort") else "")
+                             + f") — falhou antes: {'; '.join(motivos)}")
                 r2.sem_cota = sem_cota
                 return _aplica_piso(r2, worktree, base, criterios, testes)
             motivos.append(f"{ag_res}/{res.get('modelo')}: {motivo2}")

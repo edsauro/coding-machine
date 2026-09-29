@@ -1,0 +1,123 @@
+# exit_code=0 duracao=159.6s modelo=gpt-5.6-terra effort=low failure_class=None tokens=53911(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P01: Detectar colisao de arquivo entre tasks do plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe a funcao colisoes_de_arquivo(plano) em autodev/planner.py devolvendo lista de dicts com as chaves task_a, task_b, arquivo e onda
+- duas tasks da MESMA onda que citam o mesmo arquivo produzem uma colisao
+- duas tasks que citam o mesmo arquivo em ondas DIFERENTES nao produzem colisao de mesma onda (viram aviso, nao erro)
+- duas tasks distintas que citam o mesmo arquivo de teste produzem colisao em qualquer onda (a armadilha que quebrou a sprint 2, D-16)
+- validar_plano(plano) inclui as colisoes na lista de erros, citando os dois ids e o caminho do arquivo
+- os testes ficam em .autodev/tests/test_plan_colisoes.py e provam os tres casos: mesma onda, ondas diferentes e mesmo arquivo de teste
+- estende autodev/planner.py preservando as dataclasses e funcoes existentes (Plano, TaskPlano, validar_plano, parsear_plano, validar_e_ordenar, escrever_sprint) sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+teste próprio a cada task (ex.: tests/test_stats.py, tests/test_notas.py, tests/test_resultado.py) e manter `validar_plano(plano) == []`; rodar a suíte inteira e só entregar com 329/329 verdes. Nada de afrouxar a regra nova para o teste antigo passar."}, {"severidade": "media", "arquivo": "autodev/planner.py", "linha": 234, "descricao": "_arquivos_da_task trata QUALQUER citação como edição — não distingue menção de entrega. Um critério que apenas se refere ao módulo de outra task ('impacto usa colisoes_de_arquivo importada de autodev/modulo.py em vez de reimplementar a checagem', estilo do critério 2 da P03 da própria DEVFACTORY-003) colide com a task que edita autodev/modulo.py na mesma onda. Reproduzi: P01 com o critério acima + P02 com 'altera autodev/modulo.py' (mesma onda) => colisão reportada e validar_plano devolvendo erro, com o plano sendo recusado por autodev plan. Esse é exatamente o falso positivo que o script do próprio autor documenta e evita por filtro de verbo de edição (.autodev/scripts/verificar_plano.py:43-51, extrair_tocados; o comentário diz 'sem esta distincao o verificador acusa falso positivo — \"importada de autodev/planner.py\" nao edita planner.py'). Evidência extra: rodando a função nova sobre os DAGs reais do repositório, DEVFACTORY-004 acusa 1 colisão (P02/P03 na onda 2 citando .autodev/sprints/DEVFACTORY-004/decisions.md), arquivo que as duas tasks só anexam.", "correcao_sugerida": "Filtrar por intenção de edição (verbo de edição / campo `teste`), no espírito de `extrair_tocados` do verificar_plano.py, ou restringir os arquivos de produção aos citados no campo `teste` e nos critérios com verbo de edição; deixar a menção pura como aviso, não como erro. Manter a regra dura só para arquivo de teste."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 266, "descricao": "Com ids duplicados o dicionário `arquivos` (keyed por task.id) colapsa as duas tasks e produz colisão nonsense de uma task consigo mesma. Reproduzi: duas tasks de id 'T1', uma citando a.py e outra b.py (mesma onda) => {'task_a':'T1','task_b':'T1','arquivo':'b.py'} e erro 'colisão de arquivo entre T1 e T1: b.py (onda 1)'. Além de ruído, o arquivo a.py da primeira é atribuído à segunda.", "correcao_sugerida": "Pular pares com task_a.id == task_b.id (ou comparar por índice/identidade da task em vez de id) e usar o id no dedup do dicionário só depois de validar_ids; o erro 'ids duplicados no plano' já cobre esse caso."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 271, "descricao": "Sobreposição entre ondas diferentes de arquivo de produção é descartada em silêncio, sem aviso nenhum: o critério da P01 diz que essas duplas 'viram aviso, nao erro' (o spec.md da sprint, linha 23, repete 'aviso') e o plano da sprint 003 também previu A1 para isso, mas o motor não tem canal de aviso — validar_plano só devolve erros. Hoje o autor fica sem nenhum sinal do arquivo compartilhado entre ondas.", "correcao_sugerida": "Ou devolver também uma lista de avisos (ex.: `colisoes_entre_ondas(plano)`/segundo retorno), a ser exibida por `autodev plan`/`autodev prever`, ou registrar explicitamente na docstring/finding que o aviso é escopo da P02 (valida_dag) — para não deixar a promessa do critério órfã."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 257, "descricao": "Ramo defensivo e ramo inalcançável sem teste: o `except ValueError: return []` (ciclo no DAG) nunca é exercitado pelos 4 testes novos, e `onda_a if onda_a is not None else onda_b` (linha 278) é morto — onda_por_task é construído a partir de todas as tasks do plano, então o `.get()` não devolve None. _arquivo_de_teste também tem ramos não cobertos ('test' como diretório e sufixo '_test.py'; os testes só batem na cláusula 'tests').", "correcao_sugerida": "Adicionar um teste com DAG cíclico (colisoes deve devolver [] sem levantar) e um caso de teste nomeado foo_test.py/test/foo.py; remover o fallback morto ou justificá-lo em comentário."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_colisoes.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #2.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-terra/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+RESULTADO: colisões agora distinguem edição de mera menção, testes compartilhados bloqueiam sempre, avisos entre ondas foram expostos e fixtures atualizadas | TESTES: checagens diretas + `compileall` OK; `python3 -m pytest` indisponível (pytest não instalado)
+
+===== STDERR =====
+

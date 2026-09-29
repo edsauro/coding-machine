@@ -39,24 +39,39 @@ def test_escada_de_implementacao_nao_estoura_o_teto_de_tentativas(cfg):
 
 # ------------------------------------------------------------ escada de revisão
 def test_escada_de_revisao_por_tentativa(cfg):
+    """Revisor por degrau: agy 3.6/3.7/3.8 e, nas 4ª e 5ª, Hermes deepseek-flash/high.
+
+    O 5º degrau era `deepseek-v4-pro` (matriz de 27/09) e o autor trocou por
+    `deepseek-flash` em 28/09/2026: revisor é sempre o deepseek mais barato da
+    família, no esforço `high`.
+    """
     esperado = [("agy", "Gemini 3.6 Flash (Low)"),
                 ("agy", "Gemini 3.7 Flash (Low)"),
                 ("agy", "Gemini 3.8 Flash (Low)"),
                 ("hermes", "deepseek-flash"),
-                ("hermes", "deepseek-v4-pro")]
+                ("hermes", "deepseek-flash")]
     obtido = [(cfg.revisor_para_tentativa(n).get("agente"),
                cfg.revisor_para_tentativa(n).get("modelo")) for n in range(1, 6)]
     assert obtido == esperado
+    # e o esforço declarado tem de existir na matriz: `high` nas duas do Hermes
+    assert [cfg.revisor_para_tentativa(n).get("effort") for n in (4, 5)] == \
+        ["high", "high"]
 
 
-def test_revisor_de_reserva_existe_e_e_o_hermes_flash(cfg):
-    assert cfg.revisor_reserva() == {"agente": "hermes", "modelo": "deepseek-flash"}
+def test_revisor_de_reserva_existe_e_e_o_hermes_flash_no_high(cfg):
+    assert cfg.revisor_reserva() == {"agente": "hermes", "modelo": "deepseek-flash",
+                                     "effort": "high"}
 
 
-def test_cadeia_de_reserva_termina_no_hermes_pro(cfg):
-    """Não parar: agy fora -> flash -> pro, e só então o portão determinístico."""
-    assert [c["modelo"] for c in cfg.revisor_reserva_cadeia()] == [
-        "deepseek-flash", "deepseek-v4-pro"]
+def test_cadeia_de_reserva_e_um_degrau_flash_high(cfg):
+    """Não parar: agy fora → flash/high e, se ele falhar, o portão determinístico.
+
+    Dois degraus com o MESMO modelo não traziam revisor diferente (era flash e depois
+    pro; virou um degrau só, com o pro fora da escada por decisão do autor em
+    28/09/2026).
+    """
+    assert [c["modelo"] for c in cfg.revisor_reserva_cadeia()] == ["deepseek-flash"]
+    assert [c.get("effort") for c in cfg.revisor_reserva_cadeia()] == ["high"]
 
 
 def test_retomada_no_terceiro_degrau_usa_sol_low_e_agy_38(cfg):
@@ -127,7 +142,7 @@ def test_revisor_da_escada_e_usado_quando_a_tentativa_e_conhecida(repo, cfg,
 
 def test_tentativa_4_e_5_revisam_com_hermes_e_prompt_somente_leitura(repo, cfg,
                                                                     monkeypatch):
-    for tentativa, modelo in ((4, "deepseek-flash"), (5, "deepseek-v4-pro")):
+    for tentativa, modelo in ((4, "deepseek-flash"), (5, "deepseek-flash")):
         chamadas: list = []
         _captura(monkeypatch, {"*": REPROVADO}, chamadas)
         r = review.revisar(worktree=str(repo), base="HEAD", task_id="T1", titulo="t",
@@ -135,6 +150,9 @@ def test_tentativa_4_e_5_revisam_com_hermes_e_prompt_somente_leitura(repo, cfg,
                            cfg=cfg, disponiveis=_disp(), tentativa=tentativa)
         assert (r.revisor, r.modelo) == ("hermes", modelo)
         assert chamadas[0].agente == "hermes"
+        # o esforço declarado na matriz TEM de chegar à invocação (vai por
+        # `--reasoning`; até 28/09/2026 o adaptador do Hermes o ignorava)
+        assert chamadas[0].effort == "high"
         assert chamadas[0].edita is False
         assert "SOMENTE LEITURA" in chamadas[0].prompt
         assert r.veredito == "REQUEST_CHANGES"
@@ -158,18 +176,18 @@ def test_reserva_entra_quando_o_revisor_da_escada_falha(repo, cfg, monkeypatch):
     assert r.to_dict()["sem_cota"] == ["agy"]
 
 
-def test_cadeia_de_reserva_atravessa_flash_e_pro_ate_revisar(repo, cfg,
-                                                             monkeypatch):
-    """agy fora, flash fora: quem revisa é o pro. O sprint não para por revisor."""
+def test_cadeia_de_reserva_tem_um_degrau_e_nao_para_o_sprint(repo, cfg, monkeypatch):
+    """agy fora, flash fora: o portão determinístico decide. Revisor nunca para o sprint.
+
+    A CADEIA ficou com UM degrau em 28/09/2026: o autor tirou o `deepseek-v4-pro` da
+    escada de revisão, e o segundo degrau do MESMO modelo não trazia revisor diferente.
+    """
     falha = agents.Resultado(exit_code=1, stderr="Error: quota reached",
                              failure_class="CODEX_QUOTA")
     chamadas: list = []
 
     def fake(inv, cfg):
         chamadas.append((inv.agente, inv.modelo))
-        if inv.modelo == "deepseek-v4-pro":
-            return agents.Resultado(exit_code=0, stdout=REPROVADO,
-                                    modelo_usado="deepseek-v4-pro")
         return falha
 
     monkeypatch.setattr(review, "invocar", fake)
@@ -177,11 +195,9 @@ def test_cadeia_de_reserva_atravessa_flash_e_pro_ate_revisar(repo, cfg,
                        criterios=["c"], testes="3 passed", agente_impl="codex",
                        cfg=cfg, disponiveis=_disp(), tentativa=3)
     assert chamadas == [("agy", "Gemini 3.8 Flash (Low)"),
-                        ("hermes", "deepseek-flash"),
-                        ("hermes", "deepseek-v4-pro")]
-    assert (r.revisor, r.modelo) == ("hermes", "deepseek-v4-pro")
-    assert r.origem.startswith("reserva")
-    assert r.veredito == "REQUEST_CHANGES"
+                        ("hermes", "deepseek-flash")]
+    assert r.revisor == "hermes-deterministico"
+    assert "esgotados" in r.resumo
 
 
 def test_revisao_nunca_para_o_sprint_quando_todos_os_llm_falham(repo, cfg,

@@ -42,7 +42,8 @@ WRAPPERS = {
     # `hermes -z "<prompt>" -m <modelo>` roda uma sessão headless. Diferenças que
     # o adaptador precisa respeitar: o prompt vai como ARGUMENTO de -z (o CLI não
     # lê prompt por stdin) e não existem -d/--timeout/-f.
-    "hermes": {"cmd": "hermes", "flags": {"modelo": "-m", "oneshot": "-z"},
+    "hermes": {"cmd": "hermes", "flags": {"modelo": "-m", "oneshot": "-z",
+                                          "effort": "--reasoning"},
                "timeout_fmt": "{n}", "prompt_arg": True},
 }
 SANDBOX_FLAG = {"codex": {"editar": "workspace-write", "ler": "read-only"},
@@ -206,15 +207,19 @@ def invocar(inv: Invocacao, cfg) -> Resultado:
     effort = inv.effort
     res_effort = "(default)"
     if w.get("prompt_arg"):
-        # Revisor Hermes: prompt no argumento, sem -d/--timeout/-f (não existem)
-        # e sem -e (effort do Hermes não é flag de CLI). O teto de tempo é o do
-        # próprio subprocess.
+        # Revisor Hermes: prompt no argumento, sem -d/--timeout/-f (não existem). O
+        # esforço dele NÃO é `-e`: o CLI do Hermes recebe esforço por `--reasoning`
+        # (none…ultra). Antes este adaptador ignorava o esforço em silêncio, então o
+        # `high` declarado na matriz do revisor nunca chegava ao processo.
         cmd = [w["cmd"]]
         if modelo:
             cmd += [w["flags"]["modelo"], modelo]
             res_modelo = modelo
         else:
             res_modelo = "(default do agente)"
+        if effort and w["flags"].get("effort"):
+            cmd += [w["flags"]["effort"], effort]
+            res_effort = effort
         cmd += [w["flags"]["oneshot"], inv.prompt]
     else:
         cmd = [w["cmd"]]

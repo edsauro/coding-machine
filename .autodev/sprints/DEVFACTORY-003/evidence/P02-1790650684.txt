@@ -1,0 +1,5 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/test_plan_guarda.py -q
+exit=0 (1.0s)
+
+...                                                                      [100%]
+3 passed in 0.09s

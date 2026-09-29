@@ -157,6 +157,27 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 
 ## Resolvidas (histórico curto)
 
+- **28/09** — **Revisor passa a `deepseek-flash`/`high` — e o esforço do revisor volta a
+  existir.** Pedido do autor, com duas correções: (a) a matriz de revisão
+  (`.autodev/config/models.yaml`) tinha `deepseek-v4-pro` no 5º degrau **e** na cadeia de
+  reserva (vem da matriz de 27/09, `3b94dc2`, e nunca havia sido mexida — conferido por
+  `git log -S`); passou a `deepseek-flash` com `effort: high` nos dois degraus do Hermes, e
+  a cadeia ficou com **um** degrau (dois degraus do MESMO modelo não traziam revisor
+  diferente). (b) Defeito real encontrado no caminho: o esforço declarado do revisor
+  **nunca chegava ao processo** — `autodev/review.py` passava `effort=None` fixo e o
+  adaptador do Hermes (`autodev/agents.py`) ignorava esforço em silêncio (não existe `-e`
+  no CLI do Hermes; existe `--reasoning`). Agora o esforço sai da matriz, é repassado à
+  invocação e vai por `--reasoning`. Testes da escada de revisão atualizados + asserção
+  nova provando que o `high` chega à invocação: **325 verdes**.
+- **28/09** — **Relatório de tentativas ganhou o Gráfico 3 (custo estimado por pacote) e a
+  tabela de objetivos de todos os pacotes.** O Gráfico 3 usa o preço da assinatura
+  (US$ 0,423/Mtok = US$ 0,05 por ponto da janela semanal) com a parte **sólida** = token
+  MEDIDO pelo motor e a **hachurada** = estimativa pela régua de tokens do modelo (média
+  medida no motor; prévia do A/B só onde o motor nunca mediu). Honestidade do número: só
+  **12 das 102 chamadas** têm token medido (a instrumentação da P-10 é de 28/09 à noite) —
+  o gráfico marca o que é medição e o que é estimativa. A tabela final lista o objetivo de
+  cada um dos **36 pacotes** das 4 sprints (lido do `dag.json`, não escrito à mão). O texto
+  passou a incluir a 003 (a P01 rodou) e o PDF está com **9 páginas**.
 - **28/09** — **P-01 resolvida: 002 e 004 mergeadas em `main` e publicadas.** Os dois
   merges foram `--no-ff`, resolvendo os conflitos **somando os dois lados**: `README.md`
   (seção da tela + seção do Planejador), `autodev/cli.py` (`cmd_desbloquear` + `cmd_plan`),

@@ -47,6 +47,25 @@ CAUSA_TESTE_OU_PLANO_EXTRA = {
     ("DEVFACTORY-002", "P09"): ((4, 8), "D-19: contrato de preservação impossível"),
 }
 
+# ---- custo: preço do token e a régua de tokens por chamada -------------------
+# Preço: assinatura do autor, US$ 20/mês = 4 blocos semanais de 100% → US$ 0,05 por
+# ponto da janela SEMANAL; a régua medida no agregado é 118.096 tokens por ponto →
+# US$ 0,423/Mtok. (A leitura pela janela de 5h dá US$ 0,37/Mtok — as duas estão no
+# relatório de eficiência; aqui vale a semanal, que é a que limita.)
+USD_POR_TOKEN = (20.0 / 4 / 100) / 118_096
+
+# Tokens por chamada de modelo que o MOTOR nunca mediu: prévia do A/B de 28/09 (uma
+# chamada por braço, no mesmo pacote mínimo). Onde o motor tem medição própria, a média
+# dele manda — tarefa real é maior que o pacote da prévia.
+TOKENS_DA_PREVIA = {
+    "gpt-5.6-luna/low": 24_714, "gpt-5.6-luna/high": 52_239,
+    "gpt-5.6-terra/low": 25_069, "gpt-5.6-terra/high": 31_174,
+    "gpt-5.6-sol/low": 15_692, "gpt-5.6-sol/high": 17_655,
+    "gpt-5.6-sol/medium": 95_364, "gpt-6-astra/low": 47_555,
+    "gpt-6-astra/high": 22_094,
+}
+MEDIDAS: dict = {}       # preenchido em carrega(): as réguas usadas na estimativa
+
 def pacotes_do_banco() -> dict[str, list[str]]:
     """Pacotes de cada sprint lidos do BANCO (não escritos à mão).
 
@@ -66,12 +85,33 @@ def pacotes_do_banco() -> dict[str, list[str]]:
 PACOTES = pacotes_do_banco()
 
 
+def objetivos_por_sprint() -> dict[str, list[tuple[str, str]]]:
+    """Objetivo (título) de cada pacote, lido do `dag.json` de cada sprint.
+
+    A fonte é o PLANO que o motor executou, não texto escrito à mão aqui. Pacote sem
+    título entra como `(sem título)` em vez de sumir: pacote faltando é dado faltando,
+    e dado faltando tem de aparecer.
+    """
+    out: dict[str, list[tuple[str, str]]] = {}
+    for caminho in sorted((RAIZ / ".autodev" / "sprints").glob("*/dag.json")):
+        try:
+            dag = json.loads(caminho.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        pacotes = dag.get("tasks") or dag.get("tarefas") or []
+        out[caminho.parent.name] = [
+            (str(t.get("id", "?")),
+             (t.get("titulo") or "(sem título)").strip().replace("|", "\\|"))
+            for t in pacotes]
+    return out
+
+
 def carrega() -> tuple[dict, dict, dict]:
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     con.row_factory = sqlite3.Row
     linhas = [dict(r) for r in con.execute(
         "SELECT sprint_id, task_id, attempt, agent, model, effort, status,"
-        " failure_class, review_result, test_result FROM attempts"
+        " failure_class, review_result, test_result, tokens_total FROM attempts"
         " ORDER BY sprint_id, task_id, attempt")]
     titulos = {r["task_id"]: r["titulo"] for r in
                con.execute("SELECT task_id, titulo FROM tasks")}
@@ -80,6 +120,28 @@ def carrega() -> tuple[dict, dict, dict]:
     # ---- barras: chamadas do Codex por pacote, empilhadas por tentativa --------
     por_sprint: dict[str, dict[str, Counter]] = defaultdict(lambda: defaultdict(Counter))
     linhas_codex = [l for l in linhas if l["agent"] == "codex"]
+
+    # ---- réguas de token por chamada (base da estimativa de custo) -------------
+    # Média MEDIDA no motor, por modelo×esforço. O que o motor nunca mediu cai na
+    # prévia do A/B; o que não existe em nenhum dos dois cai na mediana das medidas.
+    # Nada é inventado: cada régua tem procedência, e a procedência vai para o texto.
+    com_token = [l for l in linhas_codex if l["tokens_total"] is not None]
+    _por_modelo: dict[str, list[int]] = defaultdict(list)
+    for l in com_token:
+        _por_modelo[f"{l['model']}/{l['effort']}"].append(l["tokens_total"])
+    medias = {k: sum(v) / len(v) for k, v in _por_modelo.items()}
+    _tudo = sorted(l["tokens_total"] for l in com_token)
+    mediana = float(_tudo[len(_tudo) // 2]) if _tudo else 0.0
+    MEDIDAS.update({"medias": medias, "mediana": mediana,
+                    "chamadas_medidas": len(com_token), "chamadas": len(linhas_codex),
+                    "modelos": {k: ("motor" if k in medias else "previa")
+                                for k in sorted(set(medias) | set(TOKENS_DA_PREVIA))}})
+
+    def _regua(l) -> float:
+        """Tokens por chamada a usar quando a chamada não tem medição."""
+        k = f"{l['model']}/{l['effort']}"
+        return medias.get(k, TOKENS_DA_PREVIA.get(k, mediana))
+
     for l in linhas_codex:
         por_sprint[l["sprint_id"]][l["task_id"]][l["attempt"]] += 1
     chamadas = {s: {t: dict(c) for t, c in tasks.items()} for s, tasks in por_sprint.items()}
@@ -170,6 +232,14 @@ def carrega() -> tuple[dict, dict, dict]:
                 "modelos": dict(Counter(
                     f"{l['model']}/{l['effort']}" for l in linhas_codex
                     if l["sprint_id"] == sprint and l["task_id"] == tid).most_common()),
+                # ---- custo: medido (tokens reais) × estimado (régua do modelo) ----
+                "tokens_medidos": sum(l["tokens_total"] or 0 for l in linhas_do_pacote),
+                "chamadas_com_token": sum(1 for l in linhas_do_pacote
+                                          if l["tokens_total"] is not None),
+                "usd_medido": sum(l["tokens_total"] or 0
+                                  for l in linhas_do_pacote) * USD_POR_TOKEN,
+                "usd_estimado": sum(_regua(l) for l in linhas_do_pacote
+                                    if l["tokens_total"] is None) * USD_POR_TOKEN,
             })
 
     # ---- outros agentes (não são chamadas do Codex) ---------------------------
@@ -264,7 +334,7 @@ def desenha_histograma(dados: dict) -> Path:
     ax.annotate(f"Sprint 001: {pacotes_001} pacotes, "
                 f"{sum(sum(c.values()) for c in dados['chamadas_por_sprint_pacote'].get('DEVFACTORY-001', {}).values())} "
                 f"chamada(s) — registro\nretroativo (o motor ainda não instrumentava as tentativas).\n"
-                f"Sprint 003: 7 pacotes planejados, nunca executados.",
+                f"Sprint 003: 7 pacotes; a P01 rodou em 28/09 (6 chamadas) e o resto não.",
                 xy=(0.006, 0.975), xycoords="axes fraction", fontsize=8, va="top",
                 bbox=dict(boxstyle="round,pad=0.45", facecolor="#fff8e1",
                           edgecolor="#d9c37a"))
@@ -330,6 +400,78 @@ def desenha_distribuicao(dados: dict) -> Path:
     return destino
 
 
+def desenha_custo(dados: dict) -> Path:
+    """Gráfico 3: custo ESTIMADO por pacote — medido × estimado na mesma barra.
+
+    Sólido = token que o motor MEDIU naquela chamada (rodapé do Codex, P-10, de 28/09
+    ~19h em diante). Hachurado = chamada sem medição, estimada pela régua de tokens do
+    modelo. Pacote sem nenhuma medição fica 100% hachurado: a hachura é a parte
+    estimada, não enfeite — misturar as duas sem marcar seria mentir sobre a precisão.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    pacotes = [p for p in dados["pacotes"] if p["chamadas"]]
+    pacotes.sort(key=lambda p: (p["sprint"], p["task"]))
+    sprints = sorted({p["sprint"] for p in pacotes})
+    cores = dict(zip(sprints, ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]))
+
+    med = [p["usd_medido"] for p in pacotes]
+    est = [p["usd_estimado"] for p in pacotes]
+    total = sum(med) + sum(est)
+    rotulos = [f"{p['sprint'].split('-')[-1]}/{p['task']}" for p in pacotes]
+
+    fig, ax = plt.subplots(figsize=(13.5, 5.8))
+    for i, p in enumerate(pacotes):
+        ax.bar(i, p["usd_medido"], width=0.74, color=cores[p["sprint"]],
+               edgecolor="white", linewidth=0.5, zorder=3)
+        if p["usd_estimado"]:
+            ax.bar(i, p["usd_estimado"], bottom=p["usd_medido"], width=0.74,
+                   color="#e8e8e8", edgecolor=cores[p["sprint"]], linewidth=0.8,
+                   hatch="////", zorder=3)
+        valor = p["usd_medido"] + p["usd_estimado"]
+        if valor:
+            ax.text(i, valor + (total * 0.012 if total else 0.002),
+                    f"{valor:.3f}".replace(".", ","),
+                    ha="center", va="bottom", fontsize=6.4, color="#333333", zorder=4)
+
+    alto = max((m + e for m, e in zip(med, est)), default=0.05)
+    for s in sprints:
+        idx = [i for i, p in enumerate(pacotes) if p["sprint"] == s]
+        gasto = sum(med[i] + est[i] for i in idx)
+        # Rótulo do sprint ABAIXO do eixo (transform do eixo x): dentro da área ele
+        # brigava com os rótulos de valor das barras. O gráfico 1 usa o mesmo recurso.
+        ax.text(sum(idx) / len(idx), -0.17, f"{s.split('-')[-1]}\nUS$ {gasto:.2f}",
+                transform=ax.get_xaxis_transform(), ha="center", va="top",
+                fontsize=8.5, fontweight="bold", color=cores[s])
+
+    ax.set_xticks(range(len(pacotes)))
+    ax.set_xticklabels(rotulos, fontsize=8)
+    ax.set_ylabel("custo estimado (US$)", fontsize=10.5)
+    ax.set_title(
+        f"Coding_Machine — custo estimado por pacote do backlog (assinatura US$ 20/mês)\n"
+        f"total estimado US$ {total:.2f} em {dados['total_codex']} chamadas do Codex · "
+        f"{MEDIDAS.get('chamadas_medidas', 0)} delas com token MEDIDO (sólido) e "
+        f"o resto estimado (hachurado)", fontsize=12, pad=14)
+    ax.grid(axis="y", alpha=0.25, zorder=0)
+    ax.set_axisbelow(True)
+    for lado in ("top", "right"):
+        ax.spines[lado].set_visible(False)
+    ax.set_ylim(0, alto * 1.32)
+    ax.legend(handles=[
+        Patch(facecolor="#1f77b4", edgecolor="white", label="medido (rodapé do Codex)"),
+        Patch(facecolor="#e8e8e8", edgecolor="#555555", hatch="////",
+              label="estimado (chamada sem medição)")],
+        loc="upper left", fontsize=8.5, framealpha=0.95)
+
+    destino = OUT / "custo-por-pacote.png"
+    fig.savefig(destino, dpi=170, bbox_inches="tight")
+    plt.close(fig)
+    return destino
+
+
 def escreve_relatorio(dados: dict) -> Path:
     """Gera o Markdown do MESMO dicionário que alimenta os gráficos.
 
@@ -383,7 +525,7 @@ def escreve_relatorio(dados: dict) -> Path:
         return _mult(reprov, aprov)
 
     linhas_pacote = []
-    for s in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-004"):
+    for s in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-003", "DEVFACTORY-004"):
         c = d["chamadas_por_sprint_pacote"].get(s, {})
         for tid in PACOTES.get(s, []):
             m = c.get(tid)
@@ -464,6 +606,27 @@ def escreve_relatorio(dados: dict) -> Path:
                       [p["sprint"]][p["task"]])
         if tent != list(range(tent[0], tent[-1] + 1)):
             com_buraco.append(p)
+    # ---- custo: os números do texto saem da MESMA agregação do gráfico 3 ------
+    custo_total = sum(p["usd_medido"] + p["usd_estimado"] for p in d["pacotes"])
+    custo_medido = sum(p["usd_medido"] for p in d["pacotes"])
+    _top = sorted(d["pacotes"], key=lambda p: -(p["usd_medido"] + p["usd_estimado"]))[:3]
+    top_custo_txt = "; ".join(
+        f"**{p['task']}** (sprint {p['sprint'].split('-')[-1]}) US$ "
+        f"{p['usd_medido'] + p['usd_estimado']:.3f}".replace(".", ",")
+        for p in _top)
+    _n_med = MEDIDAS.get("chamadas_medidas", 0)
+    cobertura = (f"{_n_med} das {total} chamadas ({100.0 * _n_med / total:.1f}%)"
+                 if total else "nenhuma chamada")
+    _modelos_motor = [k for k, v in (MEDIDAS.get("modelos") or {}).items() if v == "motor"]
+    _modelos_previa = [k for k, v in (MEDIDAS.get("modelos") or {}).items() if v == "previa"]
+
+    # ---- objetivos dos pacotes (todas as sprints planejadas até agora) --------
+    linhas_objetivo = []
+    for sprint, pacotes in objetivos_por_sprint().items():
+        for tid, titulo in pacotes:
+            linhas_objetivo.append(f"| {sprint.split('-')[-1]} | {tid} | {titulo} |")
+    tabela_objetivos = "\n".join(linhas_objetivo) or "| — | — | — |"
+
     hoje = datetime.now().strftime("%d/%m/%Y")
 
     md = f"""# Chamadas de API do Codex no Coding_Machine
@@ -473,7 +636,8 @@ que tentativa cada uma aconteceu e com que modelo.
 **Fonte:** `.autodev/state.db`, tabela `attempts` (o próprio motor grava uma linha por
 invocação).
 **Janela:** 27/09/2026 02:03 a 28/09/2026 {datetime.now().strftime('%H:%M')} —
-DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
+DEVFACTORY-001, 002, 003 e 004 (a 003 entrou em execução em 28/09 22:58: até aqui só a
+P01 dela tem chamadas).
 **Data do relatório:** {hoje}.
 **Total no período:** **{total} chamadas do Codex**, {aprovadas} delas aprovadas
 (revisão + integração).
@@ -486,10 +650,10 @@ DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
    retroativo** (agente `retroativo`, inserido em 27/09 02:03 para reconstruir o
    histórico) — **não são chamadas de API**. Só o T15 tem uma chamada real, e sem
    modelo registrado. É por isso que 14 colunas da sprint 001 estão vazias.
-3. **A sprint 003 não aparece no gráfico:** 7 pacotes planejados, nenhum executado.
-4. **A sprint 004 está em andamento** ({sum(1 for t in d['chamadas_por_sprint_pacote'].get('DEVFACTORY-004', {}) if True)} de 4
-   pacotes já com chamadas; a P03 está aguardando cota do Codex) — os números dela
-   ainda vão mudar.
+3. **A sprint 003 aparece com 1 de 7 pacotes:** ela entrou em execução em 28/09 22:58 e a
+   P01 fechou em 6 chamadas (aprovada no 5º degrau, `astra/low`); as outras 6 ainda não
+   rodaram.
+4. **A sprint 004 está fechada** (4/4 integradas em 28/09) — os números dela não mudam mais.
 5. **"Nª tentativa" não é o degrau da escada de modelos — são dois contadores.** O número
    nas tabelas é a **chamada** (`attempt`, sequência do banco, sempre `max+1`); o modelo vem
    do **contador da task** (`tentativas`), pelo mapa `1ª→luna/low … 5ª+→astra/low`. Quando o
@@ -630,6 +794,38 @@ degrau barato quando a falha foi de infraestrutura/harness. A tabela 3 dá a med
 lado pesa: os pacotes que aprovaram até a 3ª chamada mostram quanto trabalho se resolve sem
 sair do degrau mais barato.
 
+## Gráfico 3 — custo estimado por pacote
+
+![Custo estimado por pacote do backlog: barra sólida é o token medido, hachurada é a estimativa](report/custo-por-pacote.png)
+
+**O que é medido e o que é estimado.** O motor só começou a gravar tokens em 28/09 (P-10,
+lendo o rodapé do Codex): **{cobertura}** têm token medido. A parte **sólida** da barra é
+essa medição; a **hachurada** são as chamadas sem medição, estimadas pela régua de tokens
+por chamada do modelo — a média **medida no próprio motor** para aquele modelo/esforço
+({len(_modelos_motor)} modelo(s)) e, só para o que o motor nunca viu, a prévia do A/B de
+28/09 ({len(_modelos_previa)} modelo(s)). Chamada sem régua nenhuma usa a **mediana** das
+medidas ({MEDIDAS.get('mediana', 0):,.0f} tokens). Nada aqui vem de tabela de preço de terceiro.
+
+**O preço é o da sua assinatura:** US$ 20/mês = 4 blocos semanais de 100% → **US$ 0,05 por
+ponto da janela semanal**; a régua medida é 118.096 tokens por ponto → **US$ 0,423 por
+milhão de tokens**. Pela janela de 5h a leitura daria US$ 0,37/Mtok (as duas estão no
+relatório de eficiência; a semanal é a que limita).
+
+**Total estimado: US$ {custo_total:.2f}** para as {total} chamadas do Codex — sendo
+**US$ {custo_medido:.2f} de token medido** e o resto estimativa. Os pacotes mais caros:
+{top_custo_txt}. A sprint 001 não entra no gráfico: os 15 pacotes dela são registro
+retroativo, sem chamada de API (só o T15 tem uma chamada, e sem token).
+
+## Objetivos dos pacotes (todas as sprints planejadas até agora)
+
+Uma linha por pacote, com o objetivo como está no `dag.json` de cada sprint — lido do
+**plano**, não escrito à mão. É o mapa do que cada pacote do backlog pedia, para ler as
+tabelas acima sabendo o que estava sendo pedido em cada um.
+
+| sprint | pacote | objetivo (título do pacote no plano) |
+|---|---|---|
+{tabela_objetivos}
+
 ## Arquivos gerados e proveniência
 
 | arquivo | o que é |
@@ -637,6 +833,7 @@ sair do degrau mais barato.
 | `REPORT-TENTATIVAS-CODEX.md` | este relatório |
 | `report/histograma-tentativas.png` | gráfico 1 |
 | `report/distribuicao-tentativas.png` | gráfico 2 |
+| `report/custo-por-pacote.png` | gráfico 3 (custo estimado: medido × estimado) |
 | `report/dados.json` | agregação crua usada no texto e nos gráficos |
 | `report/gerar_relatorio_tentativas.py` | gera os três a partir de `.autodev/state.db` |
 | `report/relatorio-tentativas.html` / `.pdf` | HTML autocontido e PDF A4 |
@@ -680,6 +877,6 @@ if __name__ == "__main__":
               f"{len(tasks)} pacotes")
         print("   " + " · ".join(f"{t}={sum(c.values())}" for t, c in sorted(tasks.items())))
     print()
-    for p in desenha_histograma(dados), desenha_distribuicao(dados):
+    for p in desenha_histograma(dados), desenha_distribuicao(dados), desenha_custo(dados):
         print("PNG:", p)
     print("MD:", escreve_relatorio(dados))
