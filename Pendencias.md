@@ -157,6 +157,18 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 
 ## Resolvidas (histórico curto)
 
+- **29/09** — **Relatório restrito às sprints 003 e 004, com a razão declarada.** Os três
+  gráficos e todas as tabelas passaram a considerar só as duas sprints do protocolo atual
+  (uma chamada de API por tentativa, revisão registrada, token lido no rodapé): a 001 é
+  história reconstruída (14 dos 15 pacotes sem chamada de API) e a 002 foi levantada depois
+  do fato, com várias aprovações por pacote (até 6) e sem token medido — misturar as quatro
+  media **protocolo de registro**, não modelo. O filtro é na **fonte** (`SPRINTS`, no
+  gerador), então texto e gráficos não podem divergir; a razão aparece nos avisos e na
+  legenda dos três gráficos, e cada gráfico diz o escopo na própria imagem. A **tabela de
+  objetivos continua com as 4 sprints** (é mapa do plano, não medição) e ganhou CSS próprio:
+  colunas sprint/pacote em 3,2/3,8 em, objetivo com o resto da largura, e quebra de página
+  liberada (com o `page-break-inside: avoid` global ela pulava inteira e deixava uma página
+  quase vazia). PDF em **8 páginas**.
 - **28/09** — **Revisor passa a `deepseek-flash`/`high` — e o esforço do revisor volta a
   existir.** Pedido do autor, com duas correções: (a) a matriz de revisão
   (`.autodev/config/models.yaml`) tinha `deepseek-v4-pro` no 5º degrau **e** na cadeia de

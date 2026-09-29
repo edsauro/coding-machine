@@ -1,0 +1,210 @@
+# exit_code=0 duracao=156.0s modelo=deepseek-flash effort=(default) failure_class=None tokens=nao medido(-)
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- existe autodev/plan_impacto.py com a funcao impacto(plano) devolvendo dict com as chaves ondas, arquivos_por_task, colisoes e sem_arquivo
+- impacto usa colisoes_de_arquivo importada de autodev/planner.py em vez de reimplementar a checagem
+- autodev/plan_impacto.py nao importa a CLI e nao cria ciclo de import com autodev/planner.py
+- a funcao e pura: nao escreve em disco nem chama agente
+- os testes ficam em .autodev/tests/test_plan_impacto.py e rodam com python3 -m pytest .autodev/tests/test_plan_impacto.py -q
+
+## Task
+P03: Relatorio de impacto do plano em modulo proprio
+
+## Diff a revisar (base 4c7254dbdffc5ce92dea6731ca00fe9d1b8cda3f -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_plan_impacto.py b/.autodev/tests/test_plan_impacto.py
+new file mode 100644
+index 0000000..023ab32
+--- /dev/null
++++ b/.autodev/tests/test_plan_impacto.py
+@@ -0,0 +1,44 @@
++from autodev.plan_impacto import impacto
++from autodev.planner import Plano, TaskPlano
++
++
++def task(task_id, criterio, deps=None, teste=""):
++    return TaskPlano(task_id, task_id, [criterio], deps or [], teste=teste)
++
++
++def plano(tasks):
++    return Plano("Plano", "Objetivo", ".", tasks, "")
++
++
++def test_retorna_ondas_arquivos_colisoes_e_tasks_sem_arquivo():
++    entrada = plano([
++        task("P02", "edita autodev/b.py", deps=["P01"]),
++        task("P01", "edita autodev/a.py"),
++        task("P03", "implementa a lógica", deps=["P01"]),
++    ])
++
++    assert impacto(entrada) == {
++        "ondas": [["P01"], ["P02", "P03"]],
++        "arquivos_por_task": {
++            "P01": ["autodev/a.py"],
++            "P02": ["autodev/b.py"],
++            "P03": [],
++        },
++        "colisoes": [],
++        "sem_arquivo": ["P03"],
++    }
++
++
++def test_retorna_colisao_do_planner_e_nao_altera_o_plano():
++    entrada = plano([
++        task("P01", "edita autodev/modulo.py"),
++        task("P02", "edita autodev/modulo.py"),
++    ])
++
++    relatorio = impacto(entrada)
++
++    assert relatorio["colisoes"] == [{
++        "task_a": "P01", "task_b": "P02",
++        "arquivo": "autodev/modulo.py", "onda": 1,
++    }]
++    assert entrada.tasks[0].criterios == ["edita autodev/modulo.py"]
+diff --git a/autodev/plan_impacto.py b/autodev/plan_impacto.py
+new file mode 100644
+index 0000000..fe50ec4
+--- /dev/null
++++ b/autodev/plan_impacto.py
+@@ -0,0 +1,28 @@
++"""Relatório puro do impacto de um plano de execução."""
++
++from __future__ import annotations
++
++from . import config
++from .planner import Plano, _arquivos_da_task, colisoes_de_arquivo
++
++
++def impacto(plano: Plano) -> dict:
++    """Resume ondas, arquivos citados e colisões sem alterar o plano.
++
++    O relatório não acessa o filesystem nem invoca agentes; todos os dados são
++    derivados apenas da estrutura recebida.
++    """
++    ondas = config.ordem_topologica({
++        "tasks": [{"id": task.id, "deps": task.deps} for task in plano.tasks]
++    })
++    arquivos_por_task = {
++        task.id: sorted(_arquivos_da_task(task)) for task in plano.tasks
++    }
++    return {
++        "ondas": ondas,
++        "arquivos_por_task": arquivos_por_task,
++        "colisoes": colisoes_de_arquivo(plano),
++        "sem_arquivo": [
++            task.id for task in plano.tasks if not arquivos_por_task[task.id]
++        ],
++    }
+```
+
+## Saida dos testes
+```
+..                                                                       [100%]
+2 passed in 0.05s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+{
+  "veredito": "APPROVE",
+  "confianca": 0.82,
+  "criterios_atendidos": [
+    {
+      "criterio": "existe autodev/plan_impacto.py com a funcao impacto(plano) devolvendo dict com as chaves ondas, arquivos_por_task, colisoes e sem_arquivo",
+      "atende": true,
+      "evidencia": "Worktree /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P03-codex (HEAD fe60522, base 4c7254d); git diff base..HEAD contem exatamente os 2 arquivos do diff apresentado (72 insercoes). Execucao real: impacto(plano com P01/P02/P03) devolveu {'arquivos_por_task': {'P01': ['autodev/a.py'], 'P02': ['autodev/b.py'], 'P03': []}, 'colisoes': [], 'ondas': [['P01'], ['P02', 'P03']], 'sem_arquivo': ['P03']} — as 4 chaves exigidas, exatamente. Plano vazio devolve {'ondas': [], 'arquivos_por_task': {}, 'colisoes': [], 'sem_arquivo': []}."
+    },
+    {
+      "criterio": "impacto usa colisoes_de_arquivo importada de autodev/planner.py em vez de reimplementar a checagem",
+      "atende": true,
+      "evidencia": "Linha 7 de autodev/plan_impacto.py: 'from .planner import Plano, _arquivos_da_task, colisoes_de_arquivo'; linha 25 chama colisoes_de_arquivo(plano). Rodando o cenario de mesma onda, a saida bate campo a campo com planner.colisoes_de_arquivo (mesmos task_a/task_b/arquivo/onda), inclusive a regra de arquivo de teste em ondas diferentes e o [] para plano com ids duplicados. Nao ha copia da logica de interseccao de arquivos no modulo novo."
+    },
+    {
+      "criterio": "autodev/plan_impacto.py nao importa a CLI e nao cria ciclo de import com autodev/planner.py",
+      "atende": true,
+      "evidencia": "Prova empirica: apos 'import autodev.plan_impacto' com sys.path na raiz, 'autodev.cli' in sys.modules == False (so autodev.planner, autodev.agents, autodev.config e autodev.plan_prompt entram). grep mostra que a unica referencia a plan_impacto no repo e o proprio teste (.autodev/tests/test_plan_impacto.py), ou seja, planner nunca importa plan_impacto — sem ciclo."
+    },
+    {
+      "criterio": "a funcao e pura: nao escreve em disco nem chama agente",
+      "atende": true,
+      "evidencia": "Inspecao: impacto so usa config.ordem_topologica (dict in, lista out), _arquivos_da_task/_normalizar_caminho (regex + PurePosixPath, sem I/O) e colisoes_de_arquivo. Prova empirica: com sys.addaudithook capturando eventos 'open' em modo escrita e 'subprocess.Popen/os.system/os.exec', e com agents.invocar trocado por uma funcao que levanta AssertionError, impacto() rodou sem disparar nada; copia profunda do plano permaneceu identica (pl == antes). Os imports (plan_impacto -> planner -> agents/config/plan_prompt) tambem nao geraram evento de escrita. git status do worktree ficou limpo apos os testes."
+    },
+    {
+      "criterio": "os testes ficam em .autodev/tests/test_plan_impacto.py e rodam com python3 -m pytest .autodev/tests/test_plan_impacto.py -q",
+      "atende": true,
+      "evidencia": "Rodado de dentro do worktree com o interpretador do projeto (.venv/bin/python, que e o que o runner do motor resolve para 'python3'): 'python3 -m pytest .autodev/tests/test_plan_impacto.py -q' => '..  2 passed in 0.05s' (sem PYTHONPATH extra; o conftest.py de .autodev/tests insere a raiz no sys.path). Suite completa do worktree: 360 passed in 64.97s — sem regressao."
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/plan_impacto.py",
+      "linha": 20,
+      "descricao": "Ids duplicados no plano sao engolidos em silencio: arquivos_por_task e um dict por task.id e ondas vem de config.ordem_topologica, que tambem indexa por id, entao a segunda task com o mesmo id sobrescreve a primeira. Verificado: plano [P01 cita 'autodev/a.py', P01 cita 'autodev/z.py'] devolve arquivos_por_task == {'P01': ['autodev/z.py']} — o arquivo autodev/a.py some do relatorio sem nenhum aviso, e sem_arquivo pode sair errado. planner._ondas_por_task (planner.py:264-267) faz a checagem de duplicidade e devolve None; o modulo novo nao faz.",
+      "correcao_sugerida": "Antes de montar o relatorio, checar duplicidade (len({t.id for t in plano.tasks}) != len(plano.tasks)) e o retorno None de planner._ondas_por_task, devolvendo por exemplo {'ondas': [], ..., 'erro': 'ids duplicados'} ou levantando ValueError explicito, em vez de produzir um dict silenciosamente incorreto."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/plan_impacto.py",
+      "linha": 14,
+      "descricao": "Semantica de erro divergente da funcao irma do planner para o MESMO plano invalido: com ciclo (P01->P02, P02->P01), impacto() levanta ValueError('DAG com ciclo — nenhuma onda progressa') enquanto colisoes_de_arquivo(plano) devolve [] (planner.py:287-289). Verificado nas duas chamadas. Se um chamador usar o relatorio para decidir antes de validar_plano, ele recebe uma excecao crua de config em vez de um relatorio.",
+      "correcao_sugerida": "Envolver a chamada de config.ordem_topologica em try/except ValueError e tratar do mesmo jeito que colisoes_de_arquivo trata (ondas vazias + indicacao de plano invalido), ou documentar explicitamente no docstring que a funcao propaga ValueError em vez de resumir."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/plan_impacto.py",
+      "linha": 7,
+      "descricao": "O modulo importa o helper PRIVADO _arquivos_da_task de planner. E reuso (melhor que reimplementar), mas cria um contrato oculto sobre um nome com underscore: renomear/mover esse helper para dentro de colisoes_de_arquivo quebra plan_impacto sem quebrar nenhum teste de planner.",
+      "correcao_sugerida": "Promover o helper a API publica em planner (ex.: 'def arquivos_da_task(task)' chamado por _arquivos_da_task/colisoes_de_arquivo) e importar o nome publico; ou expor no planner uma funcao unica 'arquivos_por_task(plano) -> dict[str, list[str]]' que o relatorio reusa."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_impacto.py",
+      "linha": 27,
+      "descricao": "Os testes provam o FORMATO do dict, nao as duas propriedades estruturais dos criterios: (a) que colisoes vem de planner.colisoes_de_arquivo e (b) que a funcao nao escreve/nem chama agente. Uma reimplementacao inline da checagem com a mesma semantica passaria nos dois testes, e um patch que gravasse em disco ou chamasse agents.invocar tambem passaria. O teste 2 tambem so checa a nao-mutacao de criterios; o sorted() de arquivos_por_task nunca e exercitado (cada task cita 1 arquivo).",
+      "correcao_sugerida": "Adicionar: (1) monkeypatch em planner.colisoes_de_arquivo devolvendo um sentinela e assertar que foi ele que apareceu no relatorio; (2) spy/audit em open(...) de escrita e em agents.invocar levantando, chamando impacto() e assertando que nada disparou; (3) uma task com 2+ arquivos no criterio para fixar a ordenacao, e os casos limite de plano vazio, id duplicado e ciclo."
+    }
+  ],
+  "resumo": "Os 5 criterios de aceitacao estao atendidos e verificados por execucao real (2 testes verdes no comando exigido, 360 verdes na suite, sem import da CLI, sem ciclo, sem escrita em disco nem chamada de agente), restando apenas quatro apontamentos de baixa severidade sobre entradas invalidas (id duplicado engolido e ciclo que levanta em vez de resumir), uso de helper privado do planner e lacunas de cobertura para as propriedades 'reusa colisoes_de_arquivo' e 'e pura'."
+}
+
+
+===== STDERR =====
+

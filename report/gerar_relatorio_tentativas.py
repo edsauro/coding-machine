@@ -25,8 +25,8 @@ OUT.mkdir(exist_ok=True)
 ROTULO_SPRINT = {
     "DEVFACTORY-001": "Sprint 001\n(laço autônomo · registro retroativo)",
     "DEVFACTORY-002": "Sprint 002\n(planejador)",
-    "DEVFACTORY-003": "Sprint 003\n(portão do plano · nunca executada)",
-    "DEVFACTORY-004": "Sprint 004\n(correções da revisão retroativa)",
+    "DEVFACTORY-003": "Sprint 003\n(em execução desde 28/09)",
+    "DEVFACTORY-004": "Sprint 004\n(fechada 4/4 em 28/09)",
 }
 # ---- atribuição de causa (CURADA, com a decisão que a descreve) --------------
 # O motor grava a CLASSE da falha (TEST_FAILURE, REVIEW_FAILURE, CODEX_QUOTA...),
@@ -106,13 +106,33 @@ def objetivos_por_sprint() -> dict[str, list[tuple[str, str]]]:
     return out
 
 
+# ---- ESCOPO DO RELATÓRIO ------------------------------------------------------
+#    Só as sprints do PROTOCOLO ATUAL. A 001 é registro retroativo (14 dos 15 pacotes
+#    sem chamada de API nenhuma) e a 002 foi reconstruída depois, com várias
+#    aprovações por pacote (até 6) e sem token medido em chamada alguma — juntar as
+#    quatro num mesmo gráfico compara protocolos de registro diferentes, não modelos.
+#    O filtro acontece AQUI, na fonte, para que texto e gráficos nunca divirjam.
+SPRINTS = ("DEVFACTORY-003", "DEVFACTORY-004")
+NOTA_PROTOCOLO = (
+    "As sprints **001 e 002 estão fora deste relatório**, e o motivo é de registro, não de "
+    "mérito: a **001** é história reconstruída (14 dos 15 pacotes são linhas retroativas, "
+    "sem chamada de API nenhuma), e a **002** foi levantada depois do fato, com várias "
+    "aprovações por pacote (até 6 no mesmo pacote) e sem um único token medido. Nas "
+    "sprints **003 e 004** o protocolo é o de hoje: uma chamada de API por tentativa, "
+    "revisão registrada e token lido do rodapé do agente. Comparar as quatro juntas "
+    "mediria a diferença de protocolo, não a de modelo.")
+NOTA_CURTA = "sprints 003 e 004 · 001 e 002 fora (protocolo de registro diferente — ver nota)"
+
+
 def carrega() -> tuple[dict, dict, dict]:
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     con.row_factory = sqlite3.Row
     linhas = [dict(r) for r in con.execute(
         "SELECT sprint_id, task_id, attempt, agent, model, effort, status,"
-        " failure_class, review_result, test_result, tokens_total FROM attempts"
-        " ORDER BY sprint_id, task_id, attempt")]
+        " failure_class, review_result, test_result, tokens_total, start_time FROM attempts"
+        " WHERE sprint_id IN ({})"
+        " ORDER BY sprint_id, task_id, attempt".format(
+            ",".join("?" * len(SPRINTS))), SPRINTS)]
     titulos = {r["task_id"]: r["titulo"] for r in
                con.execute("SELECT task_id, titulo FROM tasks")}
     con.close()
@@ -278,6 +298,12 @@ def carrega() -> tuple[dict, dict, dict]:
     # ---- outros agentes (não são chamadas do Codex) ---------------------------
     outros = Counter(f"{l['agent']}" for l in linhas if l["agent"] != "codex")
 
+    # janela real do escopo (start_time é epoch em segundos, não texto)
+    from datetime import datetime as _dtm          # o módulo importa isto localmente
+    _ts = [l["start_time"] for l in linhas if l["start_time"]]
+    _ini = _dtm.fromtimestamp(min(_ts)).strftime("%Y-%m-%d %H:%M") if _ts else ""
+    _fim = _dtm.fromtimestamp(max(_ts)).strftime("%Y-%m-%d %H:%M") if _ts else ""
+
     dados = {
         "total_codex": total,
         "degraus": degraus,
@@ -289,6 +315,8 @@ def carrega() -> tuple[dict, dict, dict]:
         "pacotes": resumo_pacotes,
         "outros_agentes": dict(outros),
         "maior_degrau": max((d["degrau"] for d in degraus), default=0),
+        # janela real do que está no escopo (antes era literal, e citava a 002)
+        "janela": (_ini, _fim),
     }
     return dados, chamadas, {s: dict(v) for s, v in por_sprint.items()}
 
@@ -307,7 +335,9 @@ def desenha_histograma(dados: dict) -> Path:
     def cor(deg: int) -> tuple:
         return cmap((deg - 1) / max(1, rmax - 1))
 
-    sprints = [s for s in PACOTES if PACOTES[s]]     # sprint sem pacote não vira grupo
+    # só as sprints do escopo (o eixo NÃO pode listar pacote que ficou fora: coluna
+    # vazia de 001/002 no meio do gráfico é ruído que parece dado)
+    sprints = [s for s in SPRINTS if PACOTES.get(s)]
     xs, rotulos, fronteiras = [], [], []
     x = 0.0
     for s in sprints:
@@ -363,11 +393,12 @@ def desenha_histograma(dados: dict) -> Path:
                  fontsize=9)
     cb.ax.tick_params(labelsize=8)
 
-    pacotes_001 = len(PACOTES.get("DEVFACTORY-001", []))
-    ax.annotate(f"Sprint 001: {pacotes_001} pacotes, "
-                f"{sum(sum(c.values()) for c in dados['chamadas_por_sprint_pacote'].get('DEVFACTORY-001', {}).values())} "
-                f"chamada(s) — registro\nretroativo (o motor ainda não instrumentava as tentativas).\n"
-                f"Sprint 003: 7 pacotes; a P01 rodou em 28/09 (6 chamadas) e o resto não.",
+    _ps = dados["chamadas_por_sprint_pacote"]
+    _inv = " · ".join(
+        f"{s.split('-')[-1]}: {len(_ps.get(s, {}))} pacote(s) com chamada, "
+        f"{sum(sum(c.values()) for c in _ps.get(s, {}).values())} chamada(s)"
+        for s in SPRINTS if _ps.get(s))
+    ax.annotate(f"{_inv}.\n{NOTA_CURTA}.",
                 xy=(0.006, 0.975), xycoords="axes fraction", fontsize=8, va="top",
                 bbox=dict(boxstyle="round,pad=0.45", facecolor="#fff8e1",
                           edgecolor="#d9c37a"))
@@ -414,14 +445,16 @@ def desenha_distribuicao(dados: dict) -> Path:
                 fontsize=7.5, color="#444444")
     ax.set_ylabel("% das chamadas do Codex", fontsize=10.5)
     ax.set_title("Em que tentativa o trabalho foi resolvido — e com que modelo\n"
+                 f"{NOTA_CURTA}\n"
                  "(o modelo dominante de cada degrau; a lista completa está na tabela "
-                 "do relatório)", fontsize=12, pad=14)
+                 "do relatório)", fontsize=11.5, pad=14)
     ax.grid(axis="y", alpha=0.25, zorder=0)
     ax.set_axisbelow(True)
     for lado in ("top", "right"):
         ax.spines[lado].set_visible(False)
     ax.set_ylim(0, max(pct) * 1.25)
-    ax.annotate("Cada barra é uma fatia das 92 chamadas, não a chance de acerto.\n"
+    ax.annotate(f"Cada barra é uma fatia das {dados['total_codex']} chamadas do Codex, "
+                "não a chance de acerto.\n"
                 "A taxa de sucesso por degrau está na tabela 2.",
                 xy=(0.995, 0.95), xycoords="axes fraction", ha="right", va="top",
                 fontsize=8, color="#555555",
@@ -500,6 +533,7 @@ def desenha_custo(dados: dict) -> Path:
                   fontsize=10)
     ax.set_title(
         "Coding_Machine — custo por pacote: esperado (1ª chamada) × retrabalho\n"
+        f"{NOTA_CURTA}\n"
         f"assinatura US$ 20/mês · total estimado US$ {total:.2f} em "
         f"{dados['total_codex']} chamadas do Codex: esperado US$ {esp:.2f} "
         f"({100 * esp / total:.0f}%) · retrabalho US$ {ret:.2f} "
@@ -581,7 +615,7 @@ def escreve_relatorio(dados: dict) -> Path:
         return _mult(reprov, aprov)
 
     linhas_pacote = []
-    for s in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-003", "DEVFACTORY-004"):
+    for s in SPRINTS:
         c = d["chamadas_por_sprint_pacote"].get(s, {})
         for tid in PACOTES.get(s, []):
             m = c.get(tid)
@@ -673,6 +707,10 @@ def escreve_relatorio(dados: dict) -> Path:
     mult_dinheiro = (custo_total / custo_esp) if custo_esp else 0.0
     _br = lambda v: f"{v:.2f}".replace(".", ",")          # US$ no padrão pt-BR
     _br1 = lambda v: f"{v:.1f}".replace(".", ",")
+    _j = d["janela"]
+
+    def _dt(s: str) -> str:                     # 2026-09-28 08:12 -> 28/09/2026 08:12
+        return f"{s[8:10]}/{s[5:7]}/{s[:4]} {s[11:16]}" if len(s) >= 16 else s
     pct_esp = f"{100 * custo_esp / custo_total:.0f}%" if custo_total else "—"
     pct_ret = f"{100 * custo_ret / custo_total:.0f}%" if custo_total else "—"
     _piores = sorted((p for p in d["pacotes"] if p["usd_retrabalho"] > 0),
@@ -715,24 +753,24 @@ def escreve_relatorio(dados: dict) -> Path:
 que tentativa cada uma aconteceu e com que modelo.
 **Fonte:** `.autodev/state.db`, tabela `attempts` (o próprio motor grava uma linha por
 invocação).
-**Janela:** 27/09/2026 02:03 a 28/09/2026 {datetime.now().strftime('%H:%M')} —
-DEVFACTORY-001, 002, 003 e 004 (a 003 entrou em execução em 28/09 22:58: até aqui só a
-P01 dela tem chamadas).
+**Janela:** {_dt(_j[0])} a {_dt(_j[1])} —
+**sprints 003 e 004**, as únicas no protocolo de registro de hoje (aviso 2).
 **Data do relatório:** {hoje}.
 **Total no período:** **{total} chamadas do Codex**, {aprovadas} delas aprovadas
 (revisão + integração).
 
 ## Avisos
 
-1. **Chamada não é custo.** Cada linha conta **uma invocação** do agente; o motor não
-   registra tokens, então este relatório mede chamadas, não gasto.
-2. **A sprint 001 não é comparável.** Dos seus 15 pacotes, 14 são **registro
-   retroativo** (agente `retroativo`, inserido em 27/09 02:03 para reconstruir o
-   histórico) — **não são chamadas de API**. Só o T15 tem uma chamada real, e sem
-   modelo registrado. É por isso que 14 colunas da sprint 001 estão vazias.
-3. **A sprint 003 aparece com 1 de 7 pacotes:** ela entrou em execução em 28/09 22:58 e a
-   P01 fechou em 6 chamadas (aprovada no 5º degrau, `astra/low`); as outras 6 ainda não
-   rodaram.
+1. **Chamada é custo — com a procedência declarada.** Cada linha conta **uma invocação** do
+   agente. O motor passou a **gravar tokens** em 28/09 (P-10, lendo o rodapé do agente):
+   das {total} chamadas no escopo, **{MEDIDAS.get('chamadas_medidas', 0)} têm token medido** e
+   as outras foram **estimadas** pela régua do modelo. Todo valor em US$ diz de qual dos
+   dois vem — sólido é medição, hachurado é estimativa.
+2. **Por que só as sprints 003 e 004.** {NOTA_PROTOCOLO}
+3. **A 003 ainda está em execução.** Entrou em 28/09 22:58 e tem 1 pacote integrado de 7 (a
+   P01 fechou em 6 chamadas, aprovada no 5º degrau, `astra/low`) com a P02 rodando; os outros
+   5 ainda não começaram. Os números dela **mudam a cada rodada** — este documento é uma
+   foto do momento, não um fechamento.
 4. **A sprint 004 está fechada** (4/4 integradas em 28/09) — os números dela não mudam mais.
 5. **"Nª tentativa" não é o degrau da escada de modelos — são dois contadores.** O número
    nas tabelas é a **chamada** (`attempt`, sequência do banco, sempre `max+1`); o modelo vem
@@ -751,8 +789,8 @@ P01 dela tem chamadas).
    {d['chamadas_baratas']} no degrau mais barato ({100.0 * d['chamadas_baratas'] / d['total_codex']:.1f}%) — a
    cauda é curta porque a maioria dos pacotes aprovou antes do 5º degrau (tabela 3).
 7. **{len(fora_escada)} combinação(ões) fora da escada declarada:** {', '.join(f'`{x}`' for x in fora_escada) or 'nenhuma'}.
-   As chamadas `luna/medium` e `terra/medium` aconteceram em 27/09 entre 03:13 e 04:07,
-   **antes** de a escada ser padronizada naquele mesmo dia — não são desvio de política.
+   As combinações `…/medium` de 27/09 saíram junto com as sprints 001/002 (foi o dia em que
+   a escada foi padronizada); nas 003 e 004 a escada é seguida à risca.
 8. **A numeração por pacote tem buracos.** Rearme por dependência integrada e reabertura
    por defeito de contrato removem/renomeiam tentativas, então {len(com_buraco)} pacote(s)
    ({', '.join(f"{p['task']} (sprint {p['sprint'].split('-')[-1]})" for p in com_buraco) or 'nenhum'}) têm sequência descontínua — marcados com ⚠ na
@@ -907,9 +945,7 @@ relatório de eficiência; a semanal é a que limita).
 
 **Total estimado: US$ {_br(custo_total)}** para as {total} chamadas do Codex — sendo
 **US$ {_br(custo_medido)} de token medido** e o resto estimativa. Os pacotes mais caros:
-{top_custo_txt}. Da sprint 001 aparece só o **T15**: os outros 14 pacotes dela são registro
-retroativo, sem chamada de API — e a única chamada do T15 não tem token medido, então o
-valor dela é estimativa da régua, não medição.
+{top_custo_txt}.
 
 ## Objetivos dos pacotes (todas as sprints planejadas até agora)
 
@@ -917,9 +953,11 @@ Uma linha por pacote, com o objetivo como está no `dag.json` de cada sprint —
 **plano**, não escrito à mão. É o mapa do que cada pacote do backlog pedia, para ler as
 tabelas acima sabendo o que estava sendo pedido em cada um.
 
+::: {{.tabela-objetivos}}
 | sprint | pacote | objetivo (título do pacote no plano) |
 |---|---|---|
 {tabela_objetivos}
+:::
 
 ## Arquivos gerados e proveniência
 

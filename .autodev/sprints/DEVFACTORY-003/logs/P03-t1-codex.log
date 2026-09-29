@@ -1,0 +1,96 @@
+# exit_code=0 duracao=76.7s modelo=gpt-5.6-luna effort=low failure_class=None tokens=53910(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P03: Relatorio de impacto do plano em modulo proprio
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe autodev/plan_impacto.py com a funcao impacto(plano) devolvendo dict com as chaves ondas, arquivos_por_task, colisoes e sem_arquivo
+- impacto usa colisoes_de_arquivo importada de autodev/planner.py em vez de reimplementar a checagem
+- autodev/plan_impacto.py nao importa a CLI e nao cria ciclo de import com autodev/planner.py
+- a funcao e pura: nao escreve em disco nem chama agente
+- os testes ficam em .autodev/tests/test_plan_impacto.py e rodam com python3 -m pytest .autodev/tests/test_plan_impacto.py -q
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P03-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+===== STDOUT =====
+RESULTADO: Implementados `autodev/plan_impacto.py` e seus testes, com relatório puro e reutilização de `colisoes_de_arquivo` | TESTES: verificação direta passou; `python3 -m pytest .autodev/tests/test_plan_impacto.py -q` não executou porque pytest não está instalado.
+
+===== STDERR =====
+

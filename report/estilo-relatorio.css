@@ -60,3 +60,15 @@ hr { border: none; border-top: 1px solid #dde3ea; margin: 1.6em 0; }
 
 strong { color: #0f2a45; }
 a { color: #1f5fa8; text-decoration: none; }
+
+/* Tabela de objetivos dos pacotes: as duas primeiras colunas são códigos curtos
+   (sprint, pacote) e tomavam largura demais, empurrando o texto do objetivo para a
+   direita. Ficam na largura mínima; o objetivo recebe o resto. */
+.tabela-objetivos table { table-layout: fixed; width: 100%;
+  /* esta tabela é longa (36 linhas): tem de poder COMEÇAR na página onde a seção
+     começa e continuar na seguinte. Com o `page-break-inside: avoid` global ela
+     pulava inteira, deixando a página anterior quase em branco. */
+  page-break-inside: auto; break-inside: auto; }
+.tabela-objetivos th:nth-child(1), .tabela-objetivos td:nth-child(1) { width: 3.2em; }
+.tabela-objetivos th:nth-child(2), .tabela-objetivos td:nth-child(2) { width: 3.8em; }
+.tabela-objetivos td { vertical-align: top; }

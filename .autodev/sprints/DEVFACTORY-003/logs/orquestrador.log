@@ -59,3 +59,23 @@
 [00:17:12] P02 tentativa 4: codex gpt-5.6-sol/medium
 [00:22:20] P02 t4: 66,386 tokens (codex-cli:rodape)
 [00:22:21] P02: testes exit=0 passed=18 failed=0 (configurado)
+[00:28:56] P02: revisao por hermes [escada (tentativa 4)] -> APPROVE (5 findings)
+[00:28:56] P02: DONE em 4 tentativa(s) — commit 1d074388
+[00:28:56] P03 tentativa 1: codex gpt-5.6-luna/low
+[00:30:13] P03 t1: 53,910 tokens (codex-cli:rodape)
+[00:30:14] P03: testes exit=0 passed=2 failed=0 (configurado)
+[00:32:50] P03: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> APPROVE (4 findings)
+[00:32:50] P03: DONE em 1 tentativa(s) — commit fe605222
+[00:32:50] integrando 2 task(s) da onda 1
+[00:33:37]   portao build: OK
+[00:33:37]   portao testes: OK
+[00:33:37]   portao lint: OK
+[00:33:37]   portao seguranca: OK
+[00:34:07]   portao build: OK
+[00:34:07]   portao testes: OK
+[00:34:07]   portao lint: OK
+[00:34:07]   portao seguranca: OK
+[00:34:07] branch atual do repo: 2357f87d (main intacta — merge automatico proibido)
+[00:34:07] sprint DEVFACTORY-003: 7 tasks (0 novas) — ondas [['P01'], ['P02', 'P03'], ['P04'], ['P05'], ['P06'], ['P07']]
+[00:34:07] rodada dona: pid 3451713 — rodada única garantida pelo motor
+[00:34:07] P04 tentativa 1: codex gpt-5.6-luna/low
