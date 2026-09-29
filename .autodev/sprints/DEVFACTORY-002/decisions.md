@@ -645,5 +645,23 @@ em `nao informado`. O prompt do DAG prevalece sobre `report-extras.json`.
   aprovados. A análise sintática dos arquivos alterados e `git diff --check`
   passaram. Isso não substitui a execução da suíte ou sua coleta.
 
+## 2026-09-28 — Revisão retroativa ratificada pelo autor (baixas da P-07)
+
+O autor leu a revisão retroativa por LLM das tentativas da sprint 2 e **aprovou** o método
+e as baixas registradas. Nada fica aberto:
+
+- `README.md:105` e `README.md:167` — fechados pela **P03 da 004** (a seção `## Planejador`
+  voltou a ser seção própria e o teste passou a provar o que anuncia);
+- a diferença **"203 passed"** (evidência anexada à tentativa da P10) × **205** (árvore
+  revisada) é histórica e está explicada em **D-22**: a tentativa rodou antes do último
+  ajuste;
+- o `dag.json` do worktree da P09 estar defasado **não** afetou a entrega — verificado em
+  28/09 com os próprios olhos: o `dag.json` do `main` é **idêntico** ao de antes do merge
+  (o merge não o tocou) e **diferente** da evidência `dag.json.antes-da-correcao-D16`, ou
+  seja, as correções do D-16/D-19 seguem de pé no `main`.
+
+Ratificação humana registrada; a partir daqui a revisão retroativa da sprint 2 não tem
+pendência de leitura.
+
 Na integração, anexar esta entrada ao histórico existente de decisões, caso
 esse arquivo já exista na branch de destino, preservando as entradas anteriores.

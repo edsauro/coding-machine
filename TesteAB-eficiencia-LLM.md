@@ -12,6 +12,24 @@ de 5 degraus se paga, ou um degrau só (barato) resolveria?
 
 ---
 
+## 0. Padrão de escolha dos braços (decidido em 28/09)
+
+Regra do autor — vale como padrão **deste estudo** e como convenção da escada de execução:
+
+- **Codex sempre no `low`**, em qualquer modelo (luna, terra, sol, astra);
+- **DeepSeek sempre no `high`** (`deepseek-flash` e `deepseek-v4-pro`).
+
+Motivo medido na prévia: no Codex o `high` **não comprou acerto** (o `sol/high` reprovou
+pedindo aprovação) e custou de 1,1× a 2,1× o `low` no mesmo pacote; no DeepSeek, o `high`
+saiu **mais barato** que o `low` nas duas famílias. Com o padrão, os braços ficam 6:
+`codex {luna,terra,sol,astra}/low` + `hermes {deepseek-flash,deepseek-v4-pro}/high` — os
+`high` do Codex e os `low` do DeepSeek saem do desenho (seguem na prévia como controle).
+
+**Regras de leitura dos números** (pedido do autor): a tabela sai **ordenada por preço**
+(a coluna de preço do Codex ou a da API, o que for o custo do braço) e as colunas de Δ das
+janelas (`Δ5h`, `Δsemanal`) usam **2 casas decimais**, derivadas dos tokens medidos por
+`custos.py` — o RPC só devolve ponto percentual inteiro.
+
 ## 1. Linha de base já medida (28/09/2026)
 
 Fonte: `.autodev/state.db` → `report/relatorio-tentativas.pdf` (8 páginas).

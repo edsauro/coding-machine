@@ -1,0 +1,2636 @@
+Reading additional input from stdin...
+OpenAI Codex v0.154.0
+--------
+workdir: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+model: gpt-5.6-luna
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a0eae2-4d39-7e13-91b0-2ab81e888c0b
+--------
+user
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P01: Detectar colisao de arquivo entre tasks do plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe a funcao colisoes_de_arquivo(plano) em autodev/planner.py devolvendo lista de dicts com as chaves task_a, task_b, arquivo e onda
+- duas tasks da MESMA onda que citam o mesmo arquivo produzem uma colisao
+- duas tasks que citam o mesmo arquivo em ondas DIFERENTES nao produzem colisao de mesma onda (viram aviso, nao erro)
+- duas tasks distintas que citam o mesmo arquivo de teste produzem colisao em qualquer onda (a armadilha que quebrou a sprint 2, D-16)
+- validar_plano(plano) inclui as colisoes na lista de erros, citando os dois ids e o caminho do arquivo
+- os testes ficam em .autodev/tests/test_plan_colisoes.py e provam os tres casos: mesma onda, ondas diferentes e mesmo arquivo de teste
+- estende autodev/planner.py preservando as dataclasses e funcoes existentes (Plano, TaskPlano, validar_plano, parsear_plano, validar_e_ordenar, escrever_sprint) sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+Vou inspecionar as instruções do repositório e o planejador existente, depois implemento a detecção com testes focados nos três cenários exigidos e executo a suíte relevante.
+exec
+/usr/bin/bash -lc "sed -n '1,240p' /home/saurus/.codex/skills/r0/using-superpowers/SKILL.md && sed -n '1,220p' /home/saurus/.codex/skills/r0/test-driven-development/SKILL.md && printf '\\n--- files ---\\n' && rg --files -g '"'!*__pycache__*'"' | head -80 && printf '\\n--- planner ---\\n' && sed -n '1,280p' autodev/planner.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ exited 2 in 0ms:
+sed: can't read /home/saurus/.codex/skills/r0/using-superpowers/SKILL.md: No such file or directory
+
+exec
+/usr/bin/bash -lc "rg --files /home/saurus/.codex/skills /home/saurus/.agents/skills 2>/dev/null | rg '/(using-superpowers|test-driven-development)/SKILL.md"'$'"'" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ succeeded in 5ms:
+codex
+As instruções estão em um caminho local diferente do alias listado; vou usar os arquivos encontrados e manter a alteração restrita ao worktree.
+exec
+/usr/bin/bash -lc "sed -n '1,220p' /home/saurus/.codex/skills/using-superpowers/SKILL.md; sed -n '1,260p' /home/saurus/.codex/skills/test-driven-development/SKILL.md; printf '\\n--- files ---\\n'; rg --files -g '"'!*__pycache__*'"' | head -100; printf '\\n--- planner ---\\n'; sed -n '1,320p' autodev/planner.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ succeeded in 0ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+---
+
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, ignore this skill.
+</SUBAGENT-STOP>
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## The Rule
+
+**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+
+**Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
+
+Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+
+## Skill Priority
+
+When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
+
+- "Let's build X" → superpowers:brainstorming first, then implementation skills.
+- "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+
+## Red Flags
+
+These thoughts mean STOP—you're rationalizing:
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+
+## Platform Adaptation
+
+If your harness appears here, read its reference file for special instructions:
+
+- Codex: `references/codex-tools.md`
+- Pi: `references/pi-tools.md`
+- Antigravity: `references/antigravity-tools.md`
+- Hermes Agent: `references/hermes-tools.md`
+
+## User Instructions
+
+User instructions (CLAUDE.md, AGENTS.md, GEMINI.md, etc, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows or instructions when your human partner has explicitly told you to.
+---
+name: test-driven-development
+description: Use when implementing any feature or bugfix, before writing implementation code
+---
+
+# Test-Driven Development (TDD)
+
+## Overview
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+**Violating the letter of the rules is violating the spirit of the rules.**
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+- Refactoring
+- Behavior changes
+
+**Exceptions (ask your human partner):**
+- Throwaway prototypes
+- Generated code
+- Configuration files
+
+Thinking "skip TDD just this once"? Stop. That's rationalization.
+
+## The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Write code before the test? Delete it. Start over.
+
+**No exceptions:**
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+
+Implement fresh from tests. Period.
+
+## Red-Green-Refactor
+
+```dot
+digraph tdd_cycle {
+    rankdir=LR;
+    red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
+    verify_red [label="Verify fails\ncorrectly", shape=diamond];
+    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
+    verify_green [label="Verify passes\nAll green", shape=diamond];
+    refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
+    next [label="Next", shape=ellipse];
+
+    red -> verify_red;
+    verify_red -> green [label="yes"];
+    verify_red -> red [label="wrong\nfailure"];
+    green -> verify_green;
+    verify_green -> refactor [label="yes"];
+    verify_green -> green [label="no"];
+    refactor -> verify_green [label="stay\ngreen"];
+    verify_green -> next;
+    next -> red;
+}
+```
+
+### RED - Write Failing Test
+
+Write one minimal test showing what should happen.
+
+<Good>
+```typescript
+test('retries failed operations 3 times', async () => {
+  let attempts = 0;
+  const operation = () => {
+    attempts++;
+    if (attempts < 3) throw new Error('fail');
+    return 'success';
+  };
+
+  const result = await retryOperation(operation);
+
+  expect(result).toBe('success');
+  expect(attempts).toBe(3);
+});
+```
+Clear name, tests real behavior, one thing
+</Good>
+
+<Bad>
+```typescript
+test('retry works', async () => {
+  const mock = jest.fn()
+    .mockRejectedValueOnce(new Error())
+    .mockRejectedValueOnce(new Error())
+    .mockResolvedValueOnce('success');
+  await retryOperation(mock);
+  expect(mock).toHaveBeenCalledTimes(3);
+});
+```
+Vague name, tests mock not code
+</Bad>
+
+**Requirements:**
+- One behavior
+- Clear name
+- Real code (no mocks unless unavoidable)
+
+### Verify RED - Watch It Fail
+
+**MANDATORY. Never skip.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test fails (not errors)
+- Failure message is expected
+- Fails because feature missing (not typos)
+
+**Test passes?** You're testing existing behavior. Fix test.
+
+**Test errors?** Fix error, re-run until it fails correctly.
+
+### GREEN - Minimal Code
+
+Write simplest code to pass the test.
+
+<Good>
+```typescript
+async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === 2) throw e;
+    }
+  }
+  throw new Error('unreachable');
+}
+```
+Just enough to pass
+</Good>
+
+<Bad>
+```typescript
+async function retryOperation<T>(
+  fn: () => Promise<T>,
+  options?: {
+    maxRetries?: number;
+    backoff?: 'linear' | 'exponential';
+    onRetry?: (attempt: number) => void;
+  }
+): Promise<T> {
+  // YAGNI
+}
+```
+Over-engineered
+</Bad>
+
+Don't add features, refactor other code, or "improve" beyond the test.
+
+### Verify GREEN - Watch It Pass
+
+**MANDATORY.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test passes
+- Other tests still pass
+- Output pristine (no errors, warnings)
+
+**Test fails?** Fix code, not test.
+
+**Other tests fail?** Fix now.
+
+### REFACTOR - Clean Up
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green. Don't add behavior.
+
+### Repeat
+
+Next failing test for next feature.
+
+## Good Tests
+
+| Quality | Good | Bad |
+|---------|------|-----|
+| **Minimal** | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
+| **Clear** | Name describes behavior | `test('test1')` |
+| **Shows intent** | Demonstrates desired API | Obscures what code should do |
+
+When writing or changing any test, read [writing-good-tests.md](writing-good-tests.md) for the rules that keep tests honest:
+- Name the production change that would make the test fail — before writing it
+- Assert on real behavior, never on mock behavior
+- Keep test-only code in test utilities, out of production classes
+- Understand a dependency's side effects before mocking it
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests written after pass immediately — which proves nothing. They may test the wrong thing, test the implementation instead of the behavior, or miss the edge case you forgot. You never watched it fail, so you never proved it can catch the bug. Test-first forces that failure. |
+| "Tests after achieve same goals (spirit not ritual)" | Tests-after answer "what does this do?"; tests-first answer "what should this do?" Tests written after are biased by the code you already wrote — you verify the cases you remembered, not the ones you'd have discovered. Coverage without proof the tests work. |
+| "Already manually tested" | Manual testing is ad-hoc: no record of what you covered, no way to re-run it when the code changes, easy to forget cases under pressure. "Worked when I tried it" ≠ comprehensive. Automated tests run the same way every time. |
+| "Deleting X hours is wasteful" | Sunk cost fallacy — that time is already spent either way. The real choice: rewrite with TDD (high confidence) vs. keep it and bolt tests on after (low confidence, likely bugs). Keeping code you can't trust is the waste. |
+| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
+| "TDD will slow me down" | TDD IS the pragmatic path: catches bugs before commit, prevents regressions, lets you refactor without fear. "Pragmatic" shortcuts mean debugging in production — slower, not faster. |
+| "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
+| "Existing code has no tests" | You're improving it. Add tests for existing code. |
+
+## Red Flags - STOP and Start Over
+
+- Code before test
+- Test after implementation
+- Test passes immediately
+- Can't explain why test failed
+- Tests added "later"
+- Rationalizing "just this once"
+- "I already manually tested it"
+- "Tests after achieve the same purpose"
+- "It's about spirit not ritual"
+- "Keep as reference" or "adapt existing code"
+- "Already spent X hours, deleting is wasteful"
+- "TDD is dogmatic, I'm being pragmatic"
+- "This is different because..."
+
+**All of these mean: Delete code. Start over with TDD.**
+
+## Example: Bug Fix
+
+**Bug:** Empty email accepted
+
+**RED**
+```typescript
+test('rejects empty email', async () => {
+  const result = await submitForm({ email: '' });
+  expect(result.error).toBe('Email required');
+});
+```
+
+**Verify RED**
+```bash
+$ npm test
+
+--- files ---
+TesteAB-eficiencia-LLM.md
+tela.sh
+REPORT-TENTATIVAS-CODEX.md
+README.md
+Pendencias.md
+report/dados.json
+report/pag-1.png
+report/histograma-tentativas.png
+report/gerar_relatorio_tentativas.py
+report/estilo-relatorio.css
+report/distribuicao-tentativas.png
+report/pag-6.png
+report/pag-5.png
+report/pag-4.png
+report/relatorio-tentativas.pdf
+report/pag-3.png
+report/pag-2.png
+report/relatorio-tentativas.html
+report/pag-7.png
+report/pag-8.png
+autodev/errors.py
+autodev/config.py
+autodev/cli.py
+autodev/agents.py
+autodev/__main__.py
+autodev/__init__.py
+autodev/planner.py
+autodev/plan_prompt.py
+autodev/orchestrator.py
+autodev/killswitch.py
+autodev/integration.py
+autodev/haq.py
+autodev/sandbox.py
+autodev/review.py
+autodev/retry.py
+autodev/report.py
+autodev/testrunner.py
+autodev/state.py
+autodev/worktree.py
+
+--- planner ---
+"""Tipos e validação do plano de execução de uma sprint."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+import yaml
+
+from . import agents, config
+from .plan_prompt import montar_prompt_plano
+
+
+PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
+
+# Referências textuais: o arquivo pode ainda ser criado pela sprint.
+_ARQUIVO = re.compile(
+    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+\.[A-Za-z][A-Za-z0-9]*\b"
+    r"|\b(?:Makefile|Dockerfile)\b"
+)
+_COMANDO_TESTE = re.compile(
+    r"\b(?:pytest|(?:python(?:3)?\s+-m\s+unittest)|"
+    r"(?:npm|pnpm|yarn)\s+(?:run\s+)?test|"
+    r"(?:go|cargo)\s+test|make\s+test)\b",
+    re.IGNORECASE,
+)
+
+
+@dataclass
+class TaskPlano:
+    id: str
+    titulo: str
+    criterios: list[str]
+    deps: list[str] = field(default_factory=list)
+    agente: str = "codex"
+    teste: str = ""
+
+
+@dataclass
+class Plano:
+    titulo: str
+    objetivo: str
+    repositorio: str
+    tasks: list[TaskPlano]
+    prompt_original: str
+
+
+class PlanoInvalido(ValueError):
+    """Indica que a resposta do agente não contém um plano reconhecível."""
+
+
+class SprintJaExiste(FileExistsError):
+    """Indica que o diretório de destino do sprint já existe."""
+
+
+class CotaEsgotada(RuntimeError):
+    """Indica que o agente não pôde planejar por falta de cota."""
+
+
+def planejar(raiz: str | Path, prompt_usuario: str, agente: str) -> Plano:
+    """Solicita um plano somente-leitura ao agente e converte sua resposta."""
+    raiz = Path(raiz)
+    sprints = raiz / ".autodev" / "sprints"
+    candidatos = sorted(
+        (caminho
+        for caminho in sprints.glob("DEVFACTORY-[0-9]*")
+        if caminho.is_dir() and re.fullmatch(r"DEVFACTORY-\d+", caminho.name)),
+        key=lambda caminho: int(caminho.name.split("-")[-1]),
+    )
+    if not candidatos:
+        raise PlanoInvalido("nenhum sprint encontrado para registrar o planejamento")
+
+    prompt = montar_prompt_plano(prompt_usuario)
+    log_path = candidatos[-1] / "logs" / f"plano-{agente}.log"
+    historico = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+    resultado = agents.invocar(
+        agents.Invocacao(
+            agente=agente,
+            prompt=prompt,
+            worktree=str(raiz),
+            edita=False,
+            timeout=int(os.environ.get("AUTODEV_AGENT_TIMEOUT", "900")),
+            log_path=str(log_path),
+            fake_script=os.environ.get("AUTODEV_FAKE_SPEC") or None,
+        ),
+        config.Config.carregar(),
+    )
+    if historico:
+        # O adaptador sobrescreve o log; preserve as invocações anteriores.
+        atual = log_path.read_text(encoding="utf-8")
+        log_path.write_text(historico + "\n" + atual, encoding="utf-8")
+
+    if resultado.failure_class == "CODEX_QUOTA":
+        raise CotaEsgotada("cota do Codex esgotada durante o planejamento")
+    if not resultado.ok:
+        raise RuntimeError(
+            f"falha do agente: {resultado.failure_class}; "
+            f"exit_code={resultado.exit_code}; {resultado.stderr or resultado.stdout}"
+        )
+
+    resposta = resultado.stdout or resultado.stderr
+    try:
+        plano = parsear_plano(resposta)
+    except PlanoInvalido as erro:
+        trecho = resposta[:160].replace("\n", " ")
+        raise PlanoInvalido(f"{erro}; início da resposta: {trecho!r}") from erro
+    plano.prompt_original = prompt_usuario
+    return plano
+
+
+def escrever_sprint(raiz: str | Path, plano: Plano) -> Path:
+    """Persiste um plano em um novo diretório sequencial de sprint."""
+    diretorio_sprints = Path(raiz) / ".autodev" / "sprints"
+    diretorio_sprints.mkdir(parents=True, exist_ok=True)
+
+    numeros = [
+        int(casamento.group(1))
+        for caminho in diretorio_sprints.iterdir()
+        if (casamento := re.fullmatch(r"DEVFACTORY-(\d+)", caminho.name))
+    ]
+    sprint_id = f"DEVFACTORY-{max(numeros, default=0) + 1:03d}"
+    destino = diretorio_sprints / sprint_id
+    try:
+        destino.mkdir()
+    except FileExistsError as erro:
+        raise SprintJaExiste(f"sprint já existe: {sprint_id}") from erro
+
+    tasks = [asdict(task) for task in plano.tasks]
+    dag = {"sprint_id": sprint_id, "versao": 1, "tasks": tasks,
+           "prompt_original": plano.prompt_original}
+    (destino / "dag.json").write_text(
+        json.dumps(dag, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    sprint = {
+        "sprint_id": sprint_id,
+        "titulo": plano.titulo,
+        "objetivo": plano.objetivo,
+        "status": "PLANEJADO",
+        "repositorio": {
+            "raiz": plano.repositorio,
+            "merge_em_main": False,
+        },
+    }
+    (destino / "sprint.yaml").write_text(
+        yaml.safe_dump(sprint, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    spec = (
+        f"# Prompt original\n\n{plano.prompt_original}\n\n"
+        f"# {plano.titulo}\n\n{plano.objetivo}\n"
+    )
+    (destino / "spec.md").write_text(spec, encoding="utf-8")
+    return destino
+
+
+def parsear_plano(texto: str) -> Plano:
+    """Converte um objeto JSON com ``tasks`` encontrado no texto em ``Plano``."""
+    if not isinstance(texto, str):
+        raise PlanoInvalido("resposta sem JSON reconhecível")
+
+    decoder = json.JSONDecoder()
+    objetos: list[dict] = []
+
+    for inicio, caractere in enumerate(texto):
+        if caractere != "{":
+            continue
+        try:
+            valor, _ = decoder.raw_decode(texto[inicio:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(valor, dict):
+            objetos.append(valor)
+
+    if not objetos:
+        raise PlanoInvalido("resposta sem JSON reconhecível")
+
+    candidatos = [objeto for objeto in objetos if "tasks" in objeto]
+    if not candidatos:
+        raise PlanoInvalido("JSON sem a chave tasks")
+
+    ultimo_erro: (TypeError | KeyError | ValueError) | None = None
+    for dados in candidatos:
+        try:
+            tasks_brutas = dados["tasks"]
+            if not isinstance(tasks_brutas, list):
+                raise TypeError("tasks deve ser uma lista")
+
+            tasks = [_construir_task(task) for task in tasks_brutas]
+            campos = {
+                nome: dados[nome]
+                for nome in ("titulo", "objetivo", "repositorio")
+            }
+            campos["prompt_original"] = dados.get("prompt_original", "")
+            for nome, valor in campos.items():
+                if not isinstance(valor, str):
+                    raise TypeError(f"{nome} deve ser uma string")
+            return Plano(**campos, tasks=tasks)
+        except (TypeError, KeyError, ValueError) as erro:
+            ultimo_erro = erro
+
+    raise PlanoInvalido(f"estrutura do plano inválida: {ultimo_erro}") from ultimo_erro
+
+
+def _construir_task(dados: object) -> TaskPlano:
+    """Valida os tipos de uma task e ignora metadados desconhecidos."""
+    if not isinstance(dados, dict):
+        raise TypeError("cada task deve ser um objeto")
+
+    campos = {
+        nome: dados[nome]
+        for nome in ("id", "titulo", "criterios")
+    }
+    campos["deps"] = dados.get("deps", [])
+    campos["agente"] = dados.get("agente", "codex")
+    campos["teste"] = dados.get("teste", "")
+
+    for nome in ("id", "titulo", "agente", "teste"):
+        if not isinstance(campos[nome], str):
+            raise TypeError(f"{nome} deve ser uma string")
+    for nome in ("criterios", "deps"):
+        valor = campos[nome]
+        if not isinstance(valor, list) or not all(isinstance(item, str) for item in valor):
+            raise TypeError(f"{nome} deve ser uma lista de strings")
+
+    return TaskPlano(**campos)
+
+
+def validar_plano(plano: Plano) -> list[str]:
+    """Retorna todos os problemas estruturais encontrados no plano."""
+    erros: list[str] = []
+    tasks = plano.tasks
+    if not tasks:
+        return ["plano sem tasks"]
+
+    ids = [task.id for task in tasks]
+    conhecidos = set(ids)
+    if len(ids) != len(conhecidos):
+        erros.append("ids duplicados no plano")
+
+    for task in tasks:
+        if not task.criterios:
+            erros.append(f"task {task.id} sem criterios")
+        for dep in task.deps:
+            if dep not in conhecidos:
+                erros.append(f"{task.id} depende de {dep}, que não existe no plano")
+
+    grafo = {task.id: task.deps for task in tasks}
+    estado: dict[str, int] = {task_id: 0 for task_id in grafo}
+
+    def visita(task_id: str) -> None:
+        estado[task_id] = 1
+        for dep in grafo[task_id]:
+            if estado.get(dep) == 1:
+                erros.append(f"ciclo entre dependências envolvendo {task_id} e {dep}")
+            elif estado.get(dep) == 0:
+                visita(dep)
+        estado[task_id] = 2
+
+    for task_id in grafo:
+        if estado[task_id] == 0:
+            visita(task_id)
+    return erros
+
+
+def validar_e_ordenar(plano: Plano) -> list[list[str]]:
+    """Valida o DAG e os critérios e retorna ondas; índices começam em 1."""
+    dag = {"tasks": [
+        {"id": task.id, "titulo": task.titulo,
+         "criterios": task.criterios, "deps": task.deps}
+        for task in plano.tasks
+    ]}
+    erros = config.valida_dag(dag)
+    if not plano.tasks:
+        erros.append("plano sem tasks")
+
+    for task in plano.tasks:
+        for indice, criterio in enumerate(task.criterios, start=1):
+            palavras = set(re.findall(r"\w+", criterio.casefold()))
+            if (palavras.intersection(PALAVRAS_VAGAS)
+                    and not _ARQUIVO.search(criterio)
+                    and not _COMANDO_TESTE.search(criterio)):
+                erros.append(
+                    f"task {task.id}: critério {indice} vago; "
+                    "cite um arquivo ou comando de teste"
+                )
+
+    if erros:
+        raise PlanoInvalido("Plano inválido:\n  - " + "\n  - ".join(erros))
+    return config.ordem_topologica(dag)
+
+exec
+/usr/bin/bash -lc 'rg -n "onda|validar_plano|TaskPlano|criterios|arquivo de teste" .autodev autodev | head -120; find .autodev -maxdepth 3 -type f | sort | head -80; rg -n "pytest|unittest" pyproject.toml setup.cfg tox.ini . 2>/dev/null | head -80' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ succeeded in 22ms:
+./README.md:51:│   ├── testrunner.py           # runner determinístico (pytest)
+./README.md:76:python3 -m venv .venv && .venv/bin/pip install pytest pyyaml
+./README.md:92:.venv/bin/python -m pytest .autodev/tests/ -q
+./README.md:190:  `.venv/bin/python -m pytest .autodev/tests/ -q`. Dentro do runner, que resolve
+./README.md:192:  `python3 -m pytest .autodev/tests/ -q`.
+./Pendencias.md:192:| testes do motor | `.venv/bin/python -m pytest .autodev/tests/ -q` (**219 verdes**) |
+./autodev/worktree.py:46:RUIDO_ENTREGA = ("__pycache__/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/",
+./autodev/testrunner.py:24:    # SEM `-q` próprio: se o projeto já configura `-q` no pyproject/pytest.ini, o
+./autodev/testrunner.py:27:    ("pytest", ["pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini"],
+./autodev/testrunner.py:28:     ["python3", "-m", "pytest", "--no-header", "-p", "no:cacheprovider"]),
+./autodev/testrunner.py:29:    ("pytest-tests", ["tests"],
+./autodev/testrunner.py:30:     ["python3", "-m", "pytest", "--no-header", "-p", "no:cacheprovider"]),
+./autodev/testrunner.py:31:    ("unittest", ["test", "tests"], ["python3", "-m", "unittest", "discover", "-v"]),
+./autodev/testrunner.py:46:# Linha de progresso do pytest: "..F.s.  [ 60%]"
+./autodev/testrunner.py:98:    `PASSED`/`FAILED`/`ERROR` do resumo curto do pytest.
+./autodev/testrunner.py:114:    Hermes (que não tem pytest), e todo comando Python falhava com "No module
+./autodev/testrunner.py:115:    named pytest" — mascarado como falha de teste. O interpretador correto é o
+./autodev/testrunner.py:136:                # pytest só se houver testes de fato
+./autodev/testrunner.py:137:                if cmd[1] == "pytest":
+./autodev/testrunner.py:234:    r = rodar(wt, comando=f"python3 -m pytest {arquivo_teste} -q",
+./autodev/planner.py:25:    r"\b(?:pytest|(?:python(?:3)?\s+-m\s+unittest)|"
+./autodev/orchestrator.py:797:        # projeto não casa com os detectores (sem pyproject.toml, sem pytest.ini e
+./autodev/plan_prompt.py:24:Para testes pytest, nos critérios e no campo "teste", use `python3 -m pytest ...`.
+
+codex
+Encontrei que as ondas são derivadas do DAG por `config.ordem_topologica`, com índice natural começando em zero. Vou expor `onda` como número da onda humana (1-based), extrair arquivos de critérios e do campo `teste`, e tratar arquivos de teste como colisão mesmo quando as ondas diferem.
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plan_colisoes.py
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+
+exec
+/usr/bin/bash -lc 'python3 -m pytest .autodev/tests/test_plan_colisoes.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ exited 1 in 52ms:
+/usr/bin/python3: No module named pytest
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+
+exec
+/usr/bin/bash -lc 'ls -d .venv 2>/dev/null || true; .venv/bin/python -m pytest .autodev/tests/test_plan_colisoes.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ exited 127 in 0ms:
+/usr/bin/bash: line 1: .venv/bin/python: No such file or directory
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/autodev/planner.py
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..4412b83a137885976d6338c619b7345b132a3f8f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,50 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    ondas = config.ordem_topologica({"tasks": [
++        {"id": task.id, "deps": task.deps} for task in plano.tasks
++    ]})
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +309,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..4412b83a137885976d6338c619b7345b132a3f8f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,50 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    ondas = config.ordem_topologica({"tasks": [
++        {"id": task.id, "deps": task.deps} for task in plano.tasks
++    ]})
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +309,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+exec
+/usr/bin/bash -lc "sed -n '220,270p' autodev/config.py; python3 -m unittest discover -s .autodev/tests -p 'test_plan_colisoes.py' -v" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ exited 5 in 384ms:
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+NO TESTS RAN
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..4412b83a137885976d6338c619b7345b132a3f8f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,50 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    ondas = config.ordem_topologica({"tasks": [
++        {"id": task.id, "deps": task.deps} for task in plano.tasks
++    ]})
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +309,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+codex
+A implementação está no lugar: pares são ordenados de forma determinística, arquivos de produção só geram erro na mesma onda, e arquivos em `tests/`/`test_*.py` geram colisão em qualquer onda. Como este ambiente não tem `pytest` instalado, vou validar sintaxe e executar os casos diretamente via Python, além de rodar a suíte disponível pelo interpretador padrão.
+exec
+/usr/bin/bash -lc "python3 -m py_compile autodev/planner.py .autodev/tests/test_plan_colisoes.py && python3 - <<'PY'
+import importlib.util
+spec = importlib.util.spec_from_file_location('test_plan_colisoes', '.autodev/tests/test_plan_colisoes.py')
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+for name in dir(mod):
+    if name.startswith('test_'):
+        getattr(mod, name)()
+        print(name, 'PASS')
+PY
+python3 -m unittest discover -s .autodev/tests -p 'test_*.py' -q" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ exited 1 in 1049ms:
+test_arquivo_de_producao_em_ondas_diferentes_nao_colide PASS
+test_detecta_colisao_de_arquivo_na_mesma_onda PASS
+test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes PASS
+test_validar_plano_inclui_ids_e_arquivo_da_colisao PASS
+======================================================================
+ERROR: test_acceptance (unittest.loader._FailedTest.test_acceptance)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_acceptance
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_acceptance.py", line 21, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_adapters (unittest.loader._FailedTest.test_adapters)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_adapters
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_adapters.py", line 12, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_core (unittest.loader._FailedTest.test_core)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_core
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_core.py", line 14, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_d18_worktree_e_rodadas (unittest.loader._FailedTest.test_d18_worktree_e_rodadas)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_d18_worktree_e_rodadas
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_d18_worktree_e_rodadas.py", line 22, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_escalonamento_revisao (unittest.loader._FailedTest.test_escalonamento_revisao)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_escalonamento_revisao
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_escalonamento_revisao.py", line 17, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_git_sandbox (unittest.loader._FailedTest.test_git_sandbox)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_git_sandbox
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_git_sandbox.py", line 12, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_plan_aceitacao (unittest.loader._FailedTest.test_plan_aceitacao)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_plan_aceitacao
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plan_aceitacao.py", line 9, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_plan_agente (unittest.loader._FailedTest.test_plan_agente)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_plan_agente
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plan_agente.py", line 3, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_plan_escrita (unittest.loader._FailedTest.test_plan_escrita)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_plan_escrita
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plan_escrita.py", line 4, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_plan_parser (unittest.loader._FailedTest.test_plan_parser)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_plan_parser
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plan_parser.py", line 3, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_plan_rastreabilidade (unittest.loader._FailedTest.test_plan_rastreabilidade)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_plan_rastreabilidade
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plan_rastreabilidade.py", line 4, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_plan_validacao (unittest.loader._FailedTest.test_plan_validacao)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_plan_validacao
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plan_validacao.py", line 1, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_plano_comando (unittest.loader._FailedTest.test_plano_comando)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_plano_comando
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_plano_comando.py", line 4, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_reset_de_cota (unittest.loader._FailedTest.test_reset_de_cota)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_reset_de_cota
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_reset_de_cota.py", line 15, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_rodada_unica_e_portao (unittest.loader._FailedTest.test_rodada_unica_e_portao)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_rodada_unica_e_portao
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_rodada_unica_e_portao.py", line 21, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+======================================================================
+ERROR: test_tokens (unittest.loader._FailedTest.test_tokens)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_tokens
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/unittest/loader.py", line 433, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.14/unittest/loader.py", line 374, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/.autodev/tests/test_tokens.py", line 22, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.004s
+
+FAILED (errors=16)
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..4412b83a137885976d6338c619b7345b132a3f8f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,50 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    ondas = config.ordem_topologica({"tasks": [
++        {"id": task.id, "deps": task.deps} for task in plano.tasks
++    ]})
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +309,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex/autodev/planner.py
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..3ab68767a8f36d79965554101da4eb90d73d691f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,55 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    try:
++        ondas = config.ordem_topologica({"tasks": [
++            {"id": task.id, "deps": task.deps} for task in plano.tasks
++        ]})
++    except ValueError:
++        # O validador principal reporta ciclos; não esconda esse erro com uma
++        # exceção secundária ao tentar calcular as ondas.
++        return []
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +314,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..3ab68767a8f36d79965554101da4eb90d73d691f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,55 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    try:
++        ondas = config.ordem_topologica({"tasks": [
++            {"id": task.id, "deps": task.deps} for task in plano.tasks
++        ]})
++    except ValueError:
++        # O validador principal reporta ciclos; não esconda esse erro com uma
++        # exceção secundária ao tentar calcular as ondas.
++        return []
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +314,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+exec
+/usr/bin/bash -lc 'git diff --check && git diff --stat && git diff -- autodev/planner.py .autodev/tests/test_plan_colisoes.py' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ succeeded in 0ms:
+ autodev/planner.py | 54 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+diff --git i/autodev/planner.py w/autodev/planner.py
+index f2015d4..3ab6876 100644
+--- i/autodev/planner.py
++++ w/autodev/planner.py
+@@ -231,6 +231,55 @@ def _construir_task(dados: object) -> TaskPlano:
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    try:
++        ondas = config.ordem_topologica({"tasks": [
++            {"id": task.id, "deps": task.deps} for task in plano.tasks
++        ]})
++    except ValueError:
++        # O validador principal reporta ciclos; não esconda esse erro com uma
++        # exceção secundária ao tentar calcular as ondas.
++        return []
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +314,11 @@ def validar_plano(plano: Plano) -> list[str]:
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..3ab68767a8f36d79965554101da4eb90d73d691f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,55 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    try:
++        ondas = config.ordem_topologica({"tasks": [
++            {"id": task.id, "deps": task.deps} for task in plano.tasks
++        ]})
++    except ValueError:
++        # O validador principal reporta ciclos; não esconda esse erro com uma
++        # exceção secundária ao tentar calcular as ondas.
++        return []
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +314,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+exec
+/usr/bin/bash -lc 'git status --short --untracked-files=all; git check-ignore -v .autodev/tests/test_plan_colisoes.py || true' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P01-codex
+ succeeded in 78ms:
+ M autodev/planner.py
+?? .autodev/tests/test_plan_colisoes.py
+
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..3ab68767a8f36d79965554101da4eb90d73d691f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,55 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    try:
++        ondas = config.ordem_topologica({"tasks": [
++            {"id": task.id, "deps": task.deps} for task in plano.tasks
++        ]})
++    except ValueError:
++        # O validador principal reporta ciclos; não esconda esse erro com uma
++        # exceção secundária ao tentar calcular as ondas.
++        return []
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +314,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+codex
+RESULTADO: Implementada `colisoes_de_arquivo`, validação integrada e testes dos três cenários | TESTES: 4 casos passaram via Python; `pytest` indisponível no ambiente
+diff --git a/.autodev/tests/test_plan_colisoes.py b/.autodev/tests/test_plan_colisoes.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e691bd0f2d956e5814eff15fa685c938313340ea
+--- /dev/null
++++ b/.autodev/tests/test_plan_colisoes.py
+@@ -0,0 +1,56 @@
++from autodev.planner import Plano, TaskPlano, colisoes_de_arquivo, validar_plano
++
++
++def plano_com(*tasks):
++    return Plano("t", "o", ".", list(tasks), "")
++
++
++def task(id_, criterio, deps=None, teste=""):
++    return TaskPlano(id_, id_, [criterio], deps or [], teste=teste)
++
++
++def test_detecta_colisao_de_arquivo_na_mesma_onda():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
++    ]
++
++
++def test_arquivo_de_producao_em_ondas_diferentes_nao_colide():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py", deps=["P01"]),
++    )
++
++    assert colisoes_de_arquivo(plano) == []
++
++
++def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
++    plano = plano_com(
++        task("P01", "implementa a funcionalidade", teste="python3 -m pytest tests/test_plano.py"),
++        task(
++            "P02",
++            "implementa a segunda funcionalidade",
++            deps=["P01"],
++            teste="python3 -m pytest tests/test_plano.py",
++        ),
++    )
++
++    assert colisoes_de_arquivo(plano) == [
++        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
++    ]
++
++
++def test_validar_plano_inclui_ids_e_arquivo_da_colisao():
++    plano = plano_com(
++        task("P01", "altera autodev/modulo.py"),
++        task("P02", "altera autodev/modulo.py"),
++    )
++
++    erros = validar_plano(plano)
++
++    assert any("P01" in erro and "P02" in erro and "autodev/modulo.py" in erro for erro in erros)
+diff --git a/autodev/planner.py b/autodev/planner.py
+index f2015d4b7140a7da9aefe5ab07a8a4e253023bb4..3ab68767a8f36d79965554101da4eb90d73d691f
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -231,6 +231,55 @@
+     return TaskPlano(**campos)
+ 
+ 
++def _arquivos_da_task(task: TaskPlano) -> set[str]:
++    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
++    textos = [*task.criterios, task.teste]
++    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
++
++
++def _arquivo_de_teste(caminho: str) -> bool:
++    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
++    nome = Path(caminho).name.casefold()
++    partes = {parte.casefold() for parte in Path(caminho).parts}
++    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
++
++
++def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
++    """Retorna arquivos editados por mais de uma task no mesmo plano.
++
++    Arquivos de produção só colidem quando as tasks estão na mesma onda;
++    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
++    """
++    try:
++        ondas = config.ordem_topologica({"tasks": [
++            {"id": task.id, "deps": task.deps} for task in plano.tasks
++        ]})
++    except ValueError:
++        # O validador principal reporta ciclos; não esconda esse erro com uma
++        # exceção secundária ao tentar calcular as ondas.
++        return []
++    onda_por_task = {
++        task_id: indice + 1
++        for indice, onda in enumerate(ondas)
++        for task_id in onda
++    }
++    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
++    colisoes: list[dict[str, str | int]] = []
++    for indice, task_a in enumerate(plano.tasks):
++        for task_b in plano.tasks[indice + 1:]:
++            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
++                onda_a = onda_por_task.get(task_a.id)
++                onda_b = onda_por_task.get(task_b.id)
++                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
++                    colisoes.append({
++                        "task_a": task_a.id,
++                        "task_b": task_b.id,
++                        "arquivo": arquivo,
++                        "onda": onda_a if onda_a is not None else onda_b,
++                    })
++    return colisoes
++
++
+ def validar_plano(plano: Plano) -> list[str]:
+     """Retorna todos os problemas estruturais encontrados no plano."""
+     erros: list[str] = []
+@@ -265,6 +314,11 @@
+     for task_id in grafo:
+         if estado[task_id] == 0:
+             visita(task_id)
++    for colisao in colisoes_de_arquivo(plano):
++        erros.append(
++            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
++            f"{colisao['arquivo']} (onda {colisao['onda']})"
++        )
+     return erros
+ 
+ 
+
+tokens used
+54,069
+RESULTADO: Implementada `colisoes_de_arquivo`, validação integrada e testes dos três cenários | TESTES: 4 casos passaram via Python; `pytest` indisponível no ambiente
