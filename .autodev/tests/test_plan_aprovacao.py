@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -29,6 +30,7 @@ def test_sprint_yaml_accepts_approval_keys(tmp_path, monkeypatch):
     approval = yaml.safe_load((d / "sprint.yaml").read_text())["aprovacao"]
     assert set(approval) == {"por", "quando", "hash_dag"}
     assert approval["por"] == "Ana"
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}", approval["quando"])
     assert approval["hash_dag"] == hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
 
 
@@ -230,7 +232,10 @@ def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
     o = Orquestrador(tmp_path, "S1", modo_teste=True)
     resultado = o.rodar()
     assert resultado.parado_por is None
-    assert any(e["tipo"] == "aprovacao_plano" for e in o.store.eventos("S1"))
+    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
+    assert len(eventos) == 1
+    assert json.loads(eventos[0]["payload"]) == yaml.safe_load(
+        (d / "sprint.yaml").read_text())["aprovacao"]
 
 
 def test_run_nao_exige_aprovacao_legada_de_sprint_ja_em_execucao(tmp_path):
@@ -263,7 +268,7 @@ def test_aprovacao_nao_duplica_evento_fora_da_janela_de_500(tmp_path, monkeypatc
     for numero in range(501):
         o.store.evento("S1", None, "ruido", {"numero": numero})
 
-    o._registrar_aprovacao()
+    assert o.rodar().parado_por is None
 
     quantidade = o.store.conn.execute(
         "SELECT COUNT(*) FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
@@ -284,7 +289,7 @@ def test_dag_alterado_invalida_aprovacao(tmp_path, monkeypatch):
     assert resultado.parado_por and "diverg" in resultado.parado_por
 
 
-@pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM"])
+@pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM", "ENCERRADO", "ABORTADO"])
 def test_dag_alterado_invalida_aprovacao_em_reexecucao(
         tmp_path, monkeypatch, estado):
     d = _sprint(tmp_path)
@@ -293,13 +298,17 @@ def test_dag_alterado_invalida_aprovacao_em_reexecucao(
     o = Orquestrador(tmp_path, "S1", modo_teste=True)
     if estado == "EM_EXECUCAO":
         o.store.transicionar_sprint("S1", estado, "rodada em curso")
+    elif estado == "ENCERRADO":
+        o.store.encerrar_sprint("S1")
+    elif estado == "ABORTADO":
+        o.store.transicionar_sprint("S1", estado, "cancelado pelo autor")
     else:
         o.store.checkpoint("S1", estado, {"motivo": "fim da rodada"})
     (d / "dag.json").write_text(
         '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
         '"criterios":["alterar modulo.py"]}]}', encoding="utf-8")
 
-    resultado = o.rodar()
+    resultado = o.rodar(parar_em="P1")
 
     assert resultado.parado_por and "divergencia" in resultado.parado_por
     assert o.store.task("S1", "P1") is None

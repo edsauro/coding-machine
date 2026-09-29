@@ -4,6 +4,7 @@ Uso:
   python3 -m autodev detect                 # T01
   python3 -m autodev plan "pedido"          # cria um sprint planejado
   python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+  python3 -m autodev aprovar <sprint_id> --por <nome>  # registra a aprovacao do plano
   python3 -m autodev init                   # valida DAG e cria as tasks
   python3 -m autodev status                 # estado atual do Sprint
   python3 -m autodev run [--parar-em T07]   # executa o Sprint
@@ -24,6 +25,7 @@ import json
 import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -187,7 +189,7 @@ def cmd_aprovar(args) -> int:
         return 2
     aprovacao = {
         "por": args.por.strip(),
-        "quando": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "quando": datetime.now().astimezone().isoformat(timespec="seconds"),
         "hash_dag": hashlib.sha256(dag_path.read_bytes()).hexdigest(),
     }
     bloco = "aprovacao:\n" + "".join(

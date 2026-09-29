@@ -22,7 +22,7 @@ from pathlib import Path
 from . import agents, errors, haq, integration, killswitch, report, retry, review
 from . import sandbox as sbx
 from . import testrunner
-from .config import (SPRINT_TERMINAIS, Config, carrega_dag, carrega_sprint,
+from .config import (Config, carrega_dag, carrega_sprint,
                      ordem_topologica)
 from .state import StateStore, TransicaoInvalida, WorktreeOcupado
 from .worktree import (WorktreeManager, arquivos_alterados, branch_existe,
@@ -234,8 +234,6 @@ class Orquestrador:
             if estado in (None, "PLANEJADO"):
                 return f"sprint PLANEJADO sem aprovacao registrada; use {comando}"
             # Sprints iniciados antes da existência do portão continuam retomáveis.
-            return None
-        if estado in SPRINT_TERMINAIS:
             return None
         atual = hashlib.sha256((self.dir_sprint / "dag.json").read_bytes()).hexdigest()
         registrado = aprovacao.get("hash_dag")
