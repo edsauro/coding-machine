@@ -18,7 +18,7 @@ PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
 
 # Referências textuais: o arquivo pode ainda ser criado pela sprint.
 _ARQUIVO = re.compile(
-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+\.[A-Za-z][A-Za-z0-9]*\b"
+    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
     r"|\b(?:Makefile|Dockerfile)\b"
 )
 _COMANDO_TESTE = re.compile(

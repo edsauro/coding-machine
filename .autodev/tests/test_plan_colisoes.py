@@ -233,3 +233,26 @@ def test_cmd_plan_recusa_colisao_e_nao_escreve_sprint(monkeypatch, capsys, tmp_p
     assert "P02" in saida
     assert "autodev/modulo.py" in saida
     assert escrita == []
+
+
+@pytest.mark.parametrize("deps", [[], ["P01"]])
+def test_colisao_preserva_nome_de_teste_com_varios_pontos(deps):
+    plano = plano_com(
+        task("P01", "cria tests/plano.spec.ts"),
+        task("P02", "edita tests/plano.spec.ts", deps=deps),
+    )
+
+    assert colisoes_de_arquivo(plano) == [
+        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/plano.spec.ts", "onda": 1}
+    ]
+    assert any("tests/plano.spec.ts" in erro for erro in validar_plano(plano))
+
+
+def test_arquivos_com_extensoes_distintas_nao_colidem():
+    plano = plano_com(
+        task("P01", "cria tests/plano.spec.ts"),
+        task("P02", "cria tests/plano.spec.js"),
+    )
+
+    assert colisoes_de_arquivo(plano) == []
+    assert validar_plano(plano) == []
