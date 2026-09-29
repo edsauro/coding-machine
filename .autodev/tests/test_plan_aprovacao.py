@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 
 import yaml
+import pytest
 
 from autodev.cli import main
+from autodev.config import carrega_sprint
 from autodev.orchestrator import Orquestrador
 
 
@@ -30,11 +32,65 @@ def test_sprint_yaml_accepts_approval_keys(tmp_path, monkeypatch):
     assert approval["hash_dag"] == hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
 
 
+def test_aprovar_preserva_conteudo_existente_do_yaml(tmp_path, monkeypatch):
+    d = _sprint(tmp_path)
+    (d / "sprint.yaml").write_text(
+        "# comentario importante\nsprint_id: S1\nobjetivo: teste\n# manter\nstatus: PLANEJADO\n",
+        encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
+    assert "# comentario importante" in texto
+    assert "# manter" in texto
+
+
+@pytest.mark.parametrize("aprovacao", [
+    {"por": "Ana", "hash_dag": "abc"},
+    {"por": "Ana", "quando": "agora", "hash_dag": "abc", "extra": "nao"},
+    {"por": "", "quando": "agora", "hash_dag": "abc"},
+])
+def test_carrega_sprint_recusa_aprovacao_malformada(tmp_path, aprovacao):
+    d = _sprint(tmp_path)
+    dados = yaml.safe_load((d / "sprint.yaml").read_text())
+    dados["aprovacao"] = aprovacao
+    (d / "sprint.yaml").write_text(yaml.safe_dump(dados), encoding="utf-8")
+    with pytest.raises(ValueError, match="aprovacao"):
+        carrega_sprint(d / "sprint.yaml")
+
+
+def test_aprovar_recusa_nome_vazio(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S1", "--por", ""]) == 2
+    assert "--por" in capsys.readouterr().out
+
+
+def test_aprovar_recusa_sprints_divergentes(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path, "S1")
+    _sprint(tmp_path, "S2")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S2", "--por", "Ana"]) == 2
+    assert "diverge" in capsys.readouterr().out
+
+
+def test_run_informa_yaml_de_aprovacao_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    dados = yaml.safe_load((d / "sprint.yaml").read_text())
+    dados["aprovacao"] = {"por": "Ana", "hash_dag": "abc"}
+    (d / "sprint.yaml").write_text(yaml.safe_dump(dados), encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "run", "--modo-teste"]) == 2
+    saida = capsys.readouterr().out
+    assert "sprint invalido" in saida
+    assert "Traceback" not in saida
+
+
 def test_run_planejado_recusa_sem_aprovacao(tmp_path):
     d = _sprint(tmp_path)
     o = Orquestrador(tmp_path, "S1", modo_teste=True)
     resultado = o.rodar()
     assert resultado.parado_por and "autodev aprovar S1 --por <nome>" in resultado.parado_por
+    assert o.store.tasks("S1") == []
 
 
 def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
@@ -44,6 +100,17 @@ def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
     o = Orquestrador(tmp_path, "S1", modo_teste=True)
     o.rodar()
     assert any(e["tipo"] == "aprovacao_plano" for e in o.store.eventos("S1"))
+
+
+def test_aprovacao_gera_um_evento_por_hash(tmp_path, monkeypatch):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    o.rodar()
+    o.rodar()
+    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
+    assert len(eventos) == 1
 
 
 def test_dag_alterado_invalida_aprovacao(tmp_path, monkeypatch):

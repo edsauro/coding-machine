@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -138,7 +139,11 @@ def cmd_run(args) -> int:
     os.environ.setdefault("AUTODEV_AGENT_TIMEOUT", "900")
     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste,
                      deadline_s=args.deadline)
-    r = _rodar_com_rodadas(o, args)
+    try:
+        r = _rodar_com_rodadas(o, args)
+    except ValueError as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
     assert r is not None  # rodadas >= 1 sempre executa ao menos uma passada
     print(f"\n=== resumo ===\n  concluidas: {r.concluidas}/{len(r.tasks)}"
           f"\n  parado por: {r.parado_por or '-'}"
@@ -147,21 +152,35 @@ def cmd_run(args) -> int:
 
 
 def cmd_aprovar(args) -> int:
+    if args.sprint is not None and args.sprint != args.sprint_id:
+        print(f"--sprint {args.sprint} diverge de sprint_id {args.sprint_id}")
+        return 2
+    if not args.por.strip():
+        print("--por precisa conter um nome nao vazio")
+        return 2
     d = RAIZ / ".autodev" / "sprints" / args.sprint_id
     yaml_path = d / "sprint.yaml"
     dag_path = d / "dag.json"
     if not yaml_path.exists() or not dag_path.exists():
         print(f"sprint inexistente ou incompleto: {args.sprint_id}")
         return 1
-    with yaml_path.open(encoding="utf-8") as fh:
-        sprint = yaml.safe_load(fh) or {}
-    sprint["aprovacao"] = {
-        "por": args.por,
+    from .config import carrega_sprint
+    try:
+        carrega_sprint(yaml_path)
+    except ValueError as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    aprovacao = {
+        "por": args.por.strip(),
         "quando": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "hash_dag": hashlib.sha256(dag_path.read_bytes()).hexdigest(),
     }
-    with yaml_path.open("w", encoding="utf-8") as fh:
-        yaml.safe_dump(sprint, fh, allow_unicode=True, sort_keys=False)
+    bloco = "aprovacao:\n" + "".join(
+        f"  {chave}: {json.dumps(valor, ensure_ascii=False)}\n"
+        for chave, valor in aprovacao.items())
+    texto = yaml_path.read_text(encoding="utf-8")
+    texto = re.sub(r"(?m)^aprovacao:\n(?:^[ \t].*(?:\n|$))*", "", texto)
+    yaml_path.write_text(texto.rstrip() + "\n" + bloco, encoding="utf-8")
     print(f"sprint {args.sprint_id} aprovado por {args.por}")
     return 0
 
@@ -169,6 +188,14 @@ def cmd_aprovar(args) -> int:
 def cmd_resume(args) -> int:
     from .orchestrator import Orquestrador
     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste)
+    try:
+        bloqueio = o.checar_aprovacao()
+    except ValueError as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    if bloqueio:
+        print(f"concluidas: 0/0 | parado por: {bloqueio}")
+        return 2
     rec = o.recuperar()
     print(f"recuperacao: {json.dumps(rec, ensure_ascii=False)}")
     r = o.rodar()
@@ -450,7 +477,7 @@ def cmd_prever(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
-    p.add_argument("--sprint", default=SPRINT_PADRAO)
+    p.add_argument("--sprint", default=None)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("detect").set_defaults(fn=cmd_detect)
@@ -534,6 +561,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("start").set_defaults(fn=cmd_start)
 
     args = p.parse_args(argv)
+    if args.sprint is None and args.cmd != "aprovar":
+        args.sprint = SPRINT_PADRAO
     return args.fn(args)
 
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import subprocess
 import sys
@@ -78,12 +79,15 @@ def scaffold_sprint(raiz: Path, sprint: str, tarefas: list[dict],
     d = raiz / ".autodev" / "sprints" / sprint
     (d / "evidence").mkdir(parents=True, exist_ok=True)
     (d / "logs").mkdir(parents=True, exist_ok=True)
-    (d / "sprint.yaml").write_text(
-        f"sprint_id: {sprint}\ntitulo: teste\nobjetivo: {objetivo}\n", encoding="utf-8")
-    (d / "spec.md").write_text(f"# {sprint}\n\n{objetivo}\n", encoding="utf-8")
     (d / "dag.json").write_text(
         json.dumps({"sprint_id": sprint, "tasks": tarefas}, ensure_ascii=False),
         encoding="utf-8")
+    hash_dag = hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
+    (d / "sprint.yaml").write_text(
+        f"sprint_id: {sprint}\ntitulo: teste\nobjetivo: {objetivo}\n"
+        f"aprovacao:\n  por: teste\n  quando: fixture\n  hash_dag: {hash_dag}\n",
+        encoding="utf-8")
+    (d / "spec.md").write_text(f"# {sprint}\n\n{objetivo}\n", encoding="utf-8")
     return d
 
 
