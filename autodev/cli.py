@@ -359,6 +359,61 @@ def cmd_plan(args) -> int:
     return 0
 
 
+def cmd_prever(args) -> int:
+    """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
+    from . import plan_impacto
+    from .planner import Plano, TaskPlano
+
+    sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint
+    dag_path = sprint_dir / "dag.json"
+    if not dag_path.is_file():
+        mensagem = f"sprint não encontrado: {args.sprint}"
+        if args.json:
+            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
+        else:
+            print(mensagem)
+        return 1
+    try:
+        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+        plano = Plano(
+            titulo=dag.get("titulo", args.sprint),
+            objetivo=dag.get("objetivo", ""),
+            repositorio=dag.get("repositorio", ""),
+            prompt_original=dag.get("prompt_original", ""),
+            tasks=[TaskPlano(
+                id=t["id"], titulo=t.get("titulo", t["id"]),
+                criterios=t.get("criterios", []), deps=t.get("deps", []),
+                agente=t.get("agente", "codex"), teste=t.get("teste", ""),
+            ) for t in dag["tasks"]],
+        )
+        relatorio = plan_impacto.impacto(plano)
+    except (OSError, ValueError, KeyError, TypeError) as erro:
+        mensagem = f"não foi possível prever o sprint {args.sprint}: {erro}"
+        if args.json:
+            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
+        else:
+            print(mensagem)
+        return 1
+
+    if args.json:
+        print(json.dumps(relatorio, ensure_ascii=False, indent=2))
+        return 0
+    for numero, onda in enumerate(relatorio["ondas"], 1):
+        print(f"onda {numero}:")
+        for task_id in onda:
+            arquivos = relatorio["arquivos_por_task"][task_id]
+            print(f"  {task_id}: {', '.join(arquivos) if arquivos else '(sem arquivo nomeado)'}")
+    print("colisões:")
+    if relatorio["colisoes"]:
+        for colisao in relatorio["colisoes"]:
+            print(f"  {colisao['task_a']} x {colisao['task_b']}: {colisao['arquivo']}")
+    else:
+        print("  nenhuma")
+    if relatorio["sem_arquivo"]:
+        print("tasks sem arquivo nomeado: " + ", ".join(relatorio["sem_arquivo"]))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
     p.add_argument("--sprint", default=SPRINT_PADRAO)
@@ -373,6 +428,12 @@ def main(argv: list[str] | None = None) -> int:
     fonte.add_argument("--de", type=Path, metavar="ARQUIVO",
                        help="lê o pedido de um arquivo Markdown")
     s.set_defaults(fn=cmd_plan)
+
+    s = sub.add_parser("prever", help="prevê o impacto dos arquivos de um sprint")
+    s.add_argument("sprint_id")
+    s.add_argument("--json", action="store_true", dest="json",
+                   help="imprime o relatório em JSON")
+    s.set_defaults(fn=cmd_prever, sprint="")
 
     s = sub.add_parser("status")
     s.add_argument("-v", "--verbose", action="store_true")
@@ -434,6 +495,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("start").set_defaults(fn=cmd_start)
 
     args = p.parse_args(argv)
+    if args.cmd == "prever":
+        args.sprint = args.sprint_id
     return args.fn(args)
 
 
