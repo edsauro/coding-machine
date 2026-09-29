@@ -34,4 +34,4 @@ def test_prompt_evitar_colisao_de_arquivos_de_teste():
     prompt = montar_prompt_plano("Planeje")
 
     assert "arquivo de teste" in prompt
-    assert "agrupe" in prompt
+    assert "não podem citar o mesmo arquivo de teste" in prompt

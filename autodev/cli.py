@@ -341,10 +341,9 @@ def cmd_plan(args) -> int:
                 print(erro)
             return 1
         for aviso in planner.avisos_de_colisao_de_arquivo(plano):
-            onda_a, onda_b = str(aviso["onda"]).split(" e ", maxsplit=1)
             print(
-                f"aviso: colisão de arquivo entre {aviso['task_a']} (onda {onda_a}) "
-                f"e {aviso['task_b']} (onda {onda_b}): {aviso['arquivo']}"
+                f"aviso: colisão de arquivo entre {aviso['task_a']} (onda {aviso['onda']}) "
+                f"e {aviso['task_b']} (onda {aviso['onda_b']}): {aviso['arquivo']}"
             )
         planner.validar_e_ordenar(plano)
         destino = planner.escrever_sprint(RAIZ, plano)

@@ -28,29 +28,6 @@ _COMANDO_TESTE = re.compile(
     re.IGNORECASE,
 )
 
-# Um caminho citado como dependência, import ou exemplo não é necessariamente
-# uma entrega da task.  Colisões de produção consideram somente critérios que
-# expressam intenção de edição; arquivos de teste são a exceção deliberada
-# (D-16), pois duas citações do mesmo teste já exigem coordenação explícita.
-_VERBOS_EDICAO = (
-    "existe", "criar", "cria", "crie", "estende", "estender", "edita",
-    "editar", "ganha", "atualiza", "adiciona", "remove", "reescreve",
-    "escreve", "implementa", "altera", "substitui", "move", "grava",
-    "ficam em", "fica em", "passa a", "novo arquivo", "novo modulo",
-    "registra em",
-)
-_PADRAO_EDICAO = re.compile(
-    r"\b(?:" + "|".join(re.escape(verbo) for verbo in _VERBOS_EDICAO) + r")\b",
-    re.IGNORECASE,
-)
-_NEGACOES_EDICAO = (
-    "nao cria", "não cria", "nao edita", "não edita", "nao altera",
-    "não altera", "nao remove", "não remove", "nao reescreve",
-    "não reescreve", "nao toca", "não toca", "sem editar", "sem alterar",
-    "sem remover", "sem tocar",
-)
-
-
 @dataclass
 class TaskPlano:
     id: str
@@ -271,56 +248,15 @@ def _normalizar_caminho(caminho: str) -> str:
     return PurePosixPath(caminho).as_posix().lstrip("/")
 
 
-def _trecho_da_mencao(texto: str, inicio: int) -> str:
-    """Obtém a oração imediatamente anterior a uma menção de caminho."""
-    prefixo = texto[:inicio]
-    separadores = [m.end() for m in re.finditer(r"[,;]|\.\s+|\s+e\s+", prefixo, re.I)]
-    return prefixo[separadores[-1] if separadores else 0:]
-
-
-def _mencoes_editadas(texto: str) -> set[str]:
-    """Classifica a intenção por menção, para uma negação não vazar de oração."""
-    editados: set[str] = set()
-    contexto_afirmativo = False
-    for mencao in _ARQUIVO.finditer(texto):
-        trecho = _trecho_da_mencao(texto, mencao.start())
-        trecho_normalizado = trecho.casefold()
-        negado = any(negacao in trecho_normalizado for negacao in _NEGACOES_EDICAO)
-        afirmativo = _PADRAO_EDICAO.search(trecho) is not None
-        if not negado and (afirmativo or contexto_afirmativo):
-            editados.add(_normalizar_caminho(mencao.group(0)))
-        if afirmativo:
-            contexto_afirmativo = not negado
-    return editados
-
-
-def _arquivos_editados_da_task(task: TaskPlano) -> set[str]:
-    """Extrai arquivos que a task declara editar, não apenas mencionar."""
-    arquivos = {_normalizar_caminho(caminho.group(0)) for caminho in _ARQUIVO.finditer(task.teste)}
-    for criterio in task.criterios:
-        arquivos.update(_mencoes_editadas(criterio))
-    return arquivos
-
-
 def _arquivos_em_comum(arquivos_a: set[str], arquivos_b: set[str]) -> set[str]:
-    """Compara caminhos normalizados e aceita basename quando só um lado o usa."""
-    comuns: set[str] = set()
-    for arquivo_a in arquivos_a:
-        for arquivo_b in arquivos_b:
-            if arquivo_a == arquivo_b:
-                comuns.add(arquivo_a)
-            elif "/" not in arquivo_a and PurePosixPath(arquivo_b).name == arquivo_a:
-                comuns.add(arquivo_b)
-            elif "/" not in arquivo_b and PurePosixPath(arquivo_a).name == arquivo_b:
-                comuns.add(arquivo_a)
-    return comuns
+    """Compara caminhos normalizados sem inferir diretórios pelo basename."""
+    return arquivos_a & arquivos_b
 
 
 def _arquivo_de_teste(caminho: str) -> bool:
-    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
-    nome = Path(caminho).name.casefold()
-    partes = {parte.casefold() for parte in Path(caminho).parts}
-    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
+    """Identifica arquivos localizados em um diretório de testes."""
+    partes = {parte.casefold() for parte in PurePosixPath(caminho).parts[:-1]}
+    return "tests" in partes or "test" in partes
 
 
 def _ondas_por_task(plano: Plano) -> dict[str, int] | None:
@@ -341,42 +277,29 @@ def _ondas_por_task(plano: Plano) -> dict[str, int] | None:
 
 
 def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
-    """Retorna arquivos editados por mais de uma task no mesmo plano.
+    """Retorna arquivos citados por tasks conflitantes no mesmo plano.
 
-    Arquivos de produção só colidem quando as tasks estão na mesma onda;
-    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
+    Na mesma onda, qualquer arquivo comum colide. Arquivos em diretórios de
+    teste colidem em qualquer onda para evitar a sobrescrita observada no D-16.
     """
     onda_por_task = _ondas_por_task(plano)
     if onda_por_task is None:
         return []
     arquivos_mencionados = [_arquivos_da_task(task) for task in plano.tasks]
-    arquivos_editados = [_arquivos_editados_da_task(task) for task in plano.tasks]
     colisoes: list[dict[str, str | int]] = []
     for indice, task_a in enumerate(plano.tasks):
         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
-            arquivos_de_teste = {
-                arquivo
-                for arquivo in _arquivos_em_comum(
-                    arquivos_mencionados[indice], arquivos_mencionados[indice_b]
-                )
-                if _arquivo_de_teste(arquivo)
-            }
-            arquivos_de_producao = {
-                arquivo
-                for arquivo in _arquivos_em_comum(
-                    arquivos_editados[indice], arquivos_editados[indice_b]
-                )
-                if not _arquivo_de_teste(arquivo)
-            }
-            for arquivo in sorted(arquivos_de_teste | arquivos_de_producao):
-                onda_a = onda_por_task.get(task_a.id)
-                onda_b = onda_por_task.get(task_b.id)
+            onda_a = onda_por_task[task_a.id]
+            onda_b = onda_por_task[task_b.id]
+            for arquivo in sorted(_arquivos_em_comum(
+                arquivos_mencionados[indice], arquivos_mencionados[indice_b]
+            )):
                 if _arquivo_de_teste(arquivo) or onda_a == onda_b:
                     colisoes.append({
                         "task_a": task_a.id,
                         "task_b": task_b.id,
                         "arquivo": arquivo,
-                        "onda": (onda_a if onda_a == onda_b else f"{onda_a} e {onda_b}"),
+                        "onda": onda_a,
                     })
     return colisoes
 
@@ -386,7 +309,7 @@ def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
     onda_por_task = _ondas_por_task(plano)
     if onda_por_task is None:
         return []
-    arquivos_editados = [_arquivos_editados_da_task(task) for task in plano.tasks]
+    arquivos_mencionados = [_arquivos_da_task(task) for task in plano.tasks]
     avisos: list[dict[str, str | int]] = []
     for indice, task_a in enumerate(plano.tasks):
         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
@@ -395,14 +318,15 @@ def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
             if onda_a == onda_b:
                 continue
             for arquivo in sorted(_arquivos_em_comum(
-                arquivos_editados[indice], arquivos_editados[indice_b]
+                arquivos_mencionados[indice], arquivos_mencionados[indice_b]
             )):
                 if not _arquivo_de_teste(arquivo):
                     avisos.append({
                         "task_a": task_a.id,
                         "task_b": task_b.id,
                         "arquivo": arquivo,
-                        "onda": f"{onda_a} e {onda_b}",
+                        "onda": onda_a,
+                        "onda_b": onda_b,
                     })
     return avisos
 

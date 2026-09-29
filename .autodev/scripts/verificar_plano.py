@@ -34,6 +34,8 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
 
+from autodev import planner
+
 ARQUIVO = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|md|json|ya?ml|toml|sh|txt|cfg|ini)")
 IGNORAR = (".venv/", "site-packages/")
 COMANDO_PYTEST_CORRETO = re.compile(r"(?<![A-Za-z0-9_./-])python3\s+-m\s+pytest\b")
@@ -128,11 +130,6 @@ def _comando_de_teste_incorreto(texto: str, *, campo_teste: bool) -> bool:
     return False
 
 
-def e_arquivo_de_teste(caminho: str) -> bool:
-    nome = Path(caminho).name
-    return nome.startswith("test_") or "/tests/" in caminho or caminho.startswith("tests/")
-
-
 def ondas_lista(dag: dict) -> list[list[str]]:
     """Ondas de execucao — usa o motor real quando a sprint ja e conhecida."""
     try:
@@ -168,7 +165,24 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
         avisos.append(f"nao foi possivel rodar valida_dag do motor ({exc}); seguindo com a checagem local")
 
     arquivos = {t["id"]: extrair_arquivos(t) for t in tasks}      # mencoes (E4)
-    tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (E2/E3/A1/A2)
+    tocados = {t["id"]: extrair_tocados(t) for t in tasks}        # edicoes (A2)
+    plano = planner.Plano(
+        titulo=nome,
+        objetivo="",
+        repositorio=".",
+        prompt_original="",
+        tasks=[
+            planner.TaskPlano(
+                id=t["id"],
+                titulo=t.get("titulo", t["id"]),
+                criterios=list(t.get("criterios", [])),
+                deps=list(t.get("deps", [])),
+                agente=t.get("agente", "codex"),
+                teste=t.get("teste", "") or "",
+            )
+            for t in tasks
+        ],
+    )
 
     # E5 — o runner resolve `python3` para o interpretador do projeto. Um
     # caminho de venv relativo aponta para o worktree, onde esse venv não existe.
@@ -192,33 +206,23 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
                 ) else "")
             )
 
-    teste_de: dict[str, set[str]] = {i: {a for a in f if e_arquivo_de_teste(a)}
-                                     for i, f in tocados.items()}
     onda_de: dict[str, int] = {}
     for n, onda in enumerate(ondas_lista(dag)):
         for i in onda:
             onda_de[i] = n
 
-    # E2 — mesmo arquivo na mesma onda (conflito de merge garantido)
+    # E2/E3 — a implementação canônica fica no planner usado pelo motor.
     ids = [t["id"] for t in tasks]
-    for a in range(len(ids)):
-        for b in range(a + 1, len(ids)):
-            ia, ib = ids[a], ids[b]
-            if onda_de.get(ia) != onda_de.get(ib):
-                continue
-            comum = tocados[ia] & tocados[ib]
-            for arq in sorted(comum):
-                erros.append(f"E2: {ia} e {ib} estao na MESMA onda {onda_de.get(ia)} "
-                             f"e editam {arq} — serialize (adicione deps) ou separe o arquivo")
-
-    # E3 — mesmo ARQUIVO DE TESTE em tasks diferentes (a armadilha D-16)
-    for a in range(len(ids)):
-        for b in range(a + 1, len(ids)):
-            ia, ib = ids[a], ids[b]
-            comum = teste_de[ia] & teste_de[ib]
-            for arq in sorted(comum):
-                erros.append(f"E3: {ia} e {ib} escrevem no MESMO arquivo de teste {arq} "
-                             f"— cada task precisa do seu (armadilha D-16)")
+    for colisao in planner.colisoes_de_arquivo(plano):
+        ia = str(colisao["task_a"])
+        ib = str(colisao["task_b"])
+        arq = str(colisao["arquivo"])
+        if planner._arquivo_de_teste(arq):
+            erros.append(f"E3: {ia} e {ib} citam o MESMO arquivo de teste {arq} "
+                         f"— cada task precisa do seu (armadilha D-16)")
+        else:
+            erros.append(f"E2: {ia} e {ib} estao na MESMA onda {colisao['onda']} "
+                         f"e citam {arq} — serialize (adicione deps) ou separe o arquivo")
 
     # E4 + A2
     def alcanca(origem: str, alvo: str, grafo: dict[str, list[str]],
@@ -253,22 +257,16 @@ def verificar(dag: dict, nome: str) -> tuple[list[str], list[str]]:
                 avisos.append(f"A2: {tid} mexe em {sorted(tocados[tid] & tocados[outro])} "
                               f"que {outro} entrega antes, mas nao depende de {outro}")
 
-    # A1 — arquivo compartilhado em ondas diferentes: exige preservacao explicita
-    for arq in sorted({a for f in tocados.values() for a in f}):
-        donos = [i for i in ids if arq in tocados[i]]
-        if len(donos) < 2 or not arq.endswith(".py"):
-            continue
-        ondas_distintas = {onda_de.get(i) for i in donos}
-        if len(ondas_distintas) > 1 and not e_arquivo_de_teste(arq):
-            primeiro = min(donos, key=lambda i: onda_de.get(i, 0))
-            for i in donos:
-                if i == primeiro:
-                    continue
-                txt = " ".join(" ".join(t.get("criterios", [])) for t in tasks
-                               if t["id"] == i).lower()
-                if "preserv" not in txt and "estend" not in txt and "nao remover" not in txt:
-                    avisos.append(f"A1: {i} edita {arq} (entregue por {primeiro}) sem "
-                                  f"criterio explicito de preservacao/estender")
+    # A1 — arquivo compartilhado em ondas diferentes: exige preservacao explicita.
+    tarefas_por_id = {t["id"]: t for t in tasks}
+    for aviso in planner.avisos_de_colisao_de_arquivo(plano):
+        primeiro = str(aviso["task_a"])
+        posterior = str(aviso["task_b"])
+        arq = str(aviso["arquivo"])
+        txt = " ".join(tarefas_por_id[posterior].get("criterios", [])).lower()
+        if "preserv" not in txt and "estend" not in txt and "nao remover" not in txt:
+            avisos.append(f"A1: {posterior} cita {arq} (citado por {primeiro}) sem "
+                          f"criterio explicito de preservacao/estender")
 
     return erros, avisos
 

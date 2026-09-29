@@ -43,7 +43,13 @@ def test_arquivo_de_producao_em_ondas_diferentes_vira_aviso():
     )
 
     assert avisos_de_colisao_de_arquivo(plano) == [
-        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": "1 e 2"}
+        {
+            "task_a": "P01",
+            "task_b": "P02",
+            "arquivo": "autodev/modulo.py",
+            "onda": 1,
+            "onda_b": 2,
+        }
     ]
 
 
@@ -59,7 +65,7 @@ def test_mesmo_arquivo_de_teste_colide_em_ondas_diferentes():
     )
 
     assert colisoes_de_arquivo(plano) == [
-        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": "1 e 2"}
+        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
     ]
 
 
@@ -87,15 +93,13 @@ def test_negacao_so_afeta_a_mencao_negada():
     ]
 
 
-def test_caminhos_equivalentes_sao_normalizados():
+def test_basename_igual_em_diretorios_diferentes_nao_colide():
     plano = plano_com(
         task("P01", "altera autodev/modulo.py"),
         task("P02", "altera modulo.py"),
     )
 
-    assert colisoes_de_arquivo(plano) == [
-        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
-    ]
+    assert colisoes_de_arquivo(plano) == []
 
 
 def test_cmd_plan_exibe_aviso_de_colisao_entre_ondas(monkeypatch, capsys, tmp_path):
@@ -113,20 +117,21 @@ def test_cmd_plan_exibe_aviso_de_colisao_entre_ondas(monkeypatch, capsys, tmp_pa
     assert "aviso: colisão de arquivo entre P01 (onda 1) e P02 (onda 2): autodev/modulo.py" in saida
 
 
-def test_mencao_de_arquivo_de_producao_sem_edicao_nao_colide():
+def test_mencao_do_mesmo_arquivo_na_mesma_onda_colide():
     plano = plano_com(
         task("P01", "usa colisoes importada de autodev/modulo.py sem reimplementar"),
         task("P02", "altera autodev/modulo.py"),
     )
 
-    assert colisoes_de_arquivo(plano) == []
-    assert validar_plano(plano) == []
+    assert colisoes_de_arquivo(plano) == [
+        {"task_a": "P01", "task_b": "P02", "arquivo": "autodev/modulo.py", "onda": 1}
+    ]
 
 
 def test_ids_duplicados_nao_geram_colisao_da_task_com_ela_mesma():
     plano = plano_com(
-        task("P01", "altera autodev/primeiro.py"),
-        task("P01", "altera autodev/segundo.py"),
+        task("P01", "altera autodev/modulo.py"),
+        task("P01", "altera autodev/modulo.py"),
     )
 
     assert colisoes_de_arquivo(plano) == []
@@ -148,5 +153,43 @@ def test_arquivo_de_teste_citado_no_criterio_colide_mesmo_sem_verbo_de_edicao():
     )
 
     assert colisoes_de_arquivo(plano) == [
-        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": "1 e 2"}
+        {"task_a": "P01", "task_b": "P02", "arquivo": "tests/test_plano.py", "onda": 1}
     ]
+
+
+def test_modulo_de_producao_com_prefixo_test_nao_colide_entre_ondas():
+    plano = plano_com(
+        task("P01", "altera autodev/test_helpers.py"),
+        task("P02", "altera autodev/test_helpers.py", deps=["P01"]),
+    )
+
+    assert colisoes_de_arquivo(plano) == []
+    assert avisos_de_colisao_de_arquivo(plano) == [
+        {
+            "task_a": "P01",
+            "task_b": "P02",
+            "arquivo": "autodev/test_helpers.py",
+            "onda": 1,
+            "onda_b": 2,
+        }
+    ]
+
+
+def test_cmd_plan_recusa_colisao_e_nao_escreve_sprint(monkeypatch, capsys, tmp_path):
+    plano = plano_com(
+        task("P01", "altera autodev/modulo.py"),
+        task("P02", "altera autodev/modulo.py"),
+    )
+    escrita = []
+    monkeypatch.setattr(cli, "RAIZ", tmp_path)
+    monkeypatch.setattr("autodev.planner.planejar", lambda *_: plano)
+    monkeypatch.setattr(
+        "autodev.planner.escrever_sprint", lambda *_: escrita.append(True)
+    )
+
+    assert cli.main(["plan", "pedido"]) == 1
+    saida = capsys.readouterr().out
+    assert "P01" in saida
+    assert "P02" in saida
+    assert "autodev/modulo.py" in saida
+    assert escrita == []
