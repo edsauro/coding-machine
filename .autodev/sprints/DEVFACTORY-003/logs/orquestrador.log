@@ -48,3 +48,7 @@
 [00:05:01] P02: revisao por hermes [reserva (hermes/deepseek-flash) — falhou antes: agy: CODEX_QUOTA] -> REQUEST_CHANGES (7 findings)
 [00:05:01] P02: agy FORA desta rodada (cota esgotada)
 [00:05:01] P02 tentativa 2: codex gpt-5.6-terra/low
+[00:07:24] P02 t2: 48,863 tokens (codex-cli:rodape)
+[00:07:26] P02: testes exit=0 passed=5 failed=0 (configurado)
+[00:10:37] P02: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (6 findings)
+[00:10:37] P02 tentativa 3: codex gpt-5.6-sol/low

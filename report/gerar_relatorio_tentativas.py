@@ -214,6 +214,32 @@ def carrega() -> tuple[dict, dict, dict]:
                              and (l["failure_class"] or "") not in CLASSES_INFRA)
                 notas.append(f"{nota} (chamadas {a}–{b})")
             maximo = max(c)
+            # ---- custo: medido (tokens reais) × estimado (régua do modelo) e,
+            # dentro dele, ESPERADO × RETRABALHO. `esperado` = custo da PRIMEIRA
+            # chamada do pacote (a tentativa de acertar de primeira); `retrabalho` =
+            # todo o resto — cada chamada extra existe porque a anterior não passou.
+            # O múltiplo daqui é em DINHEIRO; o da Tabela 1 é em contagem de
+            # reprovações, então os dois não têm de coincidir.
+            primeira = min(c)
+            pri = [l for l in linhas_do_pacote if l["attempt"] == primeira]
+            resto = [l for l in linhas_do_pacote if l["attempt"] != primeira]
+
+            def _custo(ls) -> tuple[float, float, int, int]:
+                """(US$ medido, US$ estimado, tokens medidos, chamadas) de um grupo."""
+                med = sum(l["tokens_total"] or 0 for l in ls) * USD_POR_TOKEN
+                est = sum(_regua(l) for l in ls
+                          if l["tokens_total"] is None) * USD_POR_TOKEN
+                return med, est, sum(l["tokens_total"] or 0 for l in ls), len(ls)
+
+            e_med, e_est, e_tok, e_n = _custo(pri)
+            r_med, r_est, r_tok, r_n = _custo(resto)
+            _sobra = (e_med + e_est + r_med + r_est) - (
+                sum(l["tokens_total"] or 0 for l in linhas_do_pacote) * USD_POR_TOKEN
+                + sum(_regua(l) for l in linhas_do_pacote
+                      if l["tokens_total"] is None) * USD_POR_TOKEN)
+            if abs(_sobra) > 1e-9:      # esperado + retrabalho TEM de dar o total
+                raise AssertionError(
+                    f"custo de {sprint}/{tid} não fecha: sobra {_sobra:.6f} US$")
             resumo_pacotes.append({
                 "sprint": sprint, "task": tid, "chamadas": sum(c.values()),
                 "max_tentativa": maximo, "min_tentativa": min(c),
@@ -240,6 +266,13 @@ def carrega() -> tuple[dict, dict, dict]:
                                   for l in linhas_do_pacote) * USD_POR_TOKEN,
                 "usd_estimado": sum(_regua(l) for l in linhas_do_pacote
                                     if l["tokens_total"] is None) * USD_POR_TOKEN,
+                # esperado (1ª chamada) × retrabalho (2ª em diante), em US$ e em chamadas
+                "chamadas_esperado": e_n, "tokens_esperado": e_tok,
+                "usd_esperado": e_med + e_est, "usd_esperado_medido": e_med,
+                "usd_esperado_estimado": e_est,
+                "chamadas_retrabalho": r_n, "tokens_retrabalho": r_tok,
+                "usd_retrabalho": r_med + r_est, "usd_retrab_medido": r_med,
+                "usd_retrab_estimado": r_est,
             })
 
     # ---- outros agentes (não são chamadas do Codex) ---------------------------
@@ -412,35 +445,49 @@ def desenha_custo(dados: dict) -> Path:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
+    # O título tem "US$" várias vezes e o matplotlib interpreta `$...$` como
+    # matemática (ParseException no desenho). Aqui os cifrões são literais.
+    plt.rcParams["text.parse_math"] = False
 
     pacotes = [p for p in dados["pacotes"] if p["chamadas"]]
     pacotes.sort(key=lambda p: (p["sprint"], p["task"]))
     sprints = sorted({p["sprint"] for p in pacotes})
     cores = dict(zip(sprints, ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]))
 
-    med = [p["usd_medido"] for p in pacotes]
-    est = [p["usd_estimado"] for p in pacotes]
-    total = sum(med) + sum(est)
+    total = sum(p["usd_esperado"] + p["usd_retrabalho"] for p in pacotes)
+    esp = sum(p["usd_esperado"] for p in pacotes)
+    ret = sum(p["usd_retrabalho"] for p in pacotes)
     rotulos = [f"{p['sprint'].split('-')[-1]}/{p['task']}" for p in pacotes]
+    AZUL, VERM = "#1f77b4", "#c62828"      # esperado × retrabalho
 
-    fig, ax = plt.subplots(figsize=(13.5, 5.8))
+    fig, ax = plt.subplots(figsize=(13.5, 6.4))
     for i, p in enumerate(pacotes):
-        ax.bar(i, p["usd_medido"], width=0.74, color=cores[p["sprint"]],
-               edgecolor="white", linewidth=0.5, zorder=3)
-        if p["usd_estimado"]:
-            ax.bar(i, p["usd_estimado"], bottom=p["usd_medido"], width=0.74,
-                   color="#e8e8e8", edgecolor=cores[p["sprint"]], linewidth=0.8,
-                   hatch="////", zorder=3)
-        valor = p["usd_medido"] + p["usd_estimado"]
+        base = 0.0
+        # DUAS leituras na mesma barra: a COR diz se o dinheiro era esperado (1ª
+        # chamada) ou retrabalho (2ª em diante); o PADRÃO diz se aquele pedaço foi
+        # MEDIDO pelo motor (sólido) ou estimado pela régua (hachurado).
+        for usd_med, usd_est, cor in (
+                (p["usd_esperado_medido"], p["usd_esperado_estimado"], AZUL),
+                (p["usd_retrab_medido"], p["usd_retrab_estimado"], VERM)):
+            if usd_med:
+                ax.bar(i, usd_med, bottom=base, width=0.74, color=cor,
+                       edgecolor="white", linewidth=0.5, zorder=3)
+                base += usd_med
+            if usd_est:
+                ax.bar(i, usd_est, bottom=base, width=0.74, color="#f2f2f2",
+                       edgecolor=cor, linewidth=0.9, hatch="////", zorder=3)
+                base += usd_est
+        valor = p["usd_esperado"] + p["usd_retrabalho"]
         if valor:
             ax.text(i, valor + (total * 0.012 if total else 0.002),
                     f"{valor:.3f}".replace(".", ","),
                     ha="center", va="bottom", fontsize=6.4, color="#333333", zorder=4)
 
-    alto = max((m + e for m, e in zip(med, est)), default=0.05)
+    alto = max((p["usd_esperado"] + p["usd_retrabalho"] for p in pacotes), default=0.05)
     for s in sprints:
         idx = [i for i, p in enumerate(pacotes) if p["sprint"] == s]
-        gasto = sum(med[i] + est[i] for i in idx)
+        gasto = sum(pacotes[i]["usd_esperado"] + pacotes[i]["usd_retrabalho"]
+                    for i in idx)
         # Rótulo do sprint ABAIXO do eixo (transform do eixo x): dentro da área ele
         # brigava com os rótulos de valor das barras. O gráfico 1 usa o mesmo recurso.
         ax.text(sum(idx) / len(idx), -0.17, f"{s.split('-')[-1]}\nUS$ {gasto:.2f}",
@@ -449,22 +496,31 @@ def desenha_custo(dados: dict) -> Path:
 
     ax.set_xticks(range(len(pacotes)))
     ax.set_xticklabels(rotulos, fontsize=8)
-    ax.set_ylabel("custo estimado (US$)", fontsize=10.5)
+    ax.set_ylabel("custo estimado (US$) — azul: esperado · vermelho: retrabalho",
+                  fontsize=10)
     ax.set_title(
-        f"Coding_Machine — custo estimado por pacote do backlog (assinatura US$ 20/mês)\n"
-        f"total estimado US$ {total:.2f} em {dados['total_codex']} chamadas do Codex · "
-        f"{MEDIDAS.get('chamadas_medidas', 0)} delas com token MEDIDO (sólido) e "
-        f"o resto estimado (hachurado)", fontsize=12, pad=14)
+        "Coding_Machine — custo por pacote: esperado (1ª chamada) × retrabalho\n"
+        f"assinatura US$ 20/mês · total estimado US$ {total:.2f} em "
+        f"{dados['total_codex']} chamadas do Codex: esperado US$ {esp:.2f} "
+        f"({100 * esp / total:.0f}%) · retrabalho US$ {ret:.2f} "
+        f"({100 * ret / total:.0f}%"
+        + (f", ×{total / esp:.1f} sobre o esperado)" if esp else ")"),
+        fontsize=12, pad=14)
     ax.grid(axis="y", alpha=0.25, zorder=0)
     ax.set_axisbelow(True)
     for lado in ("top", "right"):
         ax.spines[lado].set_visible(False)
     ax.set_ylim(0, alto * 1.32)
     ax.legend(handles=[
-        Patch(facecolor="#1f77b4", edgecolor="white", label="medido (rodapé do Codex)"),
-        Patch(facecolor="#e8e8e8", edgecolor="#555555", hatch="////",
-              label="estimado (chamada sem medição)")],
-        loc="upper left", fontsize=8.5, framealpha=0.95)
+        Patch(facecolor=AZUL, edgecolor="white",
+              label="esperado (1ª chamada) — medido"),
+        Patch(facecolor="#f2f2f2", edgecolor=AZUL, hatch="////",
+              label="esperado (1ª chamada) — estimado"),
+        Patch(facecolor=VERM, edgecolor="white",
+              label="retrabalho (2ª em diante) — medido"),
+        Patch(facecolor="#f2f2f2", edgecolor=VERM, hatch="////",
+              label="retrabalho (2ª em diante) — estimado")],
+        loc="upper left", fontsize=8, framealpha=0.95)
 
     destino = OUT / "custo-por-pacote.png"
     fig.savefig(destino, dpi=170, bbox_inches="tight")
@@ -609,6 +665,30 @@ def escreve_relatorio(dados: dict) -> Path:
     # ---- custo: os números do texto saem da MESMA agregação do gráfico 3 ------
     custo_total = sum(p["usd_medido"] + p["usd_estimado"] for p in d["pacotes"])
     custo_medido = sum(p["usd_medido"] for p in d["pacotes"])
+    # esperado × retrabalho — mesma agregação que colore o gráfico 3
+    custo_esp = sum(p["usd_esperado"] for p in d["pacotes"])
+    custo_ret = sum(p["usd_retrabalho"] for p in d["pacotes"])
+    n_esp = sum(p["chamadas_esperado"] for p in d["pacotes"])
+    n_ret = sum(p["chamadas_retrabalho"] for p in d["pacotes"])
+    mult_dinheiro = (custo_total / custo_esp) if custo_esp else 0.0
+    _br = lambda v: f"{v:.2f}".replace(".", ",")          # US$ no padrão pt-BR
+    _br1 = lambda v: f"{v:.1f}".replace(".", ",")
+    pct_esp = f"{100 * custo_esp / custo_total:.0f}%" if custo_total else "—"
+    pct_ret = f"{100 * custo_ret / custo_total:.0f}%" if custo_total else "—"
+    _piores = sorted((p for p in d["pacotes"] if p["usd_retrabalho"] > 0),
+                     key=lambda p: -p["usd_retrabalho"])[:6]
+    bloco_piores = (
+        "Pacotes que mais gastaram insistindo:\n\n"
+        "| pacote | sprint | chamadas | esperado (US$) | retrabalho (US$) | múltiplo |\n"
+        "|---|---|---|---|---|---|\n"
+        + "\n".join(
+            f"| {p['task']} | {p['sprint'].split('-')[-1]} | {p['chamadas']} | "
+            f"{p['usd_esperado']:.3f} | {p['usd_retrabalho']:.3f} | "
+            f"{(p['usd_esperado'] + p['usd_retrabalho']) / p['usd_esperado']:.1f}x |"
+            .replace(".", ",")
+            for p in _piores)
+        + f"\n\nEm chamadas: **{n_esp}** foram a tentativa de acertar de primeira e "
+          f"**{n_ret}** foram retrabalho.")
     _top = sorted(d["pacotes"], key=lambda p: -(p["usd_medido"] + p["usd_estimado"]))[:3]
     top_custo_txt = "; ".join(
         f"**{p['task']}** (sprint {p['sprint'].split('-')[-1]}) US$ "
@@ -794,9 +874,23 @@ degrau barato quando a falha foi de infraestrutura/harness. A tabela 3 dá a med
 lado pesa: os pacotes que aprovaram até a 3ª chamada mostram quanto trabalho se resolve sem
 sair do degrau mais barato.
 
-## Gráfico 3 — custo estimado por pacote
+## Gráfico 3 — custo por pacote: esperado × retrabalho
 
-![Custo estimado por pacote do backlog: barra sólida é o token medido, hachurada é a estimativa](report/custo-por-pacote.png)
+![Custo por pacote: azul = esperado (1ª chamada), vermelho = retrabalho; sólido = token medido pelo motor, hachurado = estimativa](report/custo-por-pacote.png)
+
+**Duas leituras na mesma barra.** A **cor** diz se o dinheiro era **esperado** (a 1ª chamada
+do pacote, a tentativa de acertar de primeira) ou **retrabalho** (da 2ª em diante: cada
+chamada extra existe porque a anterior não passou). O **padrão** diz se aquele pedaço foi
+**medido** pelo motor (sólido) ou **estimado** pela régua do modelo (hachurado).
+
+**Esperado × retrabalho.** Do total de US$ {_br(custo_total)}, **US$ {_br(custo_esp)}
+({pct_esp}) era esperado** e **US$ {_br(custo_ret)} ({pct_ret}) é retrabalho** — o mesmo
+backlog custaria **×{_br1(mult_dinheiro)} menos** se todo pacote passasse de primeira. O
+múltiplo aqui é em **dinheiro**; o da Tabela 1 é em **contagem de reprovações**, e os dois
+não têm de coincidir (pacote que reprova muito com modelo barato pesa pouco em dólar, e
+vice-versa).
+
+{bloco_piores}
 
 **O que é medido e o que é estimado.** O motor só começou a gravar tokens em 28/09 (P-10,
 lendo o rodapé do Codex): **{cobertura}** têm token medido. A parte **sólida** da barra é
@@ -811,10 +905,11 @@ ponto da janela semanal**; a régua medida é 118.096 tokens por ponto → **US$
 milhão de tokens**. Pela janela de 5h a leitura daria US$ 0,37/Mtok (as duas estão no
 relatório de eficiência; a semanal é a que limita).
 
-**Total estimado: US$ {custo_total:.2f}** para as {total} chamadas do Codex — sendo
-**US$ {custo_medido:.2f} de token medido** e o resto estimativa. Os pacotes mais caros:
-{top_custo_txt}. A sprint 001 não entra no gráfico: os 15 pacotes dela são registro
-retroativo, sem chamada de API (só o T15 tem uma chamada, e sem token).
+**Total estimado: US$ {_br(custo_total)}** para as {total} chamadas do Codex — sendo
+**US$ {_br(custo_medido)} de token medido** e o resto estimativa. Os pacotes mais caros:
+{top_custo_txt}. Da sprint 001 aparece só o **T15**: os outros 14 pacotes dela são registro
+retroativo, sem chamada de API — e a única chamada do T15 não tem token medido, então o
+valor dela é estimativa da régua, não medição.
 
 ## Objetivos dos pacotes (todas as sprints planejadas até agora)
 

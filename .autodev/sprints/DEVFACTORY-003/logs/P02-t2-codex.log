@@ -1,0 +1,121 @@
+# exit_code=0 duracao=143.6s modelo=gpt-5.6-terra effort=low failure_class=None tokens=48863(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P02: Barrar colisao na mesma onda no validador do motor
+
+## Criterios de aceitacao (todos obrigatorios)
+- valida_dag em autodev/config.py recusa DAG com duas tasks na mesma onda citando o mesmo arquivo, citando os ids e o caminho
+- a recusa alcanca o comando autodev init, que ja chama valida_dag
+- plano com o mesmo arquivo em ondas diferentes continua valido (aviso, nao erro)
+- os testes ficam em .autodev/tests/test_plan_guarda.py e rodam com python3 -m pytest .autodev/tests/test_plan_guarda.py -q
+- estende autodev/config.py preservando valida_dag, ordem_topologica e carga_dag existentes, sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+so preservando os dois registros — ou aplicar a mesma allowlist ja usada no caminho do plano. Sem isso, reexecutar 'autodev init' num sprint existente quebra."}, {"severidade": "media", "arquivo": "autodev/config.py", "linha": 239, "descricao": "A normalizacao de caminho e inefetiva e a guarda e burlavel por notacao equivalente. '.replace(\"\\\\\", \"/\")' e codigo morto: as classes do regex ([\\w.-], [\\w-]) nunca casam '\\', entao nenhum match pode conter barra invertida (confirmado empiricamente: em 'autodev\\\\config.py' o match e apenas 'config.py'). E, ao contrario de planner._arquivos_da_task (planner.py:234-240, que faz texto.replace antes e _normalizar_caminho com PurePosixPath), o validador nao remove './'. Medido: P01 './autodev/config.py' + P02 'autodev/config.py' na mesma onda -> [] (nao detecta); P01 'autodev\\\\config.py' + P02 'autodev/config.py' -> [] (nao detecta); P01 'AUTODEV/config.py' + P02 'autodev/config.py' -> [] (nao detecta). O mesmo caso com './' e detectado pela regra da P01 no caminho do plano, ou seja, duas regras irmas discordam sobre o mesmo par de tasks.", "correcao_sugerida": "Reusar a normalizacao existente antes de casar o texto (texto.replace('\\\\','/') no criterio, nao no match) e aplicar a mesma _normalizar_caminho (strip de './' e barra inicial) — de preferencia importando a implementacao da P01 em vez de reescrever."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 233, "descricao": "Duplicacao literal: o regex de caminho adicionado e byte-a-byte igual a planner._ARQUIVO (planner.py:20-23), ja existente no mesmo repo desde a P01. Agora ha duas fontes de verdade para a mesma deteccao, com semantica divergente (a do planner considera arquivos de teste como colisao em QUALQUER onda e inclui o campo 'teste'; a nova so olha 'criterios' e so a mesma onda).", "correcao_sugerida": "Importar/reusar planner._ARQUIVO (ou mover o regex e a normalizacao para autodev/config.py e fazer o planner consumir dela), deixando uma unica definicao do que e 'arquivo citado'."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 251, "descricao": "O calculo de ondas reimplementa ordem_topologica (config.py:285-296) em vez de chama-la, e diverge no caso de falha: ordem_topologica levanta ValueError('DAG com ciclo — nenhuma onda progressa'); a copia faz 'break'. Com deps apontando para id inexistente, o subgrafo inteiro fica fora de qualquer onda e as colisoes dessas tasks nao sao checadas (falso negativo silencioso).", "correcao_sugerida": "Chamar 'ondas = ordem_topologica({\"tasks\": tasks})' dentro de try/except ValueError (o ciclo ja vira erro em valida_dag), eliminando a copia do algoritmo."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_guarda.py", "linha": 25, "descricao": "test_valida_dag_mantem_arquivo_em_ondas_diferentes_como_aviso promete um 'aviso' no nome, mas so assere 'erros == []' (linha 31); nada no arquivo verifica que algum aviso e emitido em algum caminho. Metade do criterio 3 ('aviso') nao esta coberta por este teste — o aviso existe em planner.avisos_de_colisao_de_arquivo, exercitado apenas indiretamente pelos testes da P01.", "correcao_sugerida": "Ou asserir explicitamente o aviso (planner.avisos_de_colisao_de_arquivo / saida de 'autodev plan') num teste deste arquivo, ou renomear o teste para o que ele realmente prova ('...continua_valido_sem_erro')."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 262, "descricao": "Numeracao de onda inconsistente com a saida do proprio comando: a nova mensagem usa 'enumerate(ondas, start=1)' ('onda 1'), enquanto cmd_init imprime as ondas com base 0 ('onda 0: P01, P02', cli.py:61-64) e o planner._ondas_por_task usa base 1 (planner.py:276-280). O autor ve 'onda 1' no erro e 'onda 0' no DAG valido do mesmo comando.", "correcao_sugerida": "Padronizar a base (usar a mesma que cli.cmd_init imprime, ou converter na hora de imprimir) para o numero do erro ser localizavel na saida do comando."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_guarda.py
+  - autodev/config.py
+
+## INSTRUCAO
+Esta e a tentativa #2.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-terra/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+RESULTADO: centralizada a extração/normalização de caminhos entre planejador e validador; colisões na mesma onda agora detectam `./` e `\`, usam `ordem_topologica`, e há testes para aviso entre ondas | TESTES: `python3 -m pytest .autodev/tests/test_plan_guarda.py -q` — não executou: `pytest` ausente; verificações diretas e integração `autodev init`: OK
+
+===== STDERR =====
+
