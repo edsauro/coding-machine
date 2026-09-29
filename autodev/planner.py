@@ -16,11 +16,6 @@ from .plan_prompt import montar_prompt_plano
 
 PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
 
-# Referências textuais: o arquivo pode ainda ser criado pela sprint.
-_ARQUIVO = re.compile(
-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
-    r"|\b(?:Makefile|Dockerfile)\b"
-)
 _COMANDO_TESTE = re.compile(
     r"\b(?:pytest|(?:python(?:3)?\s+-m\s+unittest)|"
     r"(?:npm|pnpm|yarn)\s+(?:run\s+)?test|"
@@ -233,20 +228,12 @@ def _construir_task(dados: object) -> TaskPlano:
 
 def _arquivos_da_task(task: TaskPlano) -> set[str]:
     """Extrai todos os caminhos mencionados nos critérios e no teste."""
-    textos = [*task.criterios, task.teste]
-    return {
-        _normalizar_caminho(caminho.group(0))
-        for texto in textos
-        for caminho in _ARQUIVO.finditer(texto.replace("\\", "/"))
-    }
+    return config.arquivos_citados([*task.criterios, task.teste])
 
 
 def _normalizar_caminho(caminho: str) -> str:
     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
-    caminho = caminho.replace("\\", "/")
-    while caminho.startswith("./"):
-        caminho = caminho[2:]
-    return PurePosixPath(caminho).as_posix().lstrip("/")
+    return config.normalizar_caminho(caminho)
 
 
 def arquivo_de_teste(caminho: str) -> bool:
@@ -296,6 +283,8 @@ def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
             for arquivo in sorted(
                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
             ):
+                if config.registro_compartilhado(arquivo):
+                    continue
                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
                     colisoes.append({
                         "task_a": task_a.id,
@@ -317,12 +306,12 @@ def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
             onda_a = onda_por_task[task_a.id]
             onda_b = onda_por_task[task_b.id]
-            if onda_a == onda_b:
-                continue
             for arquivo in sorted(
                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
             ):
-                if not arquivo_de_teste(arquivo):
+                if config.registro_compartilhado(arquivo) or (
+                    onda_a != onda_b and not arquivo_de_teste(arquivo)
+                ):
                     avisos.append({
                         "task_a": task_a.id,
                         "task_b": task_b.id,
@@ -390,7 +379,7 @@ def validar_e_ordenar(plano: Plano) -> list[list[str]]:
         for indice, criterio in enumerate(task.criterios, start=1):
             palavras = set(re.findall(r"\w+", criterio.casefold()))
             if (palavras.intersection(PALAVRAS_VAGAS)
-                    and not _ARQUIVO.search(criterio)
+                    and not config._ARQUIVO.search(criterio)
                     and not _COMANDO_TESTE.search(criterio)):
                 erros.append(
                     f"task {task.id}: critério {indice} vago; "
