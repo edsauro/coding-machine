@@ -231,6 +231,55 @@ def _construir_task(dados: object) -> TaskPlano:
     return TaskPlano(**campos)
 
 
+def _arquivos_da_task(task: TaskPlano) -> set[str]:
+    """Extrai os caminhos mencionados nos critérios e no comando de teste."""
+    textos = [*task.criterios, task.teste]
+    return {caminho.group(0) for texto in textos for caminho in _ARQUIVO.finditer(texto)}
+
+
+def _arquivo_de_teste(caminho: str) -> bool:
+    """Identifica caminhos de teste pelos diretórios e convenções usuais."""
+    nome = Path(caminho).name.casefold()
+    partes = {parte.casefold() for parte in Path(caminho).parts}
+    return "tests" in partes or "test" in partes or nome.startswith("test_") or nome.endswith("_test.py")
+
+
+def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+    """Retorna arquivos editados por mais de uma task no mesmo plano.
+
+    Arquivos de produção só colidem quando as tasks estão na mesma onda;
+    arquivos de teste sempre colidem, pois a escrita concorrente os sobrescreve.
+    """
+    try:
+        ondas = config.ordem_topologica({"tasks": [
+            {"id": task.id, "deps": task.deps} for task in plano.tasks
+        ]})
+    except ValueError:
+        # O validador principal reporta ciclos; não esconda esse erro com uma
+        # exceção secundária ao tentar calcular as ondas.
+        return []
+    onda_por_task = {
+        task_id: indice + 1
+        for indice, onda in enumerate(ondas)
+        for task_id in onda
+    }
+    arquivos = {task.id: _arquivos_da_task(task) for task in plano.tasks}
+    colisoes: list[dict[str, str | int]] = []
+    for indice, task_a in enumerate(plano.tasks):
+        for task_b in plano.tasks[indice + 1:]:
+            for arquivo in sorted(arquivos[task_a.id] & arquivos[task_b.id]):
+                onda_a = onda_por_task.get(task_a.id)
+                onda_b = onda_por_task.get(task_b.id)
+                if _arquivo_de_teste(arquivo) or onda_a == onda_b:
+                    colisoes.append({
+                        "task_a": task_a.id,
+                        "task_b": task_b.id,
+                        "arquivo": arquivo,
+                        "onda": onda_a if onda_a is not None else onda_b,
+                    })
+    return colisoes
+
+
 def validar_plano(plano: Plano) -> list[str]:
     """Retorna todos os problemas estruturais encontrados no plano."""
     erros: list[str] = []
@@ -265,6 +314,11 @@ def validar_plano(plano: Plano) -> list[str]:
     for task_id in grafo:
         if estado[task_id] == 0:
             visita(task_id)
+    for colisao in colisoes_de_arquivo(plano):
+        erros.append(
+            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
+            f"{colisao['arquivo']} (onda {colisao['onda']})"
+        )
     return erros
 
 
