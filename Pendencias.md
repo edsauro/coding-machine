@@ -65,6 +65,25 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Cuidado de cota:** a franquia **semanal** do Codex está em **85%** (reset 04/10
   00:22) — o A/B com N≥3 consome muitas chamadas; começar depois do reset.
 
+### P-14 · A espera de cota não sabe QUAL janela esgotou — **agente**
+- **O que é:** quando o Codex recusa por cota, o motor grava a espera com prazo **fixo** de
+  5h10m (`18600s`) e volta a tentar. Em 29/09 01:50 a janela de **5h** estava em ~30% e quem
+  havia estourado era a **semanal** (97%, renovação 04/10 00:22) — a espera apontou para
+  **07:00**, ou seja: vai acordar, falhar e re-esperar 5h10m, ~19 vezes até domingo. Não gasta
+  token (a recusa é do CLI, antes do modelo), mas acorda o vigia a cada ciclo (um aviso no
+  Telegram por ciclo) e escreve uma previsão de retomada errada no log e no `status`.
+- **Medido:** `sqlite3 .autodev/state.db "SELECT datetime(detectado_em,'unixepoch','localtime'), datetime(retry_after,'unixepoch','localtime') FROM resource_waits WHERE sprint_id='DEVFACTORY-003'"` → 29/09 01:50 → **29/09 07:00**; a leitura da cota (`ler_cota.py`) dá 5h 30% / semanal 97%. O Codex publica
+  as duas janelas (`primary` = 5h, `secondary` = 7 dias) com `usedPercent` e `resetsAt`.
+- **Caminhos:** `autodev/state.py` (gravação/leitura de `resource_waits`), onde a cota é lida
+  (`autodev/cli.py quota` — mesma fonte que o `quota` usa), `.autodev/config/policies.yaml`
+  (o prazo fixo de 5h10m).
+- **Pronto quando:** a espera mirar a janela que **realmente** esgotou — ler qual das duas
+  está no limite e usar o `resetsAt` dela, com margem; cair no prazo fixo só se a leitura
+  falhar. Teste: semanal esgotada + 5h folgada ⇒ `retry_after` = reset da semanal.
+- **Hoje:** a 003 parou exatamente nesse estado (P06 em `WAITING_RESOURCE`, retry 07:00).
+  Não implementei: mudar o motor fora do plano revisado não é o combinado — este texto é a
+  proposta.
+
 _P-12 e P-13 encerradas em 29/09 — estão no histórico de resolvidas acima._
 
 ---
