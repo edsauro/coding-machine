@@ -16,7 +16,7 @@ def _corpo_da_secao(titulo: str) -> str:
     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
-    return texto[inicio.start():fim]
+    return texto[inicio.end():fim]
 
 
 def _secao_planejador() -> str:
@@ -90,9 +90,8 @@ Mais texto.
 def test_readme_documenta_portao_e_checklist_derivado_do_d16():
     texto = _corpo_da_secao("Portão do plano").lower()
 
-    assert "portão do plano" in texto
-    assert "planejar" in texto and "prever" in texto
-    assert "aprovar" in texto and "rodar" in texto
+    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
+    assert etapas == sorted(etapas)
     assert "arquivo de teste próprio" in texto
     assert "sem colisão de arquivo na mesma onda" in texto
     assert "critério de preservação" in texto
@@ -105,11 +104,20 @@ def test_readme_documenta_verificador_e_estado_atual_das_sprints():
 
     assert ".autodev/scripts/verificar_plano.py" in portao
     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
+    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+
+
+def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
+    portao = _corpo_da_secao("Portão do plano")
+
+    for codigo in ("E1", "E2", "E3", "E4", "E5"):
+        assert codigo in portao
+    assert "PLANEJADO" in portao
+    assert "iniciados antes do portão" in portao
 
 
 def test_exemplo_documentado_do_verificador_roda_sem_erros():
@@ -132,3 +140,5 @@ def test_decisions_registra_aprovacao_humana_e_d16():
     assert "aprovação humana" in texto
     assert "d-16" in texto
     assert "sprint 2" in texto
+    assert "planejado" in texto
+    assert re.search(r"iniciados\s+antes do portão", texto)

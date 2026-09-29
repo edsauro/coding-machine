@@ -68,6 +68,10 @@ def test_arvore_completa_de_titulos_preserva_niveis_ordem_e_parentesco():
     assert _titulos() == TITULOS_ESPERADOS
 
 
+def test_seguranca_mantem_separador_entre_secoes():
+    assert "\n---\n\n## Segurança\n" in _texto()
+
+
 def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
     for titulo, arquivo in (
         ("Como rodar", "como_rodar.md"),

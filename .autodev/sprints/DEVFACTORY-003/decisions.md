@@ -9,10 +9,12 @@ demonstrou que a validação estrutural não basta para garantir um plano seguro
 inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
 reprovações e tasks bloqueadas.
 
-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
-alteração posterior no DAG invalida a aprovação.
+**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
+rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
+qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
+antes do portão continuam retomáveis sem o registro, para preservar execuções
+legadas.
 
 **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
-agente.
+rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
+execução ou cota de agente.

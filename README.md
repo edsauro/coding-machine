@@ -187,8 +187,9 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 ## Estado atual
 
 - Para medir a contagem atual da suíte do orquestrador, rode
-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
+  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
+  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
+  interpretador do projeto. O resumo do comando informa a contagem vigente.
 - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
   `status:` do `sprint.yaml` é apenas declaração de intenção.
@@ -220,8 +221,10 @@ O projeto-fixture é gerado e não é versionado:
 
 Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
 plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
+com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
+um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
+retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
+portão e exige nova aprovação.
 
 O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
 
@@ -233,8 +236,11 @@ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
 - todo critério cita um **arquivo ou comando** concreto e verificável;
 - uma task que estende módulo de outra depende dela, direta ou transitivamente.
 
-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
-aviso; preservação e dependência exigem julgamento na aprovação humana.
+O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
+dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
+teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
+da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
+exigem julgamento na aprovação humana.
 Execute-o antes da aprovação:
 
 ```bash
@@ -243,6 +249,8 @@ python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
 
 Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
 direto para `dag.json` ou `--todos` para verificar todos os planos.
+
+---
 
 ## Segurança
 
