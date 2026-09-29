@@ -302,6 +302,8 @@
    "tem_modelo_antigo": true,
    "findings": 33,
    "commit_final": "9b6d4989ecb68048e4b953c9f37b56a95d1c8af7",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "28/09 22:58",
    "fim": "28/09 23:46"
   },
@@ -381,6 +383,8 @@
    "tem_modelo_antigo": true,
    "findings": 24,
    "commit_final": "1d07438884a45f738c301f46ca74c87a939a2650",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "28/09 23:56",
    "fim": "29/09 00:17"
   },
@@ -433,6 +437,8 @@
    "tem_modelo_antigo": false,
    "findings": 4,
    "commit_final": "fe605222182a950c51d1e0c684a984ae7a1cf65c",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "29/09 00:28",
    "fim": "29/09 00:28"
   },
@@ -503,6 +509,8 @@
    "tem_modelo_antigo": false,
    "findings": 15,
    "commit_final": "a8b060629d97ebf93565342d832bf00f34fcdec8",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "29/09 00:34",
    "fim": "29/09 00:48"
   },
@@ -591,6 +599,8 @@
    "tem_modelo_antigo": true,
    "findings": 28,
    "commit_final": "7a4c701725de7f36f4b213493c00221119799ac7",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "29/09 00:55",
    "fim": "29/09 01:40"
   },
@@ -661,6 +671,8 @@
    "tem_modelo_antigo": false,
    "findings": 0,
    "commit_final": "1dfc1b7ebb7aea2bfda5a1c9bb72d5f682a7f07d",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "29/09 01:50",
    "fim": "29/09 08:01"
   },
@@ -740,6 +752,8 @@
    "tem_modelo_antigo": false,
    "findings": 29,
    "commit_final": "0234d788c346b8eaed244ac10c4ca2f63b58757d",
+   "estrategia": "tres_degraus",
+   "executou_a_gravada": false,
    "inicio": "29/09 08:14",
    "fim": "29/09 08:51"
   },
@@ -830,6 +844,8 @@
    "tem_modelo_antigo": true,
    "findings": 15,
    "commit_final": "00fc3a433f36a9351ffe7cd36dd75ae80c081937",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "28/09 14:19",
    "fim": "28/09 14:54"
   },
@@ -882,6 +898,8 @@
    "tem_modelo_antigo": false,
    "findings": 3,
    "commit_final": "cfe28c50ce600f38b364bfc07a0517a7076ebd2d",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "28/09 15:30",
    "fim": "28/09 15:30"
   },
@@ -961,6 +979,8 @@
    "tem_modelo_antigo": true,
    "findings": 17,
    "commit_final": "852344d100e724708d88f010581506ca8588517b",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "28/09 15:37",
    "fim": "28/09 19:43"
   },
@@ -1051,6 +1071,8 @@
    "tem_modelo_antigo": true,
    "findings": 21,
    "commit_final": "3fada305165b9b1f461694f9f925c62c388680a1",
+   "estrategia": "escada_5",
+   "executou_a_gravada": true,
    "inicio": "28/09 14:30",
    "fim": "28/09 15:17"
   }

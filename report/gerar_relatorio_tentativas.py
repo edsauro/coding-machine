@@ -73,6 +73,30 @@ MEDIDAS: dict = {}       # preenchido em carrega(): as réguas usadas na estimat
 ESCADA_ATUAL = {("gpt-5.6-luna", "low"), ("gpt-5.6-terra", "low"),
                 ("gpt-5.6-sol", "low"), ("gpt-6-astra", "low")}
 
+# ---- estratégia de alocação (P-15) -------------------------------------------------
+# Os "3 degraus" têm só dois pares: 1º luna/low, 2º astra/low, 3º luna/low de novo. É a
+# régua para checar se uma task GRAVADA como `tres_degraus` andou mesmo nela.
+ESCADA_3 = {("gpt-5.6-luna", "low"), ("gpt-6-astra", "low")}
+NOME_ESTRATEGIA = {"escada_5": "escada 5 degraus", "tres_degraus": "3 degraus"}
+# versão para o rótulo do eixo x, onde cada pacote tem ~1,1 in de largura
+ROTULO_ESTRATEGIA = {"escada_5": "5 degraus", "tres_degraus": "3 degraus"}
+CORES_ESTRATEGIA = {"escada_5": "#8d99ae", "tres_degraus": "#e08a00"}
+
+
+def _executou_estrategia(estrategia: str | None, linhas) -> bool:
+    """As tentativas do pacote usaram MESMO a escada da estratégia gravada?
+
+    A `escada_5` é a escada completa (luna→terra→sol→astra→astra), então qualquer
+    sequência "cabe" nela — o teste que importa é o dos "3 degraus", onde só podem
+    aparecer `luna/low` e `astra/low`. O 003/P07 foi gravado como `tres_degraus` mas
+    rodou luna→terra→sol→astra→astra: o gráfico tem de dizer isso, não esconder atrás do
+    nome da estratégia.
+    """
+    pares = {f"{l['model'] or '-'}/{l['effort'] or '-'}" for l in linhas}
+    if estrategia == "tres_degraus":
+        return pares <= set(ESCADA_3)
+    return True
+
 
 def _fora_da_escada(linha) -> bool:
     return (linha["model"] or "", linha["effort"] or "") not in ESCADA_ATUAL
@@ -160,6 +184,13 @@ def carrega() -> tuple[dict, dict, dict]:
             ",".join("?" * len(SPRINTS))), SPRINTS)]
     titulos = {r["task_id"]: r["titulo"] for r in
                con.execute("SELECT task_id, titulo FROM tasks")}
+    # Estratégia de alocação gravada por task (P-15). É o que permite marcar, no gráfico
+    # e na tabela, quem rodou na escada de 5 degraus e quem está nos "3 degraus" — a
+    # coluna nasceu em 29/09 e as tasks com tentativa foram marcadas como `escada_5`.
+    # chave por (sprint, task): "P07" existe em 002, 003 e 004 e só o da 003 está nos
+    # "3 degraus" — com chave simples o 003/P07 herdava a estratégia de outro sprint.
+    estrategias = {f"{r['sprint_id']}|{r['task_id']}": r["estrategia"] for r in
+                   con.execute("SELECT sprint_id, task_id, estrategia FROM tasks")}
     con.close()
 
     # ---- barras: chamadas do Codex por pacote, empilhadas por tentativa --------
@@ -357,6 +388,14 @@ def carrega() -> tuple[dict, dict, dict]:
                                          for m in por_modelo.values()),
                 "findings": _nfind,
                 "commit_final": _commit_final,
+                # ---- estratégia de alocação (P-15) --------------------------------
+                # `estrategia` é o que está GRAVADO na task; `executou_a_gravada` diz se
+                # as tentativas andaram de fato na escada dela. Sem os dois, o gráfico
+                # mentiria a favor da estratégia nova ao mostrar o 003/P07 como "3
+                # degraus" — ele foi marcado nela, mas rodou a escada de 5.
+                "estrategia": (estrategias.get(f"{sprint}|{tid}") or "escada_5"),
+                "executou_a_gravada": _executou_estrategia(
+                    estrategias.get(f"{sprint}|{tid}") or "escada_5", linhas_do_pacote),
                 "inicio": (_d.fromtimestamp(min(_ts_pac)).strftime("%d/%m %H:%M")
                            if _ts_pac else ""),
                 "fim": (_d.fromtimestamp(max(_ts_pac)).strftime("%d/%m %H:%M")
@@ -712,15 +751,14 @@ def desenha_paineis(dados: dict) -> Path:
     x = range(len(pacotes))
     rotulos = []
     for p in pacotes:
-        if not p["commit_final"]:
-            marca = "· em andamento"
-        elif p["modelo_unico"]:
-            marca = "· 1 modelo"
-        else:
-            marca = f"· {p['modelos_distintos']} modelos"
-        if p["tem_modelo_antigo"]:
-            marca += " (antigo)"
-        rotulos.append(f"{p['sprint'].split('-')[-1]}/{p['task']}\n{marca}")
+        # o "modelo único" (★) e o modelo de matriz antiga (barra laranja) já têm marca
+        # visual nos painéis. O rótulo carrega o que NÃO aparece sem texto: em que
+        # ESTRATÉGIA DE ALOCAÇÃO o pacote está (a dúvida do autor, 29/09) e quantos
+        # modelos a tentativa usou.
+        rotulos.append(
+            f"{p['sprint'].split('-')[-1]}/{p['task']}\n· {p['modelos_distintos']} modelos\n"
+            f"{ROTULO_ESTRATEGIA.get(p['estrategia'], p['estrategia'])}"
+            + ("" if p["executou_a_gravada"] else " *"))
 
     fig, eixos = plt.subplots(4, 1, figsize=(13.5, 17.5), sharex=True,
                               gridspec_kw={"height_ratios": [1, 1.05, 1, 1.05]})
@@ -838,10 +876,36 @@ def desenha_paineis(dados: dict) -> Path:
         for lado in ("top", "right"):
             ax_.spines[lado].set_visible(False)
         ax_.set_xlim(-0.7, len(pacotes) - 0.3)
+
+    # ---- faixas de ESTRATÉGIA (P-15) --------------------------------------------
+    # O autor não conseguia dizer, olhando o gráfico, quais pacotes estavam nos "3
+    # degraus" e quais na escada antiga. Faixa de fundo por grupo de tasks E o nome no
+    # rótulo de cada pacote: duas leituras, sem depender de legenda.
+    _grupos, _ini = [], 0
+    for _i in range(1, len(pacotes) + 1):
+        if _i == len(pacotes) or pacotes[_i]["estrategia"] != pacotes[_ini]["estrategia"]:
+            _grupos.append((_ini, _i - 1, pacotes[_ini]["estrategia"]))
+            _ini = _i
+    for _i0, _i1, _esc in _grupos:
+        for ax_ in eixos:
+            ax_.axvspan(_i0 - 0.45, _i1 + 0.45,
+                        color=CORES_ESTRATEGIA.get(_esc, "#cccccc"),
+                        alpha=0.11, zorder=0, linewidth=0)
+    eixos[3].text(0.0, -0.30,
+                  "* = task marcada nessa estratégia, mas as tentativas rodaram a escada "
+                  "antiga (a troca de código não valeu para a rodada em curso)",
+                  transform=eixos[3].transAxes, fontsize=6.8, color="#555555", va="top")
+
     eixos[1].legend(handles=[Patch(facecolor=CORES_MODELO.get(k, "#7f7f7f"), label=k,
                                    edgecolor="white")
                              for k in modelos] +
-                            [Patch(facecolor="#f4f4f4", edgecolor="#555555",
+                            [Patch(facecolor=CORES_ESTRATEGIA["tres_degraus"], alpha=0.35,
+                                   edgecolor="#b06f00",
+                                   label="faixa: estratégia dos 3 degraus"),
+                             Patch(facecolor=CORES_ESTRATEGIA["escada_5"], alpha=0.35,
+                                   edgecolor="#6b7684",
+                                   label="faixa: escada de 5 degraus"),
+                             Patch(facecolor="#f4f4f4", edgecolor="#555555",
                                    hatch="////", label="pedaço ESTIMADO (sem medição)")],
                     loc="upper left", fontsize=7.6, ncol=2, framealpha=0.95)
 
@@ -1001,8 +1065,13 @@ def escreve_relatorio(dados: dict) -> Path:
             janela = (f"{_ini}<br>→ {_fim.split(' ')[-1]}"
                       if _ini and _fim and _ini[:5] == _fim[:5]
                       else f"{_ini}<br>→ {_fim}")
+            # estratégia da task em 3 caracteres: a tabela já tem 14 colunas e não cabe
+            # nome por extenso (o nome completo vai no painel 4 e na seção 1)
+            _estr = "3D" if p["estrategia"] == "tres_degraus" else "5D"
+            if not p["executou_a_gravada"]:
+                _estr += "*"
             linhas_pacote.append(
-                f"| {s.split('-')[-1]} | {tid} | {sum(m.values())} | "
+                f"| {s.split('-')[-1]} | {_estr} | {tid} | {sum(m.values())} | "
                 f"{p['aprovacoes']}/{p['reprovacoes']}/{p['sem_avaliacao']} | "
                 f"{tent[0]}ª–{tent[-1]}ª{buraco} | {aprov} | "
                 f"{p['infra']} | {p['culpa_teste_plano']} | {p['do_modelo']} | "
@@ -1241,8 +1310,14 @@ pacote realmente entregou — contado no commit de fechamento com `git show --nu
 mesma fonte da complexidade no painel 4). Na coluna de modelos, o nome vai encurtado
 (`luna/low` = `gpt-5.6-luna/low`; `sol/med*` = matriz aposentada em 27/09).
 
-| sprint | pacote | cham. | A/R/S | 1ª–última | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados | início–fim | linhas/arq |
-|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
+A coluna `estr.` é a **estratégia de alocação** gravada na task: `5D` = escada de 5 degraus
+(a política até 29/09), `3D` = os "3 degraus" (`luna/low → astra/low → luna/low`). O `*`
+marca a task **gravada** numa estratégia que executou a outra — hoje só o 003/P07 (marcado
+nos `3D`, mas as cinco tentativas foram a escada de 5, porque a troca de código só passou a
+valer no processo seguinte).
+
+| sprint | estr. | pacote | cham. | A/R/S | 1ª–última | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados | início–fim | linhas/arq |
+|---|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
 {tabela_pacotes}
 
 ## Tabela 3 — em que chamada a aprovação veio

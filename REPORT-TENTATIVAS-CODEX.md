@@ -168,19 +168,25 @@ pacote realmente entregou — contado no commit de fechamento com `git show --nu
 mesma fonte da complexidade no painel 4). Na coluna de modelos, o nome vai encurtado
 (`luna/low` = `gpt-5.6-luna/low`; `sol/med*` = matriz aposentada em 27/09).
 
-| sprint | pacote | cham. | A/R/S | 1ª–última | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados | início–fim | linhas/arq |
-|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
-| 003 | P01 | 6 | 1/5/0 | 1ª–6ª | 6ª (gpt-6-astra/low) | 0 | 0 | 6 | 5x | 5x | luna/low, sol/low, sol/med*, terra/low, astra/low | 28/09 22:58<br>→ 23:46 | 25/2 |
-| 003 | P02 | 4 | 1/3/0 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 0 | 0 | 4 | 3x | 3x | luna/low, sol/low, sol/med*, terra/low | 28/09 23:56<br>→ 29/09 00:17 | 83/3 |
-| 003 | P03 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0x | 0x | luna/low | 29/09 00:28<br>→ 00:28 | 72/2 |
-| 003 | P04 | 3 | 1/2/0 | 1ª–3ª | 3ª (gpt-5.6-sol/low) | 0 | 0 | 3 | 2x | 2x | luna/low, sol/low, terra/low | 29/09 00:34<br>→ 00:48 | 46/2 |
-| 003 | P05 | 5 | 1/4/0 | 1ª–5ª | 5ª (gpt-6-astra/low) | 0 | 0 | 5 | 4x | 4x | luna/low, sol/low, sol/med*, terra/low, astra/low | 29/09 00:55<br>→ 01:40 | 25/3 |
-| 003 | P06 | 3 | 1/0/2 | 1ª–3ª | 3ª (gpt-5.6-sol/low) | 1 | 0 | 2 | 0x | 0x | luna/low, sol/low, terra/low | 29/09 01:50<br>→ 08:01 | 15/1 |
-| 003 | P07 | 5 | 1/4/0 | 1ª–5ª | 5ª (gpt-6-astra/low) | 0 | 0 | 5 | 4x | 4x | luna/low, sol/low, terra/low, astra/low | 29/09 08:14<br>→ 08:51 | 64/3 |
-| 004 | P01 | 8 | 1/2/5 | 1ª–9ª ⚠ | 8ª (gpt-5.6-sol/low) | 0 | 5 | 3 | 2x | 2x | luna/low, sol/low, sol/med*, terra/low, astra/low | 28/09 14:19<br>→ 14:54 | 50/2 |
-| 004 | P02 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0x | 0x | luna/low | 28/09 15:30<br>→ 15:30 | 90/2 |
-| 004 | P03 | 4 | 1/2/1 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 1 | 0 | 3 | 2x | 2x | luna/low, sol/low, sol/med*, terra/low | 28/09 15:37<br>→ 19:43 | 127/4 |
-| 004 | P04 | 10 | 1/3/6 | 1ª–10ª | 10ª (gpt-6-astra/low) | 0 | 5 | 5 | 3x | 3x | luna/low, sol/low, sol/med*, terra/low, astra/low | 28/09 14:30<br>→ 15:17 | 96/3 |
+A coluna `estr.` é a **estratégia de alocação** gravada na task: `5D` = escada de 5 degraus
+(a política até 29/09), `3D` = os "3 degraus" (`luna/low → astra/low → luna/low`). O `*`
+marca a task **gravada** numa estratégia que executou a outra — hoje só o 003/P07 (marcado
+nos `3D`, mas as cinco tentativas foram a escada de 5, porque a troca de código só passou a
+valer no processo seguinte).
+
+| sprint | estr. | pacote | cham. | A/R/S | 1ª–última | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados | início–fim | linhas/arq |
+|---|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
+| 003 | 5D | P01 | 6 | 1/5/0 | 1ª–6ª | 6ª (gpt-6-astra/low) | 0 | 0 | 6 | 5x | 5x | luna/low, sol/low, sol/med*, terra/low, astra/low | 28/09 22:58<br>→ 23:46 | 25/2 |
+| 003 | 5D | P02 | 4 | 1/3/0 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 0 | 0 | 4 | 3x | 3x | luna/low, sol/low, sol/med*, terra/low | 28/09 23:56<br>→ 29/09 00:17 | 83/3 |
+| 003 | 5D | P03 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0x | 0x | luna/low | 29/09 00:28<br>→ 00:28 | 72/2 |
+| 003 | 5D | P04 | 3 | 1/2/0 | 1ª–3ª | 3ª (gpt-5.6-sol/low) | 0 | 0 | 3 | 2x | 2x | luna/low, sol/low, terra/low | 29/09 00:34<br>→ 00:48 | 46/2 |
+| 003 | 5D | P05 | 5 | 1/4/0 | 1ª–5ª | 5ª (gpt-6-astra/low) | 0 | 0 | 5 | 4x | 4x | luna/low, sol/low, sol/med*, terra/low, astra/low | 29/09 00:55<br>→ 01:40 | 25/3 |
+| 003 | 5D | P06 | 3 | 1/0/2 | 1ª–3ª | 3ª (gpt-5.6-sol/low) | 1 | 0 | 2 | 0x | 0x | luna/low, sol/low, terra/low | 29/09 01:50<br>→ 08:01 | 15/1 |
+| 003 | 3D* | P07 | 5 | 1/4/0 | 1ª–5ª | 5ª (gpt-6-astra/low) | 0 | 0 | 5 | 4x | 4x | luna/low, sol/low, terra/low, astra/low | 29/09 08:14<br>→ 08:51 | 64/3 |
+| 004 | 5D | P01 | 8 | 1/2/5 | 1ª–9ª ⚠ | 8ª (gpt-5.6-sol/low) | 0 | 5 | 3 | 2x | 2x | luna/low, sol/low, sol/med*, terra/low, astra/low | 28/09 14:19<br>→ 14:54 | 50/2 |
+| 004 | 5D | P02 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0x | 0x | luna/low | 28/09 15:30<br>→ 15:30 | 90/2 |
+| 004 | 5D | P03 | 4 | 1/2/1 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 1 | 0 | 3 | 2x | 2x | luna/low, sol/low, sol/med*, terra/low | 28/09 15:37<br>→ 19:43 | 127/4 |
+| 004 | 5D | P04 | 10 | 1/3/6 | 1ª–10ª | 10ª (gpt-6-astra/low) | 0 | 5 | 5 | 3x | 3x | luna/low, sol/low, sol/med*, terra/low, astra/low | 28/09 14:30<br>→ 15:17 | 96/3 |
 
 ## Tabela 3 — em que chamada a aprovação veio
 
