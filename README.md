@@ -197,7 +197,7 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
   O estado factual vem do `state.db`; o `status:` do `sprint.yaml` é apenas
   declaração de intenção. Esse banco operacional não é versionado no worktree.
 - A Sprint `DEVFACTORY-001` percorreu `EM_EXECUCAO → EM_VERIFICACAO →
-  ENCERRADO`; suas tarefas estão concluídas e o relatório está em
+  ENCERRADO`. As 15 tarefas (T01–T15) estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
 - **Como as tarefas foram concluídas — leia antes de confiar no número:** as 14
   primeiras (T01–T14) foram concluídas por **evidência retroativa**. O código que
@@ -229,7 +229,8 @@ um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
 retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
 portão e exige nova aprovação.
 
-O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+O checklist de plano derivado do D-16 é obrigatório como procedimento humano
+antes de aprovar:
 
 - cada task tem um **arquivo de teste próprio**, sem compartilhá-lo com outra task;
 - sem colisão de arquivo na mesma onda: nenhuma task pode compartilhar arquivo
@@ -239,12 +240,18 @@ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
 - todo critério cita um **arquivo ou comando** concreto e verificável;
 - uma task que estende módulo de outra depende dela, direta ou transitivamente.
 
+E4 cobre apenas caminhos de arquivo reconhecidos nos critérios ou no campo
+`teste` de cada task; um comando sozinho não satisfaz essa checagem.
+A exigência de concretude de cada critério também precisa de revisão humana.
+
 O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
 dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
 teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
 da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
 exigem julgamento na aprovação humana.
-Execute-o antes da aprovação:
+A execução do verificador é um passo manual do aprovador antes da aprovação:
+`aprovar` não executa esse script. Corrija os erros e avalie os avisos antes de
+registrar a aprovação humana.
 
 ```bash
 python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003

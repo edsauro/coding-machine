@@ -108,10 +108,36 @@ def test_readme_documenta_verificador_e_estado_atual_das_sprints():
     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
     # A contagem/comando da suíte já é coberta em test_readme_afirmacoes.py
     # por test_estado_atual_mede_suite_sem_contagem_fixa.
+    bullets = re.findall(r"^- .*?(?=^- |\Z)", estado_atual, re.MULTILINE | re.DOTALL)
+    retratos = [bullet for bullet in bullets if "Retrato do `state.db`" in bullet]
+    assert len(retratos) == 1
     for sprint in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-003"):
-        assert sprint in estado_atual
+        assert re.search(
+            rf"`{sprint}`: (?:ENCERRADO|EM EXECUÇÃO|PLANEJADO)\*\*",
+            retratos[0],
+        ), f"{sprint} precisa de estado explícito no mesmo retrato do state.db"
     assert "estado factual vem do `state.db`" in estado_atual
     assert "declaração de intenção" in estado_atual
+
+
+def test_readme_distingue_checklist_manual_das_checagens_automaticas():
+    portao = " ".join(_corpo_da_secao("Portão do plano").split())
+
+    assert "passo manual do aprovador" in portao
+    assert "`aprovar` não executa esse script" in portao
+    assert "E4 cobre apenas caminhos de arquivo" in portao
+    assert "comando sozinho não satisfaz essa checagem" in portao
+
+
+def test_decisions_concilia_contagem_com_contrato_do_d27():
+    texto = (ROOT / ".autodev/sprints/DEVFACTORY-003/decisions.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "2026-09-29" in texto
+    assert "D-27" in texto
+    assert "test_estado_atual_mede_suite_sem_contagem_fixa" in texto
+    assert "contagem é satisfeita pelo comando de medição" in texto
 
 
 def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
