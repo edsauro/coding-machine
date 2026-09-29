@@ -318,8 +318,13 @@ def carrega_dag(p: Path) -> dict:
 
 
 def carrega_sprint(p: Path) -> dict:
-    with p.open(encoding="utf-8") as fh:
-        s = yaml.safe_load(fh) or {}
+    try:
+        with p.open(encoding="utf-8") as fh:
+            s = yaml.safe_load(fh) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"sprint.yaml invalido: {exc}") from exc
+    if not isinstance(s, dict):
+        raise ValueError(f"sprint.yaml precisa ser um mapa: {p}")
     for campo in ("sprint_id", "objetivo"):
         if campo not in s:
             raise ValueError(f"sprint.yaml sem '{campo}': {p}")

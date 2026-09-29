@@ -58,6 +58,24 @@ def test_aprovar_substitui_aprovacao_null(tmp_path, monkeypatch):
     assert dados["aprovacao"]["por"] == "Ana"
 
 
+@pytest.mark.parametrize("aprovacao_existente", [
+    'aprovacao: {por: Bia, quando: ontem, hash_dag: antigo}\n',
+    'aprovacao:\n  por: Bia\n  quando: ontem\n  hash_dag: antigo\n',
+])
+def test_aprovar_substitui_aprovacao_existente_sem_duplicar(
+        tmp_path, monkeypatch, aprovacao_existente):
+    d = _sprint(tmp_path)
+    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
+        arquivo.write(aprovacao_existente)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+
+    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
+    assert texto.count("aprovacao:") == 1
+    assert yaml.safe_load(texto)["aprovacao"]["por"] == "Ana"
+
+
 @pytest.mark.parametrize("sprint_id", ["", ".", "..", "../fora", r"..\fora"])
 def test_aprovar_recusa_sprint_id_invalido(tmp_path, monkeypatch, capsys, sprint_id):
     monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
@@ -95,6 +113,36 @@ def test_aprovar_recusa_sprints_divergentes(tmp_path, monkeypatch, capsys):
     assert "diverge" in capsys.readouterr().out
 
 
+def test_aprovar_recusa_id_declarado_por_outro_sprint(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path, "S1")
+    (d / "sprint.yaml").write_text(
+        "sprint_id: OUTRA\nobjetivo: teste\nstatus: PLANEJADO\n", encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+    assert "OUTRA" in capsys.readouterr().out
+    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
+
+
+def test_aprovar_recusa_dag_invalido(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    (d / "dag.json").write_text("{nao-json", encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+    assert "DAG invalido" in capsys.readouterr().out
+    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
+
+
+def test_aprovar_informa_sprint_yaml_invalido(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    (d / "sprint.yaml").write_text("sprint_id: S1\n", encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
+
+
 def test_run_informa_yaml_de_aprovacao_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
     d = _sprint(tmp_path)
     dados = yaml.safe_load((d / "sprint.yaml").read_text())
@@ -104,6 +152,54 @@ def test_run_informa_yaml_de_aprovacao_invalido_sem_traceback(tmp_path, monkeypa
     assert main(["--sprint", "S1", "run", "--modo-teste"]) == 2
     saida = capsys.readouterr().out
     assert "sprint invalido" in saida
+
+
+def test_resume_planejado_recusa_sem_aprovacao(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
+    assert "autodev aprovar S1 --por <nome>" in capsys.readouterr().out
+
+
+def test_resume_aceita_aprovacao_valida(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 0
+    assert "parado por: -" in capsys.readouterr().out
+
+
+def test_resume_informa_yaml_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
+        arquivo.write("aprovacao:\n  por: Ana\n")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("conteudo", ["sprint_id: [\n", "- sprint_id: S1\n"])
+def test_resume_informa_yaml_ilegivel_sem_traceback(
+        tmp_path, monkeypatch, capsys, conteudo):
+    d = _sprint(tmp_path)
+    (d / "sprint.yaml").write_text(conteudo, encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
+
+
+def test_report_informa_yaml_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
+        arquivo.write("aprovacao:\n  por: Ana\n")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "report"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
 
 
 def test_run_nao_mascara_value_error_do_laco(tmp_path, monkeypatch):
@@ -137,7 +233,7 @@ def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
     assert any(e["tipo"] == "aprovacao_plano" for e in o.store.eventos("S1"))
 
 
-def test_run_nao_exige_aprovacao_de_sprint_ja_em_execucao(tmp_path):
+def test_run_nao_exige_aprovacao_legada_de_sprint_ja_em_execucao(tmp_path):
     _sprint(tmp_path)
     o = Orquestrador(tmp_path, "S1", modo_teste=True)
     o.store.transicionar_sprint("S1", "EM_EXECUCAO", "sprint preexistente")
@@ -186,3 +282,24 @@ def test_dag_alterado_invalida_aprovacao(tmp_path, monkeypatch):
     )
     resultado = Orquestrador(tmp_path, "S1", modo_teste=True).rodar()
     assert resultado.parado_por and "diverg" in resultado.parado_por
+
+
+@pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM"])
+def test_dag_alterado_invalida_aprovacao_em_reexecucao(
+        tmp_path, monkeypatch, estado):
+    d = _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    if estado == "EM_EXECUCAO":
+        o.store.transicionar_sprint("S1", estado, "rodada em curso")
+    else:
+        o.store.checkpoint("S1", estado, {"motivo": "fim da rodada"})
+    (d / "dag.json").write_text(
+        '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
+        '"criterios":["alterar modulo.py"]}]}', encoding="utf-8")
+
+    resultado = o.rodar()
+
+    assert resultado.parado_por and "divergencia" in resultado.parado_por
+    assert o.store.task("S1", "P1") is None

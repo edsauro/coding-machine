@@ -166,10 +166,23 @@ def cmd_aprovar(args) -> int:
     if not yaml_path.exists() or not dag_path.exists():
         print(f"sprint inexistente ou incompleto: {args.sprint_id}")
         return 1
-    from .config import carrega_sprint
+    from .config import carrega_dag, carrega_sprint
     try:
-        carrega_sprint(yaml_path)
-    except ValueError as exc:
+        sprint = carrega_sprint(yaml_path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    if sprint["sprint_id"] != args.sprint_id:
+        print(f"sprint_id declarado {sprint['sprint_id']} diverge de {args.sprint_id}")
+        return 2
+    try:
+        carrega_dag(dag_path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"DAG invalido: {exc}")
+        return 2
+    try:
+        texto = yaml_path.read_text(encoding="utf-8")
+    except OSError as exc:
         print(f"sprint invalido: {exc}")
         return 2
     aprovacao = {
@@ -180,10 +193,8 @@ def cmd_aprovar(args) -> int:
     bloco = "aprovacao:\n" + "".join(
         f"  {chave}: {json.dumps(valor, ensure_ascii=False)}\n"
         for chave, valor in aprovacao.items())
-    texto = yaml_path.read_text(encoding="utf-8")
     texto = re.sub(
-        r"(?m)^aprovacao:(?:[ \t]*(?:null|~)[ \t]*\n?"
-        r"|[ \t]*\n(?:^[ \t]+.*(?:\n|$))*)",
+        r"(?m)^aprovacao:[^\n]*(?:\n^[ \t]+[^\n]*)*",
         "",
         texto,
     )
@@ -215,7 +226,11 @@ def cmd_report(args) -> int:
     from . import report as rp
     from .worktree import commit_atual
     d = RAIZ / ".autodev" / "sprints" / args.sprint
-    sp = carrega_sprint(d / "sprint.yaml")
+    try:
+        sp = carrega_sprint(d / "sprint.yaml")
+    except (OSError, ValueError) as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
     # O DAG acrescenta contexto; sua ausência ou corrupção não impede o report.
     try:
         valor = json.loads((d / "dag.json").read_text(encoding="utf-8")).get(

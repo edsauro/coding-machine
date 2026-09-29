@@ -22,7 +22,8 @@ from pathlib import Path
 from . import agents, errors, haq, integration, killswitch, report, retry, review
 from . import sandbox as sbx
 from . import testrunner
-from .config import Config, carrega_dag, carrega_sprint, ordem_topologica
+from .config import (SPRINT_TERMINAIS, Config, carrega_dag, carrega_sprint,
+                     ordem_topologica)
 from .state import StateStore, TransicaoInvalida, WorktreeOcupado
 from .worktree import (WorktreeManager, arquivos_alterados, branch_existe,
                        commit_atual, git)
@@ -226,12 +227,16 @@ class Orquestrador:
 
     def _validar_aprovacao(self) -> str | None:
         """Impede executar plano ainda não aprovado ou cujo DAG mudou."""
-        if self.store.estado_sprint(self.sprint) not in (None, "PLANEJADO"):
-            return None
+        estado = self.store.estado_sprint(self.sprint)
         aprovacao = self.sprint_yaml.get("aprovacao")
         comando = f"autodev aprovar {self.sprint} --por <nome>"
         if not isinstance(aprovacao, dict):
-            return f"sprint PLANEJADO sem aprovacao registrada; use {comando}"
+            if estado in (None, "PLANEJADO"):
+                return f"sprint PLANEJADO sem aprovacao registrada; use {comando}"
+            # Sprints iniciados antes da existência do portão continuam retomáveis.
+            return None
+        if estado in SPRINT_TERMINAIS:
+            return None
         atual = hashlib.sha256((self.dir_sprint / "dag.json").read_bytes()).hexdigest()
         registrado = aprovacao.get("hash_dag")
         if registrado != atual:
@@ -718,7 +723,7 @@ class Orquestrador:
             res.parado_por = motivo_lock
             res.duracao_s = 0.0
             return res
-        if self.store.estado_sprint(self.sprint) in (None, "PLANEJADO"):
+        if isinstance(self.sprint_yaml.get("aprovacao"), dict):
             self._registrar_aprovacao()
         self.log(f"rodada dona: pid {os.getpid()} — rodada única garantida pelo motor")
         parar_batimento = threading.Event()
