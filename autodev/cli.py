@@ -4,6 +4,7 @@ Uso:
   python3 -m autodev detect                 # T01
   python3 -m autodev plan "pedido"          # cria um sprint planejado
   python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+  python3 -m autodev aprovar <sprint_id> --por <nome>  # registra a aprovacao do plano
   python3 -m autodev init                   # valida DAG e cria as tasks
   python3 -m autodev status                 # estado atual do Sprint
   python3 -m autodev run [--parar-em T07]   # executa o Sprint
@@ -19,9 +20,12 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -130,12 +134,16 @@ def _rodar_com_rodadas(o, args):
 
 
 def cmd_run(args) -> int:
-    from .orchestrator import Orquestrador
+    from .orchestrator import Orquestrador, PlanoInvalido
     import os
     os.environ.setdefault("AUTODEV_AGENT_TIMEOUT", "900")
     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste,
                      deadline_s=args.deadline)
-    r = _rodar_com_rodadas(o, args)
+    try:
+        r = _rodar_com_rodadas(o, args)
+    except PlanoInvalido as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
     assert r is not None  # rodadas >= 1 sempre executa ao menos uma passada
     print(f"\n=== resumo ===\n  concluidas: {r.concluidas}/{len(r.tasks)}"
           f"\n  parado por: {r.parado_por or '-'}"
@@ -143,9 +151,71 @@ def cmd_run(args) -> int:
     return 0 if not r.parado_por else 2
 
 
+def cmd_aprovar(args) -> int:
+    if (not args.sprint_id or args.sprint_id in (".", "..")
+            or "/" in args.sprint_id or "\\" in args.sprint_id):
+        print(f"sprint inválido: {args.sprint_id}")
+        return 1
+    if args.sprint is not None and args.sprint != args.sprint_id:
+        print(f"--sprint {args.sprint} diverge de sprint_id {args.sprint_id}")
+        return 2
+    if not args.por.strip():
+        print("--por precisa conter um nome nao vazio")
+        return 2
+    d = RAIZ / ".autodev" / "sprints" / args.sprint_id
+    yaml_path = d / "sprint.yaml"
+    dag_path = d / "dag.json"
+    if not yaml_path.exists() or not dag_path.exists():
+        print(f"sprint inexistente ou incompleto: {args.sprint_id}")
+        return 1
+    from .config import carrega_dag, carrega_sprint
+    try:
+        sprint = carrega_sprint(yaml_path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    if sprint["sprint_id"] != args.sprint_id:
+        print(f"sprint_id declarado {sprint['sprint_id']} diverge de {args.sprint_id}")
+        return 2
+    try:
+        carrega_dag(dag_path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"DAG invalido: {exc}")
+        return 2
+    try:
+        texto = yaml_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    aprovacao = {
+        "por": args.por.strip(),
+        "quando": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "hash_dag": hashlib.sha256(dag_path.read_bytes()).hexdigest(),
+    }
+    bloco = "aprovacao:\n" + "".join(
+        f"  {chave}: {json.dumps(valor, ensure_ascii=False)}\n"
+        for chave, valor in aprovacao.items())
+    texto = re.sub(
+        r"(?m)^aprovacao:[^\n]*(?:\n^[ \t]+[^\n]*)*",
+        "",
+        texto,
+    )
+    yaml_path.write_text(texto.rstrip() + "\n" + bloco, encoding="utf-8")
+    print(f"sprint {args.sprint_id} aprovado por {args.por}")
+    return 0
+
+
 def cmd_resume(args) -> int:
-    from .orchestrator import Orquestrador
+    from .orchestrator import Orquestrador, PlanoInvalido
     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste)
+    try:
+        bloqueio = o.checar_aprovacao()
+    except PlanoInvalido as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    if bloqueio:
+        print(f"concluidas: 0/0 | parado por: {bloqueio}")
+        return 2
     rec = o.recuperar()
     print(f"recuperacao: {json.dumps(rec, ensure_ascii=False)}")
     r = o.rodar()
@@ -158,7 +228,11 @@ def cmd_report(args) -> int:
     from . import report as rp
     from .worktree import commit_atual
     d = RAIZ / ".autodev" / "sprints" / args.sprint
-    sp = carrega_sprint(d / "sprint.yaml")
+    try:
+        sp = carrega_sprint(d / "sprint.yaml")
+    except (OSError, ValueError) as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
     # O DAG acrescenta contexto; sua ausência ou corrupção não impede o report.
     try:
         valor = json.loads((d / "dag.json").read_text(encoding="utf-8")).get(
@@ -427,7 +501,7 @@ def cmd_prever(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
-    p.add_argument("--sprint", default=SPRINT_PADRAO)
+    p.add_argument("--sprint", default=None)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("detect").set_defaults(fn=cmd_detect)
@@ -461,6 +535,11 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--deadline", type=float, default=None,
                    help="segundos de teto de execucao")
     s.set_defaults(fn=cmd_run)
+
+    s = sub.add_parser("aprovar", help="registra a aprovação humana do plano")
+    s.add_argument("sprint_id")
+    s.add_argument("--por", required=True)
+    s.set_defaults(fn=cmd_aprovar)
 
     s = sub.add_parser("resume")
     s.add_argument("--modo-teste", action="store_true")
@@ -506,6 +585,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("start").set_defaults(fn=cmd_start)
 
     args = p.parse_args(argv)
+    if args.sprint is None and args.cmd != "aprovar":
+        args.sprint = SPRINT_PADRAO
     return args.fn(args)
 
 

@@ -318,11 +318,22 @@ def carrega_dag(p: Path) -> dict:
 
 
 def carrega_sprint(p: Path) -> dict:
-    with p.open(encoding="utf-8") as fh:
-        s = yaml.safe_load(fh) or {}
+    try:
+        with p.open(encoding="utf-8") as fh:
+            s = yaml.safe_load(fh) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"sprint.yaml invalido: {exc}") from exc
+    if not isinstance(s, dict):
+        raise ValueError(f"sprint.yaml precisa ser um mapa: {p}")
     for campo in ("sprint_id", "objetivo"):
         if campo not in s:
             raise ValueError(f"sprint.yaml sem '{campo}': {p}")
+    aprovacao = s.get("aprovacao")
+    if aprovacao is not None:
+        if not isinstance(aprovacao, dict) or set(aprovacao) != {"por", "quando", "hash_dag"}:
+            raise ValueError("aprovacao precisa conter exatamente por, quando e hash_dag")
+        if not all(isinstance(aprovacao.get(k), str) and aprovacao[k] for k in ("por", "quando", "hash_dag")):
+            raise ValueError("aprovacao precisa conter por, quando e hash_dag preenchidos")
     return s
 
 
