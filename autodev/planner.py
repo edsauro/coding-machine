@@ -16,11 +16,6 @@ from .plan_prompt import montar_prompt_plano
 
 PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
 
-# Referências textuais: o arquivo pode ainda ser criado pela sprint.
-_ARQUIVO = re.compile(
-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
-    r"|\b(?:Makefile|Dockerfile)\b"
-)
 _COMANDO_TESTE = re.compile(
     r"\b(?:pytest|(?:python(?:3)?\s+-m\s+unittest)|"
     r"(?:npm|pnpm|yarn)\s+(?:run\s+)?test|"
@@ -233,20 +228,12 @@ def _construir_task(dados: object) -> TaskPlano:
 
 def _arquivos_da_task(task: TaskPlano) -> set[str]:
     """Extrai todos os caminhos mencionados nos critérios e no teste."""
-    textos = [*task.criterios, task.teste]
-    return {
-        _normalizar_caminho(caminho.group(0))
-        for texto in textos
-        for caminho in _ARQUIVO.finditer(texto.replace("\\", "/"))
-    }
+    return config.arquivos_citados([*task.criterios, task.teste])
 
 
 def _normalizar_caminho(caminho: str) -> str:
     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
-    caminho = caminho.replace("\\", "/")
-    while caminho.startswith("./"):
-        caminho = caminho[2:]
-    return PurePosixPath(caminho).as_posix().lstrip("/")
+    return config._normalizar_caminho(caminho)
 
 
 def arquivo_de_teste(caminho: str) -> bool:

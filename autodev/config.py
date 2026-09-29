@@ -9,13 +9,20 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
 RAIZ = Path(__file__).resolve().parent.parent
 AUTODEV = RAIZ / ".autodev"
 CONFIG = AUTODEV / "config"
+
+# Referências textuais a arquivos.  O planejador e o validador do motor usam a
+# mesma regra para que um plano aprovado não mude de significado no `init`.
+_ARQUIVO = re.compile(
+    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+    r"|\b(?:Makefile|Dockerfile)\b"
+)
 
 ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
            "REVIEW", "RETRY", "DONE", "FAILED", "INTEGRATED", "WAITING_RESOURCE"]
@@ -189,6 +196,24 @@ class Task:
             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
 
 
+def _normalizar_caminho(caminho: str) -> str:
+    """Normaliza um caminho textual, sem acessar o filesystem."""
+    caminho = caminho.replace("\\", "/")
+    while caminho.startswith("./"):
+        caminho = caminho[2:]
+    return PurePosixPath(caminho).as_posix().lstrip("/")
+
+
+def arquivos_citados(textos: list[str]) -> set[str]:
+    """Extrai caminhos citados em textos usando a regra comum do plano."""
+    return {
+        _normalizar_caminho(encontrado.group(0))
+        for texto in textos
+        if isinstance(texto, str)
+        for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+    }
+
+
 def valida_dag(dag: dict) -> list[str]:
     """Valida o DAG e devolve os erros encontrados (lista vazia = ok).
 
@@ -227,33 +252,22 @@ def valida_dag(dag: dict) -> list[str]:
         if cor[n] == BRANCO:
             visita(n, [])
 
+    # A topologia só é calculada para um DAG estruturalmente válido. Isso evita
+    # que uma dependência ausente seja mascarada como uma onda incompleta.
+    if erros:
+        return erros
+
     # Uma onda é executada em paralelo; duas tasks que citam o mesmo caminho
-    # nela podem sobrescrever o trabalho uma da outra.  Dependências colocam o
+    # nela podem sobrescrever o trabalho uma da outra. Dependências colocam o
     # mesmo caminho em ondas distintas e, portanto, não são erro aqui.
-    caminho = re.compile(
-        r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
-        r"|\b(?:Makefile|Dockerfile)\b"
-    )
     arquivos = {
-        t.get("id"): {
-            encontrado.group(0).replace("\\", "/")
-            for criterio in t.get("criterios", [])
-            if isinstance(criterio, str)
-            for encontrado in caminho.finditer(criterio)
-        }
+        t.get("id"): arquivos_citados([
+            *t.get("criterios", []), t.get("teste", ""),
+        ])
         for t in tasks
     }
-    restante = {t.get("id"): set(t.get("deps", [])) for t in tasks}
-    ondas: list[list[str]] = []
-    while restante:
-        prontos = sorted(n for n, deps in restante.items()
-                         if not (deps & set(restante)))
-        if not prontos:
-            break
-        ondas.append(prontos)
-        for n in prontos:
-            del restante[n]
-    for numero, onda in enumerate(ondas, start=1):
+    ondas = ordem_topologica({"tasks": tasks})
+    for numero, onda in enumerate(ondas):
         for indice, id_a in enumerate(onda):
             for id_b in onda[indice + 1:]:
                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):

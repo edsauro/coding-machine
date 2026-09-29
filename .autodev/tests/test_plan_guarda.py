@@ -2,6 +2,7 @@ import json
 
 from autodev import cli
 from autodev.config import valida_dag
+from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
 
 
 def dag_com(*tasks):
@@ -22,13 +23,38 @@ def test_valida_dag_recusa_arquivo_citado_na_mesma_onda():
                for erro in erros)
 
 
-def test_valida_dag_mantem_arquivo_em_ondas_diferentes_como_aviso():
+def test_valida_dag_mantem_arquivo_em_ondas_diferentes_valido():
     erros = valida_dag(dag_com(
         task("P01", "altera autodev/config.py"),
         task("P02", "altera autodev/config.py", deps=["P01"]),
     ))
 
     assert erros == []
+
+
+def test_valida_dag_detecta_caminhos_equivalentes_na_mesma_onda():
+    erros = valida_dag(dag_com(
+        task("P01", "altera ./autodev/config.py"),
+        task("P02", "altera autodev\\config.py"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and "autodev/config.py" in erro
+               for erro in erros)
+
+
+def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+    plano = Plano(
+        titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+        tasks=[
+            TaskPlano("P01", "primeira", ["altera autodev/config.py"]),
+            TaskPlano("P02", "segunda", ["altera autodev/config.py"], deps=["P01"]),
+        ],
+    )
+
+    assert avisos_de_colisao_de_arquivo(plano) == [{
+        "task_a": "P01", "task_b": "P02", "arquivo": "autodev/config.py",
+        "onda": 1, "onda_b": 2,
+    }]
 
 
 def test_init_recusa_dag_com_colisao_na_mesma_onda(tmp_path, monkeypatch, capsys):
