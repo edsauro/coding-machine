@@ -10,6 +10,7 @@ Nunca a memória conversacional.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import signal
 import threading
@@ -21,7 +22,8 @@ from pathlib import Path
 from . import agents, cota, errors, haq, integration, killswitch, report, retry, review
 from . import sandbox as sbx
 from . import testrunner
-from .config import Config, carrega_dag, carrega_sprint, ordem_topologica
+from .config import (Config, carrega_dag, carrega_sprint,
+                     ordem_topologica)
 from .state import StateStore, TransicaoInvalida, WorktreeOcupado
 from .worktree import (WorktreeManager, arquivos_alterados, branch_existe,
                        commit_atual, git)
@@ -82,6 +84,10 @@ class ResultadoSprint:
     @property
     def concluidas(self) -> int:
         return sum(1 for t in self.tasks if t.estado_final in ("DONE", "INTEGRATED"))
+
+
+class PlanoInvalido(ValueError):
+    """Arquivos do plano não puderam ser carregados ou validados."""
 
 
 class Orquestrador:
@@ -211,12 +217,56 @@ class Orquestrador:
         return 0
 
     # ------------------------------------------------------------ carregar sprint
-    def carregar(self) -> None:
+    def _ler_plano(self) -> None:
+        """Lê e valida os arquivos do plano sem materializá-los no estado."""
         self.sprint_yaml = carrega_sprint(self.dir_sprint / "sprint.yaml")
         self.dag = carrega_dag(self.dir_sprint / "dag.json")
+
+    def carregar(self) -> None:
+        self._ler_plano()
         novas = self.store.criar_tasks_do_dag(self.sprint, self.dag)
         self.log(f"sprint {self.sprint}: {len(self.dag['tasks'])} tasks "
                  f"({novas} novas) — ondas {ordem_topologica(self.dag)}")
+
+    def _validar_aprovacao(self) -> str | None:
+        """Impede executar plano ainda não aprovado ou cujo DAG mudou."""
+        estado = self.store.estado_sprint(self.sprint)
+        aprovacao = self.sprint_yaml.get("aprovacao")
+        comando = f"autodev aprovar {self.sprint} --por <nome>"
+        if not isinstance(aprovacao, dict):
+            if estado in (None, "PLANEJADO"):
+                return f"sprint PLANEJADO sem aprovacao registrada; use {comando}"
+            # Sprints iniciados antes da existência do portão continuam retomáveis.
+            return None
+        atual = hashlib.sha256((self.dir_sprint / "dag.json").read_bytes()).hexdigest()
+        registrado = aprovacao.get("hash_dag")
+        if registrado != atual:
+            return (f"aprovacao invalida: divergencia no hash do dag.json "
+                    f"(aprovado {registrado}, atual {atual}); use {comando}")
+        return None
+
+    def checar_aprovacao(self) -> str | None:
+        """Checa o portão sem criar tasks ou alterar o estado persistido."""
+        try:
+            self._ler_plano()
+        except ValueError as exc:
+            raise PlanoInvalido(str(exc)) from exc
+        return self._validar_aprovacao()
+
+    def _registrar_aprovacao(self) -> None:
+        aprovacao = self.sprint_yaml["aprovacao"]
+        hash_dag = aprovacao["hash_dag"]
+        eventos = self.store.conn.execute(
+            "SELECT payload FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
+            (self.sprint,),
+        ).fetchall()
+        for evento in eventos:
+            try:
+                if json.loads(evento["payload"]).get("hash_dag") == hash_dag:
+                    return
+            except (TypeError, ValueError):
+                continue
+        self.store.evento(self.sprint, None, "aprovacao_plano", dict(aprovacao))
 
     # ------------------------------------------------------------ recuperação
     def recuperar(self) -> dict:
@@ -706,6 +756,12 @@ class Orquestrador:
     def rodar(self, *, parar_em: str | None = None) -> ResultadoSprint:
         t0 = time.time()
         res = ResultadoSprint(sprint=self.sprint)
+        bloqueio_aprovacao = self.checar_aprovacao()
+        if bloqueio_aprovacao:
+            self.log(f"RODADA NAO INICIADA: {bloqueio_aprovacao}")
+            res.parado_por = bloqueio_aprovacao
+            res.duracao_s = time.time() - t0
+            return res
         self.carregar()
         self.recuperar()
 
@@ -722,6 +778,8 @@ class Orquestrador:
             res.parado_por = motivo_lock
             res.duracao_s = 0.0
             return res
+        if isinstance(self.sprint_yaml.get("aprovacao"), dict):
+            self._registrar_aprovacao()
         self.log(f"rodada dona: pid {os.getpid()} — rodada única garantida pelo motor")
         parar_batimento = threading.Event()
         fio = threading.Thread(target=self._batimento, args=(parar_batimento,),

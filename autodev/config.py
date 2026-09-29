@@ -7,14 +7,28 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
 RAIZ = Path(__file__).resolve().parent.parent
 AUTODEV = RAIZ / ".autodev"
 CONFIG = AUTODEV / "config"
+
+# Referências textuais a arquivos. O planejador e o validador do motor usam a
+# mesma regra de extração para que um caminho não mude de significado no `init`.
+_EXTENSOES_ARQUIVO = (
+    "bash|c|cc|cfg|conf|cpp|css|csv|db|go|h|hpp|html|ini|ipynb|java|js|json|"
+    "jsx|kt|lock|log|md|pdf|php|png|py|rb|rs|sh|sql|svelte|svg|toml|ts|tsx|"
+    "txt|vue|xml|yaml|yml"
+)
+_ARQUIVO = re.compile(
+    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
+    r"|\b(?:Makefile|Dockerfile)\b",
+    re.IGNORECASE,
+)
 
 ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
            "REVIEW", "RETRY", "DONE", "FAILED", "INTEGRATED", "WAITING_RESOURCE",
@@ -261,6 +275,46 @@ class Task:
             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
 
 
+def normalizar_caminho(caminho: str) -> str:
+    """Normaliza um caminho textual, sem acessar o filesystem."""
+    caminho = caminho.replace("\\", "/")
+    while caminho.startswith("./"):
+        caminho = caminho[2:]
+    partes: list[str] = []
+    for parte in PurePosixPath(caminho).parts:
+        if parte in ("/", "."):
+            continue
+        if parte == ".." and partes and partes[-1] != "..":
+            partes.pop()
+        else:
+            partes.append(parte)
+    return "/".join(partes)
+
+
+def registro_compartilhado(caminho: str) -> bool:
+    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
+    partes = PurePosixPath(normalizar_caminho(caminho)).parts
+    minusculas = tuple(parte.casefold() for parte in partes)
+    if len(minusculas) < 4 or minusculas[:2] != (".autodev", "sprints"):
+        return False
+    nome = minusculas[-1]
+    return bool(
+        nome == "decisions.md"
+        or (set(minusculas[3:-1]) & {"logs", "evidence"}
+            and PurePosixPath(nome).suffix in {".log", ".md", ".txt"})
+    )
+
+
+def arquivos_citados(textos: list[str]) -> set[str]:
+    """Extrai caminhos citados em textos usando a regra comum do plano."""
+    return {
+        normalizar_caminho(encontrado.group(0))
+        for texto in textos
+        if isinstance(texto, str)
+        for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+    }
+
+
 def valida_dag(dag: dict) -> list[str]:
     """Valida o DAG e devolve os erros encontrados (lista vazia = ok).
 
@@ -298,6 +352,32 @@ def valida_dag(dag: dict) -> list[str]:
     for n in grafo:
         if cor[n] == BRANCO:
             visita(n, [])
+
+    # A topologia só é calculada para um DAG estruturalmente válido. Isso evita
+    # que uma dependência ausente seja mascarada como uma onda incompleta.
+    if erros:
+        return erros
+
+    # Uma onda é executada em paralelo; duas tasks que citam o mesmo caminho
+    # nela podem sobrescrever o trabalho uma da outra. Dependências colocam o
+    # mesmo caminho em ondas distintas e, portanto, não são erro aqui.
+    arquivos = {
+        t.get("id"): arquivos_citados([
+            *t.get("criterios", []), t.get("teste", ""),
+        ])
+        for t in tasks
+    }
+    ondas = ordem_topologica({"tasks": tasks})
+    for numero, onda in enumerate(ondas):
+        for indice, id_a in enumerate(onda):
+            for id_b in onda[indice + 1:]:
+                for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
+                    if registro_compartilhado(arquivo):
+                        continue
+                    erros.append(
+                        f"colisão de arquivo entre {id_a} e {id_b}: "
+                        f"{arquivo} (onda {numero + 1})"
+                    )
     return erros
 
 
@@ -311,11 +391,22 @@ def carrega_dag(p: Path) -> dict:
 
 
 def carrega_sprint(p: Path) -> dict:
-    with p.open(encoding="utf-8") as fh:
-        s = yaml.safe_load(fh) or {}
+    try:
+        with p.open(encoding="utf-8") as fh:
+            s = yaml.safe_load(fh) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"sprint.yaml invalido: {exc}") from exc
+    if not isinstance(s, dict):
+        raise ValueError(f"sprint.yaml precisa ser um mapa: {p}")
     for campo in ("sprint_id", "objetivo"):
         if campo not in s:
             raise ValueError(f"sprint.yaml sem '{campo}': {p}")
+    aprovacao = s.get("aprovacao")
+    if aprovacao is not None:
+        if not isinstance(aprovacao, dict) or set(aprovacao) != {"por", "quando", "hash_dag"}:
+            raise ValueError("aprovacao precisa conter exatamente por, quando e hash_dag")
+        if not all(isinstance(aprovacao.get(k), str) and aprovacao[k] for k in ("por", "quando", "hash_dag")):
+            raise ValueError("aprovacao precisa conter por, quando e hash_dag preenchidos")
     return s
 
 

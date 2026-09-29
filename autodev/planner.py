@@ -6,7 +6,7 @@ import json
 import os
 import re
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
@@ -16,11 +16,6 @@ from .plan_prompt import montar_prompt_plano
 
 PALAVRAS_VAGAS = ["melhorar", "otimizar", "refatorar", "revisar", "ajustar"]
 
-# Referências textuais: o arquivo pode ainda ser criado pela sprint.
-_ARQUIVO = re.compile(
-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+\.[A-Za-z][A-Za-z0-9]*\b"
-    r"|\b(?:Makefile|Dockerfile)\b"
-)
 _COMANDO_TESTE = re.compile(
     r"\b(?:pytest|(?:python(?:3)?\s+-m\s+unittest)|"
     r"(?:npm|pnpm|yarn)\s+(?:run\s+)?test|"
@@ -231,6 +226,102 @@ def _construir_task(dados: object) -> TaskPlano:
     return TaskPlano(**campos)
 
 
+def _arquivos_da_task(task: TaskPlano) -> set[str]:
+    """Extrai todos os caminhos mencionados nos critérios e no teste."""
+    return config.arquivos_citados([*task.criterios, task.teste])
+
+
+def _normalizar_caminho(caminho: str) -> str:
+    """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+    return config.normalizar_caminho(caminho)
+
+
+def arquivo_de_teste(caminho: str) -> bool:
+    """Reconhece diretórios de testes e nomes convencionais de testes Python."""
+    caminho = PurePosixPath(_normalizar_caminho(caminho))
+    partes = {parte.casefold() for parte in caminho.parts[:-1]}
+    nome = caminho.name.casefold()
+    return bool(
+        partes & {"tests", "test"}
+        or nome == "conftest.py"
+        or (nome.endswith(".py") and (nome.startswith("test_") or nome.endswith("_test.py")))
+    )
+
+
+def _ondas_por_task(plano: Plano) -> dict[str, int] | None:
+    """Calcula ondas sem mascarar os erros de IDs duplicados ou ciclos."""
+    if len({task.id for task in plano.tasks}) != len(plano.tasks):
+        return None
+    try:
+        ondas = config.ordem_topologica({"tasks": [
+            {"id": task.id, "deps": task.deps} for task in plano.tasks
+        ]})
+    except ValueError:
+        return None
+    return {
+        task_id: indice + 1
+        for indice, onda in enumerate(ondas)
+        for task_id in onda
+    }
+
+
+def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+    """Retorna arquivos citados por tasks conflitantes no mesmo plano.
+
+    Na mesma onda, qualquer arquivo comum colide. Arquivos de
+    teste colidem em qualquer onda para evitar a sobrescrita observada no D-16.
+    """
+    onda_por_task = _ondas_por_task(plano)
+    if onda_por_task is None:
+        return []
+    arquivos_mencionados = [_arquivos_da_task(task) for task in plano.tasks]
+    colisoes: list[dict[str, str | int]] = []
+    for indice, task_a in enumerate(plano.tasks):
+        for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+            onda_a = onda_por_task[task_a.id]
+            onda_b = onda_por_task[task_b.id]
+            for arquivo in sorted(
+                arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+            ):
+                if config.registro_compartilhado(arquivo):
+                    continue
+                if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                    colisoes.append({
+                        "task_a": task_a.id,
+                        "task_b": task_b.id,
+                        "arquivo": arquivo,
+                        "onda": onda_a,
+                    })
+    return colisoes
+
+
+def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+    """Retorna caminhos de produção citados em ondas diferentes como avisos."""
+    onda_por_task = _ondas_por_task(plano)
+    if onda_por_task is None:
+        return []
+    arquivos_mencionados = [_arquivos_da_task(task) for task in plano.tasks]
+    avisos: list[dict[str, str | int]] = []
+    for indice, task_a in enumerate(plano.tasks):
+        for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+            onda_a = onda_por_task[task_a.id]
+            onda_b = onda_por_task[task_b.id]
+            for arquivo in sorted(
+                arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+            ):
+                if config.registro_compartilhado(arquivo) or (
+                    onda_a != onda_b and not arquivo_de_teste(arquivo)
+                ):
+                    avisos.append({
+                        "task_a": task_a.id,
+                        "task_b": task_b.id,
+                        "arquivo": arquivo,
+                        "onda": onda_a,
+                        "onda_b": onda_b,
+                    })
+    return avisos
+
+
 def validar_plano(plano: Plano) -> list[str]:
     """Retorna todos os problemas estruturais encontrados no plano."""
     erros: list[str] = []
@@ -265,6 +356,11 @@ def validar_plano(plano: Plano) -> list[str]:
     for task_id in grafo:
         if estado[task_id] == 0:
             visita(task_id)
+    for colisao in colisoes_de_arquivo(plano):
+        erros.append(
+            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
+            f"{colisao['arquivo']} (onda {colisao['onda']})"
+        )
     return erros
 
 
@@ -283,7 +379,7 @@ def validar_e_ordenar(plano: Plano) -> list[list[str]]:
         for indice, criterio in enumerate(task.criterios, start=1):
             palavras = set(re.findall(r"\w+", criterio.casefold()))
             if (palavras.intersection(PALAVRAS_VAGAS)
-                    and not _ARQUIVO.search(criterio)
+                    and not config._ARQUIVO.search(criterio)
                     and not _COMANDO_TESTE.search(criterio)):
                 erros.append(
                     f"task {task.id}: critério {indice} vago; "

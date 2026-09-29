@@ -48,7 +48,7 @@ def _resposta_do_planejador() -> str:
                     "criterios": ["NOTAS.md descreve a entrega verificada"],
                     "deps": [],
                     "agente": "codex",
-                    "teste": "python3 -m pytest tests/test_stats.py -q",
+                    "teste": "python3 -m pytest tests/test_notas.py -q",
                 },
                 {
                     "id": "P03",
@@ -56,7 +56,7 @@ def _resposta_do_planejador() -> str:
                     "criterios": ["RESULTADO.md registra o resultado final"],
                     "deps": ["P01", "P02"],
                     "agente": "codex",
-                    "teste": "python3 -m pytest tests/test_stats.py -q",
+                    "teste": "python3 -m pytest tests/test_resultado.py -q",
                 },
             ],
         },
@@ -72,7 +72,23 @@ def _escrever_spec_fake(caminho: Path, conteudo: dict) -> None:
 def test_aceitacao_do_planejador(tmp_path, monkeypatch, capsys):
     raiz = criar_fixture(tmp_path / "projeto")
     (raiz / "src/stats.py").write_text(STATS_CORRIGIDO, encoding="utf-8")
-    subprocess.run(["git", "add", "src/stats.py"], cwd=raiz, check=True)
+    (raiz / "tests/test_notas.py").write_text(
+        "from pathlib import Path\n\n"
+        "def test_notas_registradas():\n"
+        "    assert Path('NOTAS.md').exists()\n",
+        encoding="utf-8",
+    )
+    (raiz / "tests/test_resultado.py").write_text(
+        "from pathlib import Path\n\n"
+        "def test_resultado_consolidado():\n"
+        "    assert Path('RESULTADO.md').exists()\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "add", "src/stats.py", "tests/test_notas.py", "tests/test_resultado.py"],
+        cwd=raiz,
+        check=True,
+    )
     subprocess.run(
         ["git", "commit", "-q", "-m", "fixture verde"], cwd=raiz, check=True
     )
@@ -95,6 +111,7 @@ def test_aceitacao_do_planejador(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "RAIZ", raiz)
     assert cli.main(["--sprint", sprint_id, "init"]) == 0
     assert "DAG valido: 3 tasks em 2 ondas" in capsys.readouterr().out
+    assert cli.main(["aprovar", sprint_id, "--por", "Teste de aceitacao"]) == 0
 
     dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
     ondas = ordem_topologica(dag)
