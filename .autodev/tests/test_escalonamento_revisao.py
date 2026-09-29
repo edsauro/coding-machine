@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from autodev import agents, review, sandbox
+from autodev import agents, retry, review, sandbox
 
 SOB_SANDBOX = os.environ.get("AUTODEV_SANDBOX") == "1"
 SPRINT = "TESTE-900"
@@ -401,3 +401,41 @@ def test_limpeza_remove_copia_antiga_em_worktree(tmp_path, monkeypatch):
                         fake_raiz / ".autodev" / "sandbox-home")
     assert sandbox._limpar_copias_antigas() == [str(copia / "auth.json")]
     assert not (copia / "auth.json").exists()
+
+
+# ------------------------------------------- P-09: infra não gasta degrau de modelo
+def test_classe_declarada_nunca_escalona_modelo(cfg):
+    """P-09 — a lista `classes_sem_escalonamento` da política tem de valer de fato.
+
+    A intenção sempre esteve escrita; a fiação não existia: o degrau vinha do
+    CONTADOR da task, então uma falha de rede/ambiente pagava a chamada cara.
+    """
+    for classe in sorted(cfg.classes_sem_escalonamento()):
+        for n_tent in (1, 3, 4):
+            d = retry.decidir(failure_class=classe, tentativas_implementacao=n_tent,
+                              esperas_cota=0, agente_atual="codex", cfg=cfg,
+                              fp_nova="mesma-falha", fps_anteriores=["mesma-falha"])
+            assert d.estrategia != retry.Estrategia.ESCALONAR_MODELO, (
+                f"{classe} na {n_tent}a tentativa escalou modelo — a política proíbe")
+            if d.estrategia == retry.Estrategia.RETRY_IGUAL:
+                atual = cfg.modelo_para_tentativa(n_tent)
+                assert d.tier == atual["tier"], (
+                    f"{classe}: a retomada tem de repetir o degrau ATUAL "
+                    f"({atual['slug']}/{atual['effort']}), não o próximo da escada")
+
+
+def test_orquestrador_respeita_o_degrau_da_decisao(cfg):
+    """O motor não pode deduzir degrau do contador quando a decisão já diz qual é."""
+    from autodev.orchestrator import Orquestrador
+    orq = Orquestrador.__new__(Orquestrador)      # só o mapa decisão -> degrau
+    orq.cfg = cfg
+    # 4 tentativas feitas: o degrau ATUAL é o 4º (sol/medium), não o 5º (astra/low)
+    d = retry.decidir(failure_class="NETWORK_ERROR", tentativas_implementacao=4,
+                      esperas_cota=0, agente_atual="codex", cfg=cfg,
+                      fp_nova="mesma-falha", fps_anteriores=["mesma-falha"])
+    m = orq._modelo_da_tentativa(d, n_tent=4)
+    assert (m["slug"], m["effort"]) == ("gpt-5.6-sol", "medium"), (
+        "falha de rede não pode subir para o degrau caro (astra/low)")
+    # e, sem decisão (1ª tentativa), o contador continua mandando
+    m1 = orq._modelo_da_tentativa(None, n_tent=0)
+    assert (m1["slug"], m1["effort"]) == ("gpt-5.6-luna", "low")

@@ -90,12 +90,25 @@ class Config:
     def escada(self) -> list[dict]:
         return self.models["codex"]["ladder"]
 
+    def degrau_por_tier(self, tier: int) -> dict | None:
+        """Degrau da escada de um tier — o MESMO critério de `modelo_para_tentativa`.
+
+        Existe para a decisão de retry poder dizer QUAL degrau usar quando a classe de
+        falha não recebe escalonamento (P-09): sem isso o motor deduzia o degrau do
+        contador da task, e uma falha de rede/ambiente pagava a chamada cara.
+        """
+        degraus = [d for d in self.escada() if d["tier"] == tier]
+        return degraus[0] if degraus else None
+
     def modelo_para_tentativa(self, tentativa: int) -> dict:
         """Tentativa N -> degrau da escada (spec §10). 1-indexado."""
         mapa = self.policies["retry"]["escalonamento"]
         tier = mapa.get(min(tentativa, max(mapa)), max(mapa.values()))
-        degraus = [d for d in self.escada() if d["tier"] == tier]
-        return degraus[0] if degraus else self.models["codex"]["default"]
+        return self.degrau_por_tier(tier) or self.models["codex"]["default"]
+
+    def tier_atual(self, tentativas_implementacao: int) -> int:
+        """Tier do degrau EM USO depois de N tentativas — nunca o próximo da escada."""
+        return self.modelo_para_tentativa(max(tentativas_implementacao, 1))["tier"]
 
     def classes_sem_escalonamento(self) -> set[str]:
         return set(self.policies["retry"]["classes_sem_escalonamento"])

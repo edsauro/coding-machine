@@ -128,6 +128,23 @@ class Orquestrador:
         if self.deadline and time.time() > self.deadline:
             raise killswitch.ParadoPorKillSwitch("DEADLINE", "deadline do sprint atingido")
 
+    def _modelo_da_tentativa(self, d, n_tent: int) -> dict:
+        """Degrau de modelo da PRÓXIMA tentativa.
+
+        Sem decisão (1ª tentativa), vale o contador da task (`n_tent + 1`) — chumbar 1
+        fazia uma sprint retomada voltar ao degrau barato, ignorando o desbloqueio.
+        Com decisão, quem manda é o `tier` DELA: quando a classe de falha não recebe
+        escalonamento (P-09 — cota, rede, ambiente, permissão, segredo), a decisão
+        carrega o degrau ATUAL e a infra deixa de pagar a chamada cara.
+        """
+        if d is None:
+            return self.cfg.modelo_para_tentativa(n_tent + 1)
+        if d.tier:
+            atual = self.cfg.degrau_por_tier(d.tier)
+            if atual is not None:
+                return atual
+        return self.cfg.modelo_para_tentativa(d.tentativa_proxima)
+
     def _ctx(self) -> str:
         p = self.dir_sprint / "spec.md"
         return p.read_text(encoding="utf-8")[:2500] if p.exists() else "(sem spec.md)"
@@ -347,14 +364,14 @@ class Orquestrador:
                         agente = alvo
                         wt = self.wm.criar(self.sprint, task_id, agente, base=base)
                         self.store.adquirir_worktree(str(wt.caminho), task_id, agente)
-                modelo_info = self.cfg.modelo_para_tentativa(d.tentativa_proxima)
+                modelo_info = self._modelo_da_tentativa(d, n_tent)
             else:
                 d = None
                 # O modelo da tentativa vem do CONTADOR DA TASK (n_tent + 1), não de
                 # um "1" fixo: numa retomada o contador pode já estar em 2 (a próxima
                 # tentativa é a 3ª da escada) — chumbar 1 fazia a sprint retomada
                 # voltar para o degrau mais barato, ignorando o desbloqueio.
-                modelo_info = self.cfg.modelo_para_tentativa(n_tent + 1)
+                modelo_info = self._modelo_da_tentativa(None, n_tent)
 
             # ---- monta o prompt (com evidência nova, nunca o mesmo prompt) -----
             prompt = PROMPT_TASK.format(

@@ -115,7 +115,10 @@ def decidir(*, failure_class: str, tentativas_implementacao: int,
             return Decisao(Estrategia.BLOQUEAR, tentativas_implementacao, 0,
                            f"{fc.value} nao resolvido apos {tentativas_implementacao} "
                            f"tentativas", failure_class, fingerprint=fp)
-        return Decisao(Estrategia.RETRY_IGUAL, tentativas_implementacao + 1, 0,
+        # P-09: o tier vai EXPLÍCITO (o degrau atual). Com 0, o orquestrador caía no
+        # contador da task e a falha de rede pagava o próximo degrau da escada.
+        return Decisao(Estrategia.RETRY_IGUAL, tentativas_implementacao + 1,
+                       cfg.tier_atual(tentativas_implementacao),
                        f"{fc.value}: corrigir o ambiente antes de reexecutar "
                        f"(sem escalonar modelo)", failure_class, fingerprint=fp)
 
@@ -126,7 +129,8 @@ def decidir(*, failure_class: str, tentativas_implementacao: int,
                        f"limite de {max_tent} tentativas de implementacao atingido",
                        failure_class, fingerprint=fp)
     if fc.value in sem_escalonar:
-        return Decisao(Estrategia.RETRY_IGUAL, prox, 0,
+        # P-09: mesma regra do bloco de ambiente — tier explícito, degrau atual.
+        return Decisao(Estrategia.RETRY_IGUAL, prox, cfg.tier_atual(tentativas_implementacao),
                        f"{fc.value} nao recebe escalonamento de modelo",
                        failure_class, fingerprint=fp)
 
