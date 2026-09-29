@@ -1,8 +1,10 @@
 # Pendências do Coding_Machine
 
-Atualizado em **28/09/2026** (Hermes), logo depois de a `DEVFACTORY-002` ser encerrada.
-Estado dos sprints: **001 ENCERRADA** · **002 ENCERRADA (10/10 integradas)** ·
-**003 PLANEJADA** · **004 PLANEJADA (aprovada pelo autor em P1, em execução)**.
+Atualizado em **28/09/2026, ~22h** (Hermes) — depois de a `DEVFACTORY-004` encerrar, de o
+relatório de tentativas ganhar as colunas de retrabalho e de a **prévia de custo do A/B**
+ser medida (12 braços).
+Estado dos sprints: **001 ENCERRADA** · **002 ENCERRADA (10/10, aguarda merge)** ·
+**003 PLANEJADA (espera o seu "vai", P-03)** · **004 ENCERRADA (4/4, aguarda merge)**.
 
 ## Como este arquivo é mantido
 
@@ -23,35 +25,39 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 
 ## Abertas
 
-### P-01 · Merge da DEVFACTORY-002 em `main` — **autor**
+### P-01 · Merge das sprints 002 e 004 em `main` — **autor**
 - **Por que importa:** o trabalho está integrado, mas fora do `main`. Enquanto não
-  mergear, `main` não tem o planejador, o portão de testes nem a tela.
+  mergear, `main` não tem o planejador, os portões nem a tela. **Duas** pontas esperam:
+  a 002 e a 004.
 - **Caminhos:**
-  - branch com o trabalho: `sprint/DEVFACTORY-002/integration`
+  - `sprint/DEVFACTORY-002/integration`
+  - `sprint/DEVFACTORY-004/integration` (ponta **`4ce5174`**)
   - arquivos que **vão conflitar** (as duas pontas os mudaram):
-    `.autodev/sprints/DEVFACTORY-002/decisions.md` e `README.md`
+    `.autodev/sprints/*/decisions.md` e `README.md`
   - resolução correta: **somar os dois lados** (o log de decisões de um lado, as duas
     seções de documentação do outro) — não escolher uma versão.
 - **Verificação:**
-  `git merge-tree --write-tree main sprint/DEVFACTORY-002/integration` (lista os conflitos)
-- **Pronto quando:** `main` contiver as 10 tasks e os dois arquivos com as duas partes.
-- **Já conferido:** `dag.json` **não** regride — só o `main` o mudou desde a base do
-  merge, então as correções D-16/D-19 são preservadas.
+  `git merge-tree --write-tree main sprint/DEVFACTORY-004/integration` (lista os conflitos)
+- **Pronto quando:** `main` contiver as 10 tasks da 002 e as 4 da 004, com os dois arquivos
+  somados.
+- **Já conferido:** `dag.json` **não** regride; as correções D-16/D-19 são preservadas.
 - **Extra:** há commits locais à frente de `origin/main` (sem push). Push é decisão sua.
-- **Depois deste:** a `sprint/DEVFACTORY-004/integration` (ponta `4ce5174`) também espera
-  merge — mesmo cuidado de somar os dois lados em `README.md` e nos `decisions.md`.
 
 ### P-03 · Aprovar o objetivo da DEVFACTORY-003 — **autor**
 - **Por que importa:** é a sprint que transforma a lição do D-16 em código — colisão de
   arquivo na mesma onda vira **erro** antes de o agente rodar — e cria o portão de
   aprovação humana do plano. Sem o seu "vai", ela não começa.
 - **Caminhos:** `.autodev/sprints/DEVFACTORY-003/` (`spec.md`, `dag.json`, `sprint.yaml`)
+- **As 7 tasks (6 ondas):** P01 detectar colisão de arquivo entre tasks · P02 barrar
+  colisão na mesma onda no validador · P03 relatório de impacto do plano em módulo próprio ·
+  P04 `autodev prever:` impacto antes de rodar · P05 portão de aprovação humana do plano ·
+  P06 aceitação ponta a ponta do portão · P07 documentar o portão e o checklist do D-16.
 - **Verificação:**
   `.venv/bin/python .autodev/scripts/verificar_plano.py DEVFACTORY-003` (hoje: 0 erros, 0 avisos)
-- **Pronto quando:** você aprovar (ou ajustar) o objetivo. Depois disso eu rodo, em
-  sequência à 004.
-- **Ordem importa:** 004 **antes** de 003 — a P07 da 003 mexe em
-  `.autodev/tests/test_plan_docs.py`, o mesmo arquivo que a P02 da 004 corrige.
+- **Pronto quando:** você aprovar (ou ajustar) o objetivo.
+- **Bloqueio de ordem — RESOLVIDO em 28/09:** a 003 tinha de vir **depois** da 004 porque a
+  P07 dela mexe em `.autodev/tests/test_plan_docs.py`, o mesmo arquivo que a P02 da 004
+  corrige. A 004 está **fechada**, então a 003 pode começar assim que você aprovar.
 
 ### P-04 · HAQ-002 — encerramento retroativo da sprint 1 — **autor**
 - **O que é:** as T01–T14 da sprint 1 foram concluídas por **evidência retroativa**
@@ -65,42 +71,8 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Pronto quando:** a HAQ estiver com resultado registrado (o sprint 1 já está
   `ENCERRADO`; a HAQ é a ratificação formal do método).
 
-### P-05 · Os 2 achados médios da revisão retroativa da P10 — **fechada pela DEVFACTORY-004** ✅
-- **1.** `README.md:91` — a seção `## Planejador` foi inserida **dentro** de
-  `## Como rodar`, rebaixando `### Ciclo de vida do sprint` e `### Conclusão por
-  evidência` a subseções do Planejador.
-- **2.** `.autodev/tests/test_plan_docs.py:13` — `_secao_planejador()` corta a seção
-  apenas no próximo `\n## `, então o teste examina subseções que não são do Planejador:
-  **prova menos do que anuncia**.
-- **Quem fecha:** `P01` e `P02` da DEVFACTORY-004.
-- **Evidência:** `.autodev/sprints/DEVFACTORY-002/revisao-retroativa/P10-veredito-relido.json`
-
-### P-06 · Forma do comando de teste nos critérios — **agente**
-- **O que é:** o critério (`teste` e os comandos citados) é executado pelo **runner do
-  motor**, com `cwd` **dentro do worktree**. Ali o venv do projeto **não existe de forma
-  útil**, então `.venv/bin/python -m pytest` quebra o portão de testes. A forma
-  suportada é **`python3 -m pytest ...`** — o sandbox resolve o interpretador do
-  projeto. Rodar à mão é outra coisa: aí sim vale `.venv/bin/python -m pytest` (é o que
-  o README manda).
-- **Provado na prática em 28/09:** os critérios da DEVFACTORY-004 saíram com
-  `.venv/bin/python` e **12 tentativas** (P01 e P04) morreram com
-  `No module named pytest` — evidência em
-  `.autodev/sprints/DEVFACTORY-004/evidence/P04-*.txt` e decisão **D-23** em
-  `.autodev/sprints/DEVFACTORY-004/decisions.md`.
-- **Caminhos:** `.autodev/sprints/*/dag.json` (campo `teste` e critérios),
-  `.autodev/sprints/*/sprint.yaml` (bloco `aceitacao`), `autodev/plan_prompt.py`.
-- **Verificação:** `grep -rn "\.venv/bin/python" .autodev/sprints/*/dag.json` (só deve
-  aparecer onde o texto **proíbe** a forma) e
-  `grep -rn "python3 -m pytest" .autodev/sprints/*/dag.json`
-- **Quem fecha:** `P04` da DEVFACTORY-004 — já invertida: exige a forma do runner e
-  reprova caminho de venv relativo, com a explicação.
-- **Fechada pela 004 em 28/09** (a forma do runner virou regra escrita, D-23).
-
-### P-07 · Baixas da revisão retroativa (registradas, não bloqueiam) — **agente** (os 2 itens de `README` fechados pela P03 da 004)
-- `README.md:105` — diz que a execução "consome cota do agente configurado", mas o
-  agente do planejador é **fixo** em `codex` (`autodev/cli.py`, `cmd_plan`). → P03 da 004.
-- `README.md:167` — "Suíte do orquestrador: **123** testes passando": número obsoleto
-  (a árvore coleta 205). → P03 da 004.
+### P-07 · Baixas da revisão retroativa (registradas, não bloqueiam) — **agente**
+- `README.md:105` e `README.md:167` — **fechados pela P03 da 004** ✅
 - Evidência anexada à tentativa da P10 dizia "203 passed"; a árvore revisada coleta
   **205**. Diferença explicada (a tentativa rodou antes do último ajuste), registrada
   em D-22.
@@ -110,59 +82,56 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Evidência:** `.autodev/sprints/DEVFACTORY-002/revisao-retroativa/P0{9,10}-veredito-relido.json`
 
 ### P-08 · Higiene de vigias — **agente**
-- O vigia noturno terminou seus 14 disparos e o diurno foi **pausado** quando a sprint 2
-  fechou (`cronjob` `329c5e1d03b4`). Se a 003 for aprovada, criar um vigia novo para ela
-  (mesmo padrão: trava de sobreposição via `.autodev/scripts/rodada_em_andamento.py` e
-  silêncio quando nada muda).
-
-### P-09 · Escalonamento de modelo não respeita `classes_sem_escalonamento` — **agente**
-- **O que é:** a política declara que falhas de infraestrutura (cota, rede, ambiente,
-  dependência, permissão, segredo, ação vermelha) **não** gastam degrau de modelo. Mas o
-  orquestrador escolhe o modelo pelo **contador da task** (`modelo_para_tentativa(n_tent+1)`)
-  e **ignora** o tier da decisão (`d.tier`) — na prática, espera de cota escalona como
-  qualquer falha. A intenção está escrita; a fiação não existe.
-- **Por que importa:** é dinheiro — o degrau caro é pago por um problema que não era do
-  modelo. Aparece na base: 8 chamadas de `astra/low` no período (ver relatório de tentativas).
-- **Caminhos:** `autodev/orchestrator.py` (≈linhas 336–412, escolha de `modelo_info`),
-  `autodev/retry.py` (`classes_sem_escalonamento`, `decidir`), `autodev/config.py`
-  (`modelo_para_tentativa`).
-- **Verificação:** `.venv/bin/python -m pytest .autodev/tests -q` com um teste novo que
-  prove: falha `CODEX_QUOTA` na 5ª chamada **não** muda o modelo da 6ª.
-- **Pronto quando:** existe teste que falha hoje e passa depois; e o relatório de tentativas
-  mostra o degrau barato repetido nas classes de infraestrutura.
-- **Relacionado:** decisão de política discutida em 28/09 — escalonar por **causa**
-  (teste do código falhou / revisor reprovou) em vez de por **número** de tentativa.
-
-### P-10 · Tokens e custo por tentativa — **CONCLUÍDA em 28/09** (passado não é recuperável)
-- **Feito:** o motor grava `attempts.tokens_total` + `tokens_fonte` em cada tentativa.
-  O wrapper `~/.local/bin/ask-codex` ganhou o opt-in `ASK_CODEX_USO`: ele copia o consumo
-  (e as últimas 200 KB da saída crua do CLI) **antes** de o `trap` apagar o `mktemp`.
-  Fiação: `autodev/agents.py` (`parse_tokens_do_texto`, `ler_uso`, `_medir_tokens`, env no
-  `subprocess.run`) → `autodev/state.py` (`gravar_tokens`) → `autodev/orchestrator.py`.
-  Testes: `.autodev/tests/test_tokens.py` (15; suíte **217 verdes**).
-- **O passado NÃO é recuperável — medido, não suposto:** o rodapé `tokens used` vivia num
-  `mktemp` apagado no fim de cada chamada. `backfill_tokens.py` varreu os 110 registros:
-  **95 têm algum arquivo em disco e só 3 têm número** (2 da P06 e 1 da P03 da 004, que
-  escaparam no fallback do wrapper). Cobertura retroativa: 3/110 (2,7%).
-- **Limite honesto:** o CLI do Codex informa **um total**, sem separar entrada/saída.
-  Registrar como total; nunca inventar o split (custo exato exige o split + preço).
-- **Próximo passo:** com tokens, falta a **tabela de preço por modelo** — ela entra junto
-  com os braços do A/B (P-11).
+- **Estado em 28/09:** o vigia da 004 (`de834c952bcd`, 30 em 30 min) **completou os 12
+  disparos** e entregou a conclusão (19:55, 20:26, 20:57 — "4/4 integradas, ENCERRADA").
+  O vigil da sprint 2 está `completed` (14/14) e o diurno segue **pausado**
+  (`329c5e1d03b4`).
+- **Lembrete do A/B:** cron `5eb37e814ff2` passou de "dias úteis 9h" para **toda segunda
+  9h** (próximo 05/10) a pedido do autor — ele avisa, não roda o estudo.
+- **Pendente:** quando a **003** for aprovada, criar o vigia dela (mesmo padrão: trava de
+  sobreposição via `.autodev/scripts/rodada_em_andamento.py` e silêncio quando nada muda).
 
 ### P-11 · Estudo A/B de modelos (espelho) nos pacotes limpos — **autor (aprova o gasto)**
 - **O que é:** rodar o mesmo pacote, do mesmo commit-base, com o mesmo revisor, em N≥3
   repetições por braço (degraus da escada atual × 1–2 APIs externas de código),
   medindo aceite, chamadas, tokens, custo e tempo.
-- **Plano completo, com procedimento de cada braço:** `TesteAB-eficiencia-LLM.md` (raiz do
-  projeto). Candidatos: **P08 (sprint 002, 4 chamadas, 4/0/0, aprovada na 4ª)** e
-  **P05/P07 (sprint 002, 6 chamadas cada)**. Evitar P02/P03/P09 (002) e P01/P04 (004) —
-  todos dentro de janela de culpa de teste/plano (ver "Descontando" no relatório).
-- **Lembrete ativo:** cron `5eb37e814ff2` (`testeab-eficiencia-llm`, dias úteis 9h, entrega
-  no Telegram) cobra os braços externos e o preço por modelo, e se cala quando o estudo
-  começar.
+- **Plano completo:** `TesteAB-eficiencia-LLM.md` (raiz do projeto). Candidatos: **P08
+  (002, 4 chamadas, 4/0/0)** e **P05/P07 (002, 6 chamadas cada)**. Evitar P02/P03/P09
+  (002) e P01/P04 (004) — dentro de janela de culpa de teste/plano.
+- **PRÉVIA DE CUSTO JÁ MEDIDA (28/09)** — 12 braços, 1 chamada cada, pacote mínimo,
+  com o revisor fixo mais barato (deepseek-flash):
+  **`~/workspace/s_llm-coding-efficiency/previa-custo/RELATORIO.md`**
+  (`resultados.jsonl` cru; `medir.py` reproduz; `custos.py` gera o relatório).
+  - Codex pela assinatura do autor (US$ 20/mês = 4 blocos semanais de 100%): **US$ 0,05
+    por 1% da janela semanal**, janela de 5h ≈ 1/7 da semanal → **~US$ 0,40 por milhão de
+    tokens**; 1% da 5h ≈ 16,9 mil tokens. **A janela semanal é a que limita** (a semana
+    tem 33,6 janelas de 5h, mas a franquia vale ~7 delas).
+  - Custo do MESMO pacote: deepseek-flash **US$ 0,003** · deepseek-v4-pro **US$ 0,013** ·
+    codex sol/low **US$ 0,0066** · terra/low **0,0106** · luna/low **0,0105** · terra/high
+    **0,0132** · astra/low **0,0201** · luna/high **0,0221**.
+  - Tokens ≠ custo: o deepseek gasta ~4× mais tokens por chamada e custa ~13× menos por
+    token (~US$ 0,03/Mtok); piso de ~9,4 mil tokens por chamada de Codex.
+  - `sol/high` **reprovou pedindo aprovação** ("Aprova esse desenho?") com `rc=0`: em
+    headless, quem pergunta não entrega.
+- **Custos das APIs externas:** o Hermes grava `--usage-file` com `estimated_cost_usd`
+  (fonte oficial) por chamada; o **saldo** vem direto da API — DeepSeek
+  `GET /user/balance` (**US$ 8,36** em 28/09, chave em `~/.hermes/.env`, nunca em tela).
+  Não existe API de fatura por chamada.
 - **Pronto quando:** tabela por braço com aceite/custo/tempo e um veredito que nomeie o
   perdedor e a condição que inverte a decisão.
-- **Método:** skill `llm-coding-efficiency` (fases 1–6) + `capability-ab-test` (protocolo).
+- **Método:** skill `llm-coding-efficiency` (+ `references/custo-e-janela-codex.md`,
+  `references/coding-machine-baseline.md`) e `capability-ab-test` (protocolo).
+
+### P-12 · Contador `escalonamentos` do resumo está morto (sempre 0) — **agente**
+- **O que é:** o resumo do sprint conta escalonamentos por
+  `json_extract(test_result,'$.tier') > 0` (`autodev/state.py:946`), mas **ninguém escreve
+  `tier` dentro de `test_result`** — o motor grava o degrau em `tasks.tier_atual`.
+- **Medido em 28/09:** `SELECT COUNT(*) FROM attempts WHERE test_result LIKE '%tier%'` → **0**;
+  `... WHERE CAST(json_extract(test_result,'$.tier') AS INTEGER) > 0` → **0**. Ou seja: todos
+  os sprints reportam "**0 escalonamentos**", o que se lê como fato e não é.
+- **Verificação:** `sqlite3 .autodev/state.db "SELECT COUNT(*) FROM attempts WHERE test_result LIKE '%tier%';"`
+- **Pronto quando:** o contador contar escalonamento de verdade (comparar o degrau da
+  tentativa com o da anterior, via `tasks.tier_atual`/modelo) **ou** a chave sair do resumo.
 
 ---
 
@@ -190,12 +159,12 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 | **relatório final** | `.autodev/sprints/DEVFACTORY-002/SPRINT-REPORT.md` |
 | evidência de teste (76) | `.autodev/sprints/DEVFACTORY-002/evidence/` |
 | logs do motor | `.autodev/sprints/DEVFACTORY-002/logs/orquestrador.log` (+ por tentativa e revisão) |
-| **revisão retroativa por LLM** | `.autodev/sprints/DEVFACTORY-002/revisao-retroativa/` (vereditos, logs, scripts) |
+| **revisão retroativa por LLM** | `.autodev/sprints/DEVFACTORY-002/revisao-retroativa/` |
 | branch de integração | `sprint/DEVFACTORY-002/integration` (P01 `b963e0e` … P10 `785988d`) |
 | branches por task | `sprint/DEVFACTORY-002/P0X-*`; tentativas antigas em `refs/arquivo/DEVFACTORY-002/` |
 | logs das rodadas (fora do repo) | `~/workspace/a_devfactory/sprint-002-retomada/` |
 
-### DEVFACTORY-003 — portão de qualidade do plano (PLANEJADA)
+### DEVFACTORY-003 — portão de qualidade do plano (PLANEJADA, espera aprovação)
 | produto | caminho |
 | --- | --- |
 | spec / plano / sprint | `.autodev/sprints/DEVFACTORY-003/{spec.md,dag.json,sprint.yaml}` |
@@ -217,23 +186,47 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 | **tela de eventos** (permanente) | `./tela.sh` → `.autodev/scripts/tela.py` |
 | verificador de planos | `.autodev/scripts/verificar_plano.py` |
 | guarda de sobreposição (vigias) | `.autodev/scripts/rodada_em_andamento.py` |
-| **relatório de tentativas** (visual, regenerável) | `REPORT-TENTATIVAS-CODEX.md` + `report/` (script, PNGs, HTML, PDF A4) |
-| testes do motor | `.venv/bin/python -m pytest .autodev/tests/ -q` |
+| backfill de tokens (histórico) | `.autodev/scripts/backfill_tokens.py [--gravar]` |
+| **relatório de tentativas** (visual, regenerável) | `REPORT-TENTATIVAS-CODEX.md` + `report/` (PDF A4, 7 págs: Tabela 1 nas págs. 3–4 com **retrabalho bruto/ajustado em múltiplo**) |
+| **prévia de custo do A/B** (12 braços) | `~/workspace/s_llm-coding-efficiency/previa-custo/RELATORIO.md` |
+| testes do motor | `.venv/bin/python -m pytest .autodev/tests/ -q` (**219 verdes**) |
 | estado (fonte da verdade) | `.autodev/state.db` |
 
 ---
 
 ## Resolvidas (histórico curto)
 
+- **28/09** — **P-09 corrigida**: classe de falha declarada sem escalonamento deixou de
+  gastar degrau. A decisão agora carrega o **tier atual** explícito (`cfg.tier_atual`) nos
+  blocos de ambiente e de `classes_sem_escalonamento`, e o orquestrador obedece o degrau
+  **da decisão** (`Orquestrador._modelo_da_tentativa`) em vez de deduzi-lo do contador da
+  task. Testes novos em `.autodev/tests/test_escalonamento_revisao.py` (falhavam antes):
+  **219 verdes**. Commit **`0875764`**. Comprovação em execução real vem no relatório do
+  próximo sprint (o degrau barato deve repetir nas classes de infraestrutura).
+- **28/09** — **Relatório de tentativas** ganhou **`retrab. bruto` e `retrab. ajust.`** em
+  múltiplo (`0,3x`, `2x`, `3x`; não em %, porque a razão "reprovações por aprovação" passa
+  de 1x): global **0,5x bruto → 0,4x ajustado**; o `002/P09` sai de 0,8x para **0x** quando
+  se desconta a culpa do nosso teste/plano. Também corrigido o layout: cabeçalho da tabela
+  repete entre páginas e nenhuma linha se parte. Commits `cef0b2f`, `060cf1c`.
+- **28/09** — **Prévia de custo do A/B medida** (12 braços; ver P-11). Tabela de preço do
+  Codex derivada da assinatura do autor; custos do DeepSeek do `--usage-file`; saldo lido
+  direto na API. Método guardado na skill `llm-coding-efficiency`.
+- **28/09** — **Tier "Fast" removido** do `~/.codex/config.toml` (`service_tier = "priority"`,
+  1,5–2× de consumo, só por velocidade). Testado antes: `flex` **não é aceito** por esses
+  modelos (o CLI omite com aviso), então o mais barato é **não pedir tier nenhum** — vai no
+  padrão. Backup em `~/.codex/config.toml.bak-20260928`.
 - **28/09** — **P-02 / DEVFACTORY-004 concluída**: 4/4 tasks integradas (P01, P02, P03,
-  P04) com os 4 portões (build, testes, lint, segurança) OK em cada integração; 24
-  tentativas, 1 espera de cota (Codex), 0 HAQ. `main` intacta — trabalho no branch
-  `sprint/DEVFACTORY-004/integration` (ponta `4ce5174`). Relatório:
-  `.autodev/sprints/DEVFACTORY-004/SPRINT-REPORT.md`. Decisões novas: D-23 (comando de
+  P04) com os 4 portões (build, testes, lint, segurança) OK em cada integração; 23
+  chamadas do Codex, 1 espera de cota, 0 HAQ. `main` intacta — trabalho no branch
+  `sprint/DEVFACTORY-004/integration` (ponta `4ce5174`). Decisões novas: D-23 (comando de
   teste é o que o runner resolve), D-24 (rodada única é do motor), D-25 (portão de
-  segurança julga o diff). Com isso fecharam os achados P-05 (seção `## Planejador`
-  rebaixada + teste que prova menos do que anuncia), P-06 (forma do comando nos
-  critérios) e os 2 itens de `README` da P-07.
+  segurança julga o diff). Com isso fecharam os achados **P-05** (seção `## Planejador`
+  rebaixada + teste que prova menos do que anuncia) e **P-06** (forma do comando nos
+  critérios), além dos 2 itens de `README` da P-07.
+- **28/09** — **P-10 concluída**: tokens por tentativa gravados (`attempts.tokens_total` +
+  `tokens_fonte`), via opt-in `ASK_CODEX_USO` no wrapper `~/.local/bin/ask-codex`; suíte
+  com `test_tokens.py` (15). Retroativo **não** é recuperável (3/110 = 2,7% medidos).
+  Commit `078139e`.
 - **28/09** — DEVFACTORY-002 encerrada: 10/10 integradas, suíte do projeto 205 testes,
   motor 194; quatro portões OK em cada integração.
 - **28/09** — D-22: revisões retroativas por LLM da P09/P10 refeitas com créditos
