@@ -76,6 +76,9 @@ def cmd_status(args) -> int:
         print(f"=== {args.sprint} ===")
         print(f"  tasks {m['tasks_total']}  done {m['done']}  blocked {m['blocked']}  "
               f"failed {m['failed']}  aguardando recurso {m['waiting_resource']}")
+        if m.get("waiting_human"):
+            print(f"  ⏸ {m['waiting_human']} task(s) AGUARDANDO CONFIRMACAO DO AUTOR "
+                  f"(estrategia com portao humano)")
         print(f"  tentativas {m['tentativas_implementacao']}  esperas de cota "
               f"{m['esperas_cota']}  HAQ {m['haq']} (abertos {m['haq_abertos']})")
         ks = st.killswitch_ativo(args.sprint)
@@ -287,38 +290,65 @@ def cmd_evidenciar(args) -> int:
 
 
 def cmd_desbloquear(args) -> int:
-    """Reabre tasks bloqueadas para uma nova rodada, no degrau pedido.
+    """Reabre tasks paradas para uma nova rodada, no degrau pedido.
 
     Não executa nada: devolve o sprint a EM_EXECUCAO e as tasks a QUEUED, com o
     contador de tentativas no valor pedido — é o contador que escolhe o modelo
     (escalonamento). `--tentativas 2` faz a próxima tentativa ser a 3ª da escada.
+
+    Casos da estratégia "3 degraus" (P-15), quando o motor para em WAITING_HUMAN e
+    pergunta ao autor: `--repetir` recomeça o ciclo do 1º degrau (contador em zero);
+    `--estrategia NOME` troca a estratégia da task e também recomeça.
     """
     from .config import Config
     cfg = Config.carregar()
-    maximo = cfg.policies["retry"]["max_tentativas_implementacao"]
-    if args.tentativas >= maximo:
-        print(f"RECUSADO: --tentativas {args.tentativas} >= maximo {maximo} —"
-              " a task bloquearia de novo na primeira checagem.")
+    repetir = getattr(args, "repetir", False)
+    estrategia = getattr(args, "estrategia", "") or ""
+    # Teto global antes de olhar as tasks (o teste e o hábito antigo esperam esta recusa):
+    # `--tentativas >= maximo` pararia na primeira checagem. Com --repetir/--estrategia o
+    # contador é do ciclo novo (zero), então não se aplica.
+    if not (repetir or estrategia) and args.tentativas >= cfg.max_tentativas(None):
+        print(f"RECUSADO: --tentativas {args.tentativas} >= maximo "
+              f"{cfg.max_tentativas(None)} — a task pararia de novo na primeira checagem.")
         return 1
     with _store(RAIZ) as st:
         tasks = st.tasks(args.sprint)
-        alvos = args.tasks or [t["task_id"] for t in tasks if t["estado"] == "BLOCKED"]
+        alvos = args.tasks or [t["task_id"] for t in tasks
+                               if t["estado"] in ("BLOCKED", "WAITING_HUMAN")]
         if not alvos:
-            print("nenhuma task bloqueada para reabrir")
+            print("nenhuma task bloqueada ou aguardando confirmacao para reabrir")
             return 0
+        if estrategia and estrategia not in cfg.estrategias():
+            print(f"RECUSADO: estrategia '{estrategia}' nao existe"
+                  f" (policies.yaml tem: {', '.join(cfg.estrategias()) or 'nenhuma'})")
+            return 1
+        if estrategia:
+            for tid in alvos:
+                st.trocar_estrategia(args.sprint, tid, estrategia)
+        # A estratégia de quem já entrou manda (P-15); task sem estratégia recebe a padrão.
+        ests = {tid: st.definir_estrategia(args.sprint, tid, cfg.estrategia_padrao())
+                for tid in alvos}
+        tentativas = 0 if (repetir or estrategia) else args.tentativas
+        for tid, est in ests.items():
+            teto = cfg.max_tentativas(est)
+            if tentativas >= teto:
+                print(f"RECUSADO: --tentativas {tentativas} >= maximo {teto} da "
+                      f"estrategia '{est}' ({tid}) — a task pararia de novo na "
+                      f"primeira checagem.")
+                return 1
         de = st.reabrir_sprint(args.sprint,
                                motivo=f"desbloqueio para nova rodada: {', '.join(alvos)}")
-        feitas = st.reabrir_tasks(args.sprint, alvos, tentativas=args.tentativas,
+        feitas = st.reabrir_tasks(args.sprint, alvos, tentativas=tentativas,
                                   motivo=args.motivo or "desbloqueio manual")
-        prox = cfg.modelo_para_tentativa(args.tentativas + 1)
-        revisor = cfg.revisor_para_tentativa(args.tentativas + 1)
         print(f"sprint {args.sprint}: {de or '(sem estado)'} -> EM_EXECUCAO")
         print(f"  tasks reabertas ({len(feitas)}): {', '.join(feitas)}")
-        print(f"  contador de tentativas: {args.tentativas}/{maximo}"
-              f"  =>  proxima tentativa e a {args.tentativas + 1}a da escada")
-        print(f"  modelo da proxima tentativa: {prox.get('slug')}/{prox.get('effort')}")
-        print(f"  revisor da proxima tentativa: {revisor.get('agente') or '-'}"
-              f"{' (' + revisor['modelo'] + ')' if revisor.get('modelo') else ''}")
+        for tid in feitas:
+            est = ests[tid]
+            prox = cfg.modelo_para_tentativa(tentativas + 1, est)
+            print(f"  {tid}: estrategia '{est}'  contador {tentativas}"
+                  f"  => proxima tentativa e a {tentativas + 1}a"
+                  f"  modelo {prox.get('slug')}/{prox.get('effort')}")
+    return 0
 
 def cmd_plan(args) -> int:
     """Planeja um pedido, valida o resultado e persiste um novo sprint."""
@@ -416,6 +446,11 @@ def main(argv: list[str] | None = None) -> int:
                    help="task ids (padrao: todas as BLOCKED do sprint)")
     s.add_argument("--tentativas", type=int, default=0,
                    help="contador inicial: 2 => a proxima tentativa e a 3a da escada")
+    s.add_argument("--repetir", action="store_true",
+                   help="recomeca o ciclo do 1o degrau (estrategia '3 degraus': "
+                        "resposta 'repetir' a pergunta do motor)")
+    s.add_argument("--estrategia", default="",
+                   help="troca a estrategia da task (nomes em policies.yaml)")
     s.add_argument("--motivo", default="")
     s.set_defaults(fn=cmd_desbloquear)
 

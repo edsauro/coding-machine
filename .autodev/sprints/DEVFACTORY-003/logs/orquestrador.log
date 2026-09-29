@@ -81,3 +81,87 @@
 [00:34:07] P04 tentativa 1: codex gpt-5.6-luna/low
 [00:36:04] P04 t1: 42,961 tokens (codex-cli:rodape)
 [00:36:05] P04: testes exit=0 passed=3 failed=0 (configurado)
+[00:42:54] P04: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (5 findings)
+[00:42:54] P04 tentativa 2: codex gpt-5.6-terra/low
+[00:45:41] P04 t2: 50,770 tokens (codex-cli:rodape)
+[00:45:42] P04: testes exit=0 passed=6 failed=0 (configurado)
+[00:48:57] P04: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (5 findings)
+[00:48:57] P04 tentativa 3: codex gpt-5.6-sol/low
+[00:52:18] P04 t3: 42,179 tokens (codex-cli:rodape)
+[00:52:19] P04: testes exit=0 passed=8 failed=0 (configurado)
+[00:55:29] P04: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> APPROVE (5 findings)
+[00:55:29] P04: DONE em 3 tentativa(s) — commit a8b06062
+[00:55:29] integrando 1 task(s) da onda 2
+[00:55:59]   portao build: OK
+[00:55:59]   portao testes: OK
+[00:55:59]   portao lint: OK
+[00:55:59]   portao seguranca: OK
+[00:55:59] branch atual do repo: 8b9ccefd (main intacta — merge automatico proibido)
+[00:55:59] sprint DEVFACTORY-003: 7 tasks (0 novas) — ondas [['P01'], ['P02', 'P03'], ['P04'], ['P05'], ['P06'], ['P07']]
+[00:55:59] rodada dona: pid 3451713 — rodada única garantida pelo motor
+[00:55:59] P05 tentativa 1: codex gpt-5.6-luna/low
+[00:58:21] P05 t1: 68,849 tokens (codex-cli:rodape)
+[00:58:22] P05: testes exit=0 passed=4 failed=0 (configurado)
+[01:02:43] P05: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (9 findings)
+[01:02:43] P05 tentativa 2: codex gpt-5.6-terra/low
+[01:08:44] P05 t2: 87,349 tokens (codex-cli:rodape)
+[01:08:45] P05: testes exit=0 passed=12 failed=0 (configurado)
+[01:13:14] P05: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (7 findings)
+[01:13:14] P05 tentativa 3: codex gpt-5.6-sol/low
+[01:19:25] P05 t3: 88,383 tokens (codex-cli:rodape)
+[01:19:26] P05: testes exit=0 passed=21 failed=0 (configurado)
+[01:24:21] P05: revisao por hermes [reserva (revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (5 findings)
+[01:24:21] P05: agy esta fora desta rodada (cota) — seguindo com codex
+[01:24:21] P05 tentativa 4: codex gpt-5.6-sol/medium
+[01:33:03] P05 t4: 102,485 tokens (codex-cli:rodape)
+[01:33:05] P05: testes exit=0 passed=34 failed=0 (configurado)
+[01:40:04] P05: revisao por hermes [escada (tentativa 4)] -> REQUEST_CHANGES (4 findings)
+[01:40:04] P05: agy esta fora desta rodada (cota) — seguindo com codex
+[01:40:04] P05 tentativa 5: codex gpt-6-astra/low
+[01:43:16] P05 t5: 52,386 tokens (codex-cli:rodape)
+[01:43:18] P05: testes exit=0 passed=36 failed=0 (configurado)
+[01:49:35] P05: revisao por hermes [escada (tentativa 5)] -> APPROVE (3 findings)
+[01:49:35] P05: DONE em 5 tentativa(s) — commit 7a4c7017
+[01:49:35] integrando 1 task(s) da onda 3
+[01:50:06]   portao build: OK
+[01:50:06]   portao testes: OK
+[01:50:06]   portao lint: OK
+[01:50:06]   portao seguranca: OK
+[01:50:06] branch atual do repo: 8b9ccefd (main intacta — merge automatico proibido)
+[01:50:07] sprint DEVFACTORY-003: 7 tasks (0 novas) — ondas [['P01'], ['P02', 'P03'], ['P04'], ['P05'], ['P06'], ['P07']]
+[01:50:07] rodada dona: pid 3451713 — rodada única garantida pelo motor
+[01:50:07] P06 tentativa 1: codex gpt-5.6-luna/low
+[01:50:11] P06: COTA ESGOTADA — aguardando 18600s (checkpoint em ae79f9f7)
+[07:59:06] sprint DEVFACTORY-003: 7 tasks (0 novas) — ondas [['P01'], ['P02', 'P03'], ['P04'], ['P05'], ['P06'], ['P07']]
+[07:59:06] recuperacao: {'stale': [], 'requeued': [], 'resource': ['P06']}
+[07:59:06] rodada dona: pid 330946 — rodada única garantida pelo motor
+[07:59:07] P06: escalonamento de degrau gpt-5.6-luna/low -> gpt-5.6-terra/low
+[07:59:07] P06 tentativa 2: codex gpt-5.6-terra/low
+[08:01:45] P06 t2: 81,753 tokens (codex-cli:rodape)
+[08:01:48] P06: testes exit=1 passed=0 failed=1 (configurado)
+[08:01:48] P06: escalonamento de degrau gpt-5.6-terra/low -> gpt-5.6-sol/low
+[08:01:48] P06 tentativa 3: codex gpt-5.6-sol/low
+[08:03:33] P06 t3: 37,308 tokens (codex-cli:rodape)
+[08:03:36] P06: testes exit=0 passed=1 failed=0 (configurado)
+[08:13:18] P06: revisao por hermes-deterministico [escada (tentativa 3)] -> APPROVE (0 findings)
+[08:13:18] P06: agy FORA desta rodada (cota esgotada)
+[08:13:18] P06: DONE em 3 tentativa(s) — commit 1dfc1b7e
+[08:13:18] integrando 1 task(s) da onda 4
+[08:14:02]   portao build: OK
+[08:14:02]   portao testes: OK
+[08:14:02]   portao lint: OK
+[08:14:02]   portao seguranca: OK
+[08:14:02] branch atual do repo: e385efff (main intacta — merge automatico proibido)
+[08:14:02] sprint DEVFACTORY-003: 7 tasks (0 novas) — ondas [['P01'], ['P02', 'P03'], ['P04'], ['P05'], ['P06'], ['P07']]
+[08:14:02] rodada dona: pid 330946 — rodada única garantida pelo motor
+[08:14:02] P07 tentativa 1: codex gpt-5.6-luna/low
+[08:23:40] P07 t1: 80,498 tokens (codex-cli:rodape)
+[08:23:41] P07: testes exit=0 passed=8 failed=0 (configurado)
+[08:28:39] P07: revisao por hermes [reserva (hermes/deepseek-flash/high — revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (7 findings)
+[08:28:39] P07: escalonamento de degrau gpt-5.6-luna/low -> gpt-5.6-terra/low
+[08:28:39] P07 tentativa 2: codex gpt-5.6-terra/low
+[08:30:56] P07 t2: 60,362 tokens (codex-cli:rodape)
+[08:30:58] P07: testes exit=0 passed=9 failed=0 (configurado)
+[08:34:32] P07: revisao por hermes [reserva (hermes/deepseek-flash/high — revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (6 findings)
+[08:34:32] P07: escalonamento de degrau gpt-5.6-terra/low -> gpt-5.6-sol/low
+[08:34:32] P07 tentativa 3: codex gpt-5.6-sol/low

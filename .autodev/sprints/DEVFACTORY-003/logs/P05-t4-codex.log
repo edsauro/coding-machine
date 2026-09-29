@@ -1,0 +1,129 @@
+# exit_code=0 duracao=522.0s modelo=gpt-5.6-sol effort=medium failure_class=None tokens=102485(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P05: Portao de aprovacao humana do plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- sprint.yaml aceita o bloco aprovacao com as chaves por, quando e hash_dag (sha256 do dag.json)
+- autodev run recusa rodar sprint PLANEJADO sem aprovacao registrada, dizendo qual comando registra a aprovacao
+- existe o comando autodev aprovar <sprint_id> --por <nome> que grava a aprovacao com o hash atual do dag.json
+- depois de aprovar, autodev run aceita o sprint e registra um evento de aprovacao no historico
+- dag.json alterado depois da aprovacao invalida a aprovacao (hash nao confere) e o run recusa de novo, citando a divergencia
+- os testes ficam em .autodev/tests/test_plan_aprovacao.py e rodam com python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q
+- estende autodev/cli.py e autodev/orchestrator.py preservando os subcomandos e o laco de execucao atuais, sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+  - tentativa 2: REVIEW_FAILURE (exit 0) — 
+  - tentativa 3: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+anto o estado do sprint e None ou PLANEJADO. Sprint que ja rodou (FIM) ou esta EM_EXECUCAO passa direto: demonstrei em execucao real que, apos aprovar e rodar, substituir o dag.json por um plano nunca aprovado faz checar_aprovacao() devolver None e a rodada seguinte materializar e tentar executar a task injetada. Ou seja, o criterio 'dag.json alterado depois da aprovacao invalida a aprovacao e o run recusa de novo' vale por apenas um instante (o primeiro run), embora a aprovacao fique gravada no sprint.yaml como se continuasse valida. Efeito pratico: o fluxo normal de re-execucao noturna aceita plano divergente sem recusa nem evento de divergencia.", "correcao_sugerida": "Trocar a guarda por estado: se 'aprovacao' existe (dict), conferir o hash sempre, exceto em estados terminais de decisao humana (ENCERRADO/ABORTADO). Como nada reescreve dag.json durante a rodada (apenas autodev/planner.py:129 o escreve, em plan/init), isso nao bloqueia passadas nem resume; so reage a divergencia real. Alternativa: persistir o hash aprovado no store e comparar em toda rodada. Incluir testes para sprint em EM_EXECUCAO e em FIM com dag.json alterado."}, {"severidade": "media", "arquivo": "autodev/cli.py", "linha": 195, "descricao": "Codigo de producao novo sem nenhum teste: cmd_resume ganhou um portao antecipado (checar_aprovacao + tratamento de PlanoInvalido, cli.py:196-206) que muda o comportamento do subcomando 'resume' (antes sempre recuperava e rodava; agora recusa sprints sem aprovacao) e nenhum teste em test_plan_aprovacao.py o exercita. Os testes so tocam run e aprovar.", "correcao_sugerida": "Adicionar testes: resume em sprint PLANEJADO sem aprovacao (rc 2 + mensagem com o comando), resume com aprovacao valida, resume com sprint.yaml malformado (sem traceback)."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 184, "descricao": "O regex de limpeza da aprovacao anterior so reconhece o estilo bloco/`null`/`~`. Com 'aprovacao: {por: Ana, quando: agora, hash_dag: abc}' (estilo fluxo, escrito a mao) o bloco antigo nao e removido: o sprint.yaml fica com DUAS chaves 'aprovacao' (verificado: count==2). O PyYAML aceita e a ultima vence, entao funciona por acidente, mas o arquivo aprovado fica ambiguo para qualquer leitor mais estrito ou edicao humana, e nenhum teste cobre esse caso.", "correcao_sugerida": "Casar a linha inteira (`(?m)^aprovacao:.*$` mais as linhas indentadas seguintes quando o valor for bloco), em vez de exigir null/~; ou reescrever o arquivo inteiro com yaml.safe_dump preservando as chaves. Cobrir com teste o estilo fluxo e o estilo multi-linha."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 213, "descricao": "A validacao nova em carrega_sprint atinge quem chama a funcao fora do run: `autodev report` morre com ValueError nao tratado (traceback) quando o sprint.yaml tem aprovacao malformada; verificado em execucao real. run e resume foram explicitamente ensinados a imprimir 'sprint invalido' sem traceback, report/status nao — o requisito de nao vazar traceback ficou aplicado de forma desigual.", "correcao_sugerida": "Envolver carrega_sprint em cmd_report (e nos demais chamadores) com o mesmo try/except ValueError -> mensagem 'sprint invalido: ...' + rc 2 usado em cmd_run/cmd_resume."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 171, "descricao": "cmd_aprovar valida sprint.yaml mas nao valida o dag.json nem que o campo sprint_id do yaml corresponde ao <sprint_id> do comando. Verificado: (a) com dag.json invalido o comando sai rc 0 e grava o hash de um arquivo que o run depois recusa; (b) num diretorio S1 cujo yaml declara 'sprint_id: OUTRA' a aprovacao e gravada em S1 sem qualquer aviso — registra-se a aprovacao de um artefato que nao e o do nome informado. O erro so aparece depois, no run.", "correcao_sugerida": "Antes de escrever: carrega_dag(dag_path) (ou valida_dag) para recusar plano ilegivel e comparar sp['sprint_id'] == args.sprint_id, devolvendo 2 com mensagem clara."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/conftest.py
+  - .autodev/tests/test_plan_aceitacao.py
+  - .autodev/tests/test_plan_aprovacao.py
+  - autodev/cli.py
+  - autodev/config.py
+  - autodev/orchestrator.py
+
+## INSTRUCAO
+Esta e a tentativa #4.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 4a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+RESULTADO: portão de aprovação corrigido, incluindo reexecuções, validação de DAG/ID, YAML e `resume`/`report` | TESTES: `python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q` — 34 passed; suíte completa — 420 passed.
+
+===== STDERR =====
+

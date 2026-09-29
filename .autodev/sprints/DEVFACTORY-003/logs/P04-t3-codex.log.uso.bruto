@@ -1,0 +1,2124 @@
+Reading additional input from stdin...
+OpenAI Codex v0.154.0
+--------
+workdir: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a0eb47-abf4-75c3-ab99-a0b2f29861b2
+--------
+user
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P04: Comando autodev prever: impacto do plano antes de rodar
+
+## Criterios de aceitacao (todos obrigatorios)
+- a CLI aceita autodev prever <sprint_id> e imprime, por onda, os arquivos prometidos por cada task e as colisoes encontradas
+- autodev prever aceita --json e imprime o mesmo conteudo em JSON valido
+- sprint inexistente devolve exit code 1 com mensagem clara, sem traceback
+- os testes ficam em .autodev/tests/test_plan_cli_prever.py e rodam com python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q
+- estende autodev/cli.py preservando os subcomandos existentes (detect, init, status, run, resume, report, haq, quota, metrics, encerrar, evidenciar, desbloquear, stop, start) sem remover nenhum
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+  - tentativa 2: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+[{"severidade": "media", "arquivo": "autodev/cli.py", "linha": 382, "descricao": "cmd_prever monta o Plano direto do JSON sem validar o DAG (nao usa config.valida_dag nem config.carrega_dag). Provado empiricamente: DAG com ids duplicados (P01 duas vezes) imprime 'onda 1: P01: autodev/planner.py / colisoes: nenhuma' com exit=0, enquanto config.valida_dag(dag) devolve ['ids duplicados no DAG'] e o motor (carrega_dag, usado por orchestrator.py:184) recusa rodar o sprint; DAG com dep inexistente (P99) tambem passa em silencio, mas valida_dag acusa 'P01 depende de P99, que nao existe no DAG'. Ou seja, o comando de previsao pode afirmar um impacto que o motor jamais executara - exatamente a classe de divergencia que o P01/P02 desta sprint ataca, e nenhum teste cobre isso.", "correcao_sugerida": "Dentro do try, apos o json.loads, validar o DAG reusando o caminho canonico: `from . import config` e `erros = config.valida_dag(dag); if erros: raise ValueError('DAG invalido: ' + '; '.join(erros))` (ou simplesmente `dag = config.carrega_dag(dag_path)`), mantendo o except atual -> exit 1 com mensagem clara e sem traceback. Confirmei que as fixtures atuais dos testes continuam validas com valida_dag (S-001 -> [] e S-SEM-ARQUIVO -> []), entao a correcao nao quebra os 6 testes."}, {"severidade": "baixa", "arquivo": "autodev/plan_impacto.py", "linha": 15, "descricao": "impacto() chama config.ordem_topologica direto, sem a guarda de ids duplicados que planner._ondas_por_task (planner.py:251-258) faz. Com ids repetidos o dict comprehension de ordem_topologica colapsa os ids: uma task desaparece de arquivos_por_task e colisoes_de_arquivo devolve [] em silencio. Codigo do P03, mas e o que faz o comando novo (P04) mentir no caso acima.", "correcao_sugerida": "Reusar a guarda existente (chamar planner._ondas_por_task ou replicar o if de ids duplicados) e propagar erro em vez de silenciar; com a validacao de DAG sugerida no finding anterior o caso deixa de chegar aqui."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 367, "descricao": "O sprint_id e concatenado ao caminho sem validacao de formato. Provado: `autodev prever ../../fora` leu 'fora/dag.json' fora de .autodev/sprints e devolveu relatorio com exit=0 (sem 'sprint nao encontrado'). E somente leitura, mas quebra a promessa do criterio 3 e permite que o comando reporte qualquer dag.json do disco com outra identidade.", "correcao_sugerida": "Rejeitar separadores e '..' no sprint_id (ex.: `if not args.sprint_id or '/' in args.sprint_id or '\\\\' in args.sprint_id or args.sprint_id in ('.','..')`), mantendo o caminho resolvido dentro de RAIZ/.autodev/sprints; nao fixar regex 'DEVFACTORY-\\d+' porque os testes usam ids como S-001."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_cli_prever.py", "linha": 32, "descricao": "A linha de colisao no modo texto nunca e exercitada: 'assert \"colis\" in saida.lower()' e satisfeito pelo cabecalho 'colisoes:' impresso sempre, e o unico assert de colisao real (colisoes[0]['arquivo']) e do JSON. A formatacao '  P01 x P02: arquivo' (cli.py:398) pode quebrar sem nenhum teste falhar.", "correcao_sugerida": "No test_prever_imprime_impacto_por_onda, trocar por assert explicito do par, ex.: `assert \"P01 x P02: tests/test_a.py\" in saida`; opcionalmente acrescentar um caso com DAG invalido (ids duplicados / dep inexistente) exigindo exit 1 apos a correcao do finding media."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 3, "descricao": "O docstring 'Uso:' no topo do modulo lista detect/plan/init/status/run/resume/report/stop/start/haq/quota/evidenciar/encerrar e nao menciona o comando novo, ficando desatualizado no proprio arquivo alterado.", "correcao_sugerida": "Adicionar a linha de uso, ex. `python3 -m autodev prever <sprint_id> [--json]  # impacto do plano antes de rodar`."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_cli_prever.py
+  - autodev/cli.py
+
+## INSTRUCAO
+Esta e a tentativa #3.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-sol/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+A abordagem anterior falhou porque o comando calculava o impacto de um `dag.json` bruto, sem aplicar a mesma validação canônica do motor. Vou corrigir essa divergência, bloquear traversal no `sprint_id`, reforçar os testes pedidos e validar a suíte específica. Estou usando as skills de desenvolvimento orientado a testes e verificação final porque esta é uma correção comportamental com critérios executáveis.
+exec
+/usr/bin/bash -lc "sed -n '1,240p' /home/saurus/.codex/skills/using-superpowers/SKILL.md && sed -n '1,260p' /home/saurus/.codex/skills/test-driven-development/SKILL.md && sed -n '1,220p' /home/saurus/.codex/skills/verification-before-completion/SKILL.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 0ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+---
+
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, ignore this skill.
+</SUBAGENT-STOP>
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## The Rule
+
+**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+
+**Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
+
+Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+
+## Skill Priority
+
+When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
+
+- "Let's build X" → superpowers:brainstorming first, then implementation skills.
+- "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+
+## Red Flags
+
+These thoughts mean STOP—you're rationalizing:
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+
+## Platform Adaptation
+
+If your harness appears here, read its reference file for special instructions:
+
+- Codex: `references/codex-tools.md`
+- Pi: `references/pi-tools.md`
+- Antigravity: `references/antigravity-tools.md`
+- Hermes Agent: `references/hermes-tools.md`
+
+## User Instructions
+
+User instructions (CLAUDE.md, AGENTS.md, GEMINI.md, etc, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows or instructions when your human partner has explicitly told you to.
+---
+name: test-driven-development
+description: Use when implementing any feature or bugfix, before writing implementation code
+---
+
+# Test-Driven Development (TDD)
+
+## Overview
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+**Violating the letter of the rules is violating the spirit of the rules.**
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+- Refactoring
+- Behavior changes
+
+**Exceptions (ask your human partner):**
+- Throwaway prototypes
+- Generated code
+- Configuration files
+
+Thinking "skip TDD just this once"? Stop. That's rationalization.
+
+## The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Write code before the test? Delete it. Start over.
+
+**No exceptions:**
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+
+Implement fresh from tests. Period.
+
+## Red-Green-Refactor
+
+```dot
+digraph tdd_cycle {
+    rankdir=LR;
+    red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
+    verify_red [label="Verify fails\ncorrectly", shape=diamond];
+    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
+    verify_green [label="Verify passes\nAll green", shape=diamond];
+    refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
+    next [label="Next", shape=ellipse];
+
+    red -> verify_red;
+    verify_red -> green [label="yes"];
+    verify_red -> red [label="wrong\nfailure"];
+    green -> verify_green;
+    verify_green -> refactor [label="yes"];
+    verify_green -> green [label="no"];
+    refactor -> verify_green [label="stay\ngreen"];
+    verify_green -> next;
+    next -> red;
+}
+```
+
+### RED - Write Failing Test
+
+Write one minimal test showing what should happen.
+
+<Good>
+```typescript
+test('retries failed operations 3 times', async () => {
+  let attempts = 0;
+  const operation = () => {
+    attempts++;
+    if (attempts < 3) throw new Error('fail');
+    return 'success';
+  };
+
+  const result = await retryOperation(operation);
+
+  expect(result).toBe('success');
+  expect(attempts).toBe(3);
+});
+```
+Clear name, tests real behavior, one thing
+</Good>
+
+<Bad>
+```typescript
+test('retry works', async () => {
+  const mock = jest.fn()
+    .mockRejectedValueOnce(new Error())
+    .mockRejectedValueOnce(new Error())
+    .mockResolvedValueOnce('success');
+  await retryOperation(mock);
+  expect(mock).toHaveBeenCalledTimes(3);
+});
+```
+Vague name, tests mock not code
+</Bad>
+
+**Requirements:**
+- One behavior
+- Clear name
+- Real code (no mocks unless unavoidable)
+
+### Verify RED - Watch It Fail
+
+**MANDATORY. Never skip.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test fails (not errors)
+- Failure message is expected
+- Fails because feature missing (not typos)
+
+**Test passes?** You're testing existing behavior. Fix test.
+
+**Test errors?** Fix error, re-run until it fails correctly.
+
+### GREEN - Minimal Code
+
+Write simplest code to pass the test.
+
+<Good>
+```typescript
+async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === 2) throw e;
+    }
+  }
+  throw new Error('unreachable');
+}
+```
+Just enough to pass
+</Good>
+
+<Bad>
+```typescript
+async function retryOperation<T>(
+  fn: () => Promise<T>,
+  options?: {
+    maxRetries?: number;
+    backoff?: 'linear' | 'exponential';
+    onRetry?: (attempt: number) => void;
+  }
+): Promise<T> {
+  // YAGNI
+}
+```
+Over-engineered
+</Bad>
+
+Don't add features, refactor other code, or "improve" beyond the test.
+
+### Verify GREEN - Watch It Pass
+
+**MANDATORY.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test passes
+- Other tests still pass
+- Output pristine (no errors, warnings)
+
+**Test fails?** Fix code, not test.
+
+**Other tests fail?** Fix now.
+
+### REFACTOR - Clean Up
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green. Don't add behavior.
+
+### Repeat
+
+Next failing test for next feature.
+
+## Good Tests
+
+| Quality | Good | Bad |
+|---------|------|-----|
+| **Minimal** | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
+| **Clear** | Name describes behavior | `test('test1')` |
+| **Shows intent** | Demonstrates desired API | Obscures what code should do |
+
+When writing or changing any test, read [writing-good-tests.md](writing-good-tests.md) for the rules that keep tests honest:
+- Name the production change that would make the test fail — before writing it
+- Assert on real behavior, never on mock behavior
+- Keep test-only code in test utilities, out of production classes
+- Understand a dependency's side effects before mocking it
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests written after pass immediately — which proves nothing. They may test the wrong thing, test the implementation instead of the behavior, or miss the edge case you forgot. You never watched it fail, so you never proved it can catch the bug. Test-first forces that failure. |
+| "Tests after achieve same goals (spirit not ritual)" | Tests-after answer "what does this do?"; tests-first answer "what should this do?" Tests written after are biased by the code you already wrote — you verify the cases you remembered, not the ones you'd have discovered. Coverage without proof the tests work. |
+| "Already manually tested" | Manual testing is ad-hoc: no record of what you covered, no way to re-run it when the code changes, easy to forget cases under pressure. "Worked when I tried it" ≠ comprehensive. Automated tests run the same way every time. |
+| "Deleting X hours is wasteful" | Sunk cost fallacy — that time is already spent either way. The real choice: rewrite with TDD (high confidence) vs. keep it and bolt tests on after (low confidence, likely bugs). Keeping code you can't trust is the waste. |
+| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
+| "TDD will slow me down" | TDD IS the pragmatic path: catches bugs before commit, prevents regressions, lets you refactor without fear. "Pragmatic" shortcuts mean debugging in production — slower, not faster. |
+| "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
+| "Existing code has no tests" | You're improving it. Add tests for existing code. |
+
+## Red Flags - STOP and Start Over
+
+- Code before test
+- Test after implementation
+- Test passes immediately
+- Can't explain why test failed
+- Tests added "later"
+- Rationalizing "just this once"
+- "I already manually tested it"
+- "Tests after achieve the same purpose"
+- "It's about spirit not ritual"
+- "Keep as reference" or "adapt existing code"
+- "Already spent X hours, deleting is wasteful"
+- "TDD is dogmatic, I'm being pragmatic"
+- "This is different because..."
+
+**All of these mean: Delete code. Start over with TDD.**
+
+## Example: Bug Fix
+
+**Bug:** Empty email accepted
+
+**RED**
+```typescript
+test('rejects empty email', async () => {
+  const result = await submitForm({ email: '' });
+  expect(result.error).toBe('Email required');
+});
+```
+
+**Verify RED**
+```bash
+$ npm test
+---
+name: verification-before-completion
+description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+---
+
+# Verification Before Completion
+
+## Overview
+
+**Core principle:** Evidence before claims, always.
+
+**Violating the letter of this rule is violating the spirit of this rule.**
+
+## The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+If you haven't run the verification command in this message, you cannot claim it passes.
+
+## The Gate Function
+
+```
+BEFORE claiming any status or expressing satisfaction:
+
+1. IDENTIFY: What command proves this claim?
+2. RUN: Execute the FULL command (fresh, complete)
+3. READ: Full output, check exit code, count failures
+4. VERIFY: Does output confirm the claim?
+   - If NO: State actual status with evidence
+   - If YES: State claim WITH evidence
+5. ONLY THEN: Make the claim
+
+Skip any step = lying, not verifying
+```
+
+## Common Failures
+
+| Claim | Requires | Not Sufficient |
+|-------|----------|----------------|
+| Tests pass | Test command output: 0 failures | Previous run, "should pass" |
+| Linter clean | Linter output: 0 errors | Partial check, extrapolation |
+| Build succeeds | Build command: exit 0 | Linter passing, logs look good |
+| Bug fixed | Test original symptom: passes | Code changed, assumed fixed |
+| Regression test works | Red-green cycle verified | Test passes once |
+| Agent completed | VCS diff shows changes | Agent reports "success" |
+| Requirements met | Line-by-line checklist | Tests passing |
+
+## Red Flags - STOP
+
+- Using "should", "probably", "seems to"
+- Expressing satisfaction before verification ("Great!", "Perfect!", "Done!", etc.)
+- About to commit/push/PR without verification
+- Trusting agent success reports
+- Relying on partial verification
+- Thinking "just this once"
+- Tired and wanting work over
+- **ANY wording implying success without having run verification**
+
+## Rationalization Prevention
+
+| Excuse | Reality |
+|--------|---------|
+| "Should work now" | RUN the verification |
+| "I'm confident" | Confidence ≠ evidence |
+| "Just this once" | No exceptions |
+| "Linter passed" | Linter ≠ compiler |
+| "Agent said success" | Verify independently |
+| "I'm tired" | Exhaustion ≠ excuse |
+| "Partial check is enough" | Partial proves nothing |
+| "Different words so rule doesn't apply" | Spirit over letter |
+
+## Key Patterns
+
+**Tests:**
+```
+✅ [Run test command] [See: 34/34 pass] "All tests pass"
+❌ "Should pass now" / "Looks correct"
+```
+
+**Regression tests (TDD Red-Green):**
+```
+✅ Write → Run (pass) → Revert fix → Run (MUST FAIL) → Restore → Run (pass)
+❌ "I've written a regression test" (without red-green verification)
+```
+
+**Build:**
+```
+✅ [Run build] [See: exit 0] "Build passes"
+❌ "Linter passed" (linter doesn't check compilation)
+```
+
+**Requirements:**
+```
+✅ Re-read plan → Create checklist → Verify each → Report gaps or completion
+❌ "Tests pass, phase complete"
+```
+
+**Agent delegation:**
+```
+✅ Agent reports success → Check VCS diff → Verify changes → Report actual state
+❌ Trust agent report
+```
+
+## When To Apply
+
+**ALWAYS before:**
+- ANY variation of success/completion claims
+- ANY expression of satisfaction
+- ANY positive statement about work state
+- Committing, PR creation, task completion
+- Moving to next task
+- Delegating to agents
+
+**Rule applies to:**
+- Exact phrases
+- Paraphrases and synonyms
+- Implications of success
+- ANY communication suggesting completion/correctness
+
+exec
+/usr/bin/bash -lc "sed -n '1,260p' /home/saurus/.codex/skills/systematic-debugging/SKILL.md && sed -n '1,240p' /home/saurus/.codex/skills/test-driven-development/writing-good-tests.md && find .. -name AGENTS.md -print" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 23ms:
+exec
+/usr/bin/bash -lc "git status --short && git diff -- autodev/cli.py .autodev/tests/test_plan_cli_prever.py && sed -n '1,460p' autodev/cli.py && sed -n '1,260p' .autodev/tests/test_plan_cli_prever.py && rg -n \"def (valida_dag|carrega_dag|ordem_topologica)|SPRINTS|sprints\" autodev/config.py autodev/*.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 5ms:
+exec
+/usr/bin/bash -lc "sed -n '200,360p' autodev/config.py && sed -n '1,240p' autodev/plan_impacto.py && sed -n '230,285p' autodev/planner.py && git status --short && git log -3 --oneline" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 0ms:
+            raise ValueError(f"task sem campos obrigatórios {faltando}: {d}")
+        if not isinstance(d["criterios"], list) or not d["criterios"]:
+            raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+
+
+def normalizar_caminho(caminho: str) -> str:
+    """Normaliza um caminho textual, sem acessar o filesystem."""
+    caminho = caminho.replace("\\", "/")
+    while caminho.startswith("./"):
+        caminho = caminho[2:]
+    partes: list[str] = []
+    for parte in PurePosixPath(caminho).parts:
+        if parte in ("/", "."):
+            continue
+        if parte == ".." and partes and partes[-1] != "..":
+            partes.pop()
+        else:
+            partes.append(parte)
+    return "/".join(partes)
+
+
+def registro_compartilhado(caminho: str) -> bool:
+    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
+    partes = PurePosixPath(normalizar_caminho(caminho)).parts
+    minusculas = tuple(parte.casefold() for parte in partes)
+    if len(minusculas) < 4 or minusculas[:2] != (".autodev", "sprints"):
+        return False
+    nome = minusculas[-1]
+    return bool(
+        nome == "decisions.md"
+        or (set(minusculas[3:-1]) & {"logs", "evidence"}
+            and PurePosixPath(nome).suffix in {".log", ".md", ".txt"})
+    )
+
+
+def arquivos_citados(textos: list[str]) -> set[str]:
+    """Extrai caminhos citados em textos usando a regra comum do plano."""
+    return {
+        normalizar_caminho(encontrado.group(0))
+        for texto in textos
+        if isinstance(texto, str)
+        for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+    }
+
+
+def valida_dag(dag: dict) -> list[str]:
+    """Valida o DAG e devolve os erros encontrados (lista vazia = ok).
+
+    Checa: ids únicos, deps existem, sem ciclos, e que nenhuma task
+    paralelizável dependa de outra do mesmo grupo paralelo sem ser marcada.
+    """
+    erros: list[str] = []
+    tasks = dag.get("tasks", [])
+    ids = [t.get("id") for t in tasks]
+    if len(ids) != len(set(ids)):
+        erros.append("ids duplicados no DAG")
+    conhecidos = set(ids)
+    for t in tasks:
+        try:
+            Task.validar(t)
+        except ValueError as e:
+            erros.append(str(e))
+        for d in t.get("deps", []):
+            if d not in conhecidos:
+                erros.append(f"{t['id']} depende de {d}, que não existe no DAG")
+    # detecção de ciclo (DFS com marcação de cor)
+    grafo = {t["id"]: list(t.get("deps", [])) for t in tasks}
+    BRANCO, CINZA, PRETO = 0, 1, 2
+    cor = {i: BRANCO for i in grafo}
+
+    def visita(n: str, pilha: list[str]) -> None:
+        cor[n] = CINZA
+        for d in grafo.get(n, []):
+            if cor.get(d) == CINZA:
+                erros.append(f"ciclo: {' -> '.join(pilha + [n, d])}")
+            elif cor.get(d) == BRANCO:
+                visita(d, pilha + [n])
+        cor[n] = PRETO
+
+    for n in grafo:
+        if cor[n] == BRANCO:
+            visita(n, [])
+
+    # A topologia só é calculada para um DAG estruturalmente válido. Isso evita
+    # que uma dependência ausente seja mascarada como uma onda incompleta.
+    if erros:
+        return erros
+
+    # Uma onda é executada em paralelo; duas tasks que citam o mesmo caminho
+    # nela podem sobrescrever o trabalho uma da outra. Dependências colocam o
+    # mesmo caminho em ondas distintas e, portanto, não são erro aqui.
+    arquivos = {
+        t.get("id"): arquivos_citados([
+            *t.get("criterios", []), t.get("teste", ""),
+        ])
+        for t in tasks
+    }
+    ondas = ordem_topologica({"tasks": tasks})
+    for numero, onda in enumerate(ondas):
+        for indice, id_a in enumerate(onda):
+            for id_b in onda[indice + 1:]:
+                for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
+                    if registro_compartilhado(arquivo):
+                        continue
+                    erros.append(
+                        f"colisão de arquivo entre {id_a} e {id_b}: "
+                        f"{arquivo} (onda {numero + 1})"
+                    )
+    return erros
+
+
+def carrega_dag(p: Path) -> dict:
+    with p.open(encoding="utf-8") as fh:
+        dag = json.load(fh)
+    erros = valida_dag(dag)
+    if erros:
+        raise ValueError("DAG inválido:\n  - " + "\n  - ".join(erros))
+    return dag
+
+
+def carrega_sprint(p: Path) -> dict:
+    with p.open(encoding="utf-8") as fh:
+        s = yaml.safe_load(fh) or {}
+    for campo in ("sprint_id", "objetivo"):
+        if campo not in s:
+            raise ValueError(f"sprint.yaml sem '{campo}': {p}")
+    return s
+
+
+def ordem_topologica(dag: dict) -> list[list[str]]:
+    """Devolve as 'ondas' do DAG: cada onda pode rodar em paralelo."""
+    grafo = {t["id"]: set(t.get("deps", [])) for t in dag["tasks"]}
+    ondas, restante = [], dict(grafo)
+    while restante:
+        prontos = sorted(n for n, d in restante.items() if not (d & set(restante)))
+        if not prontos:
+            raise ValueError("DAG com ciclo — nenhuma onda progressa")
+        ondas.append(prontos)
+        for n in prontos:
+            del restante[n]
+    return ondas
+"""Relatório puro do impacto de um plano de execução."""
+
+from __future__ import annotations
+
+from . import config
+from .planner import Plano, _arquivos_da_task, colisoes_de_arquivo
+
+
+def impacto(plano: Plano) -> dict:
+    """Resume ondas, arquivos citados e colisões sem alterar o plano.
+
+    O relatório não acessa o filesystem nem invoca agentes; todos os dados são
+    derivados apenas da estrutura recebida.
+    """
+    ondas = config.ordem_topologica({
+        "tasks": [{"id": task.id, "deps": task.deps} for task in plano.tasks]
+    })
+    arquivos_por_task = {
+        task.id: sorted(_arquivos_da_task(task)) for task in plano.tasks
+    }
+    return {
+        "ondas": ondas,
+        "arquivos_por_task": arquivos_por_task,
+        "colisoes": colisoes_de_arquivo(plano),
+        "sem_arquivo": [
+            task.id for task in plano.tasks if not arquivos_por_task[task.id]
+        ],
+    }
+    """Extrai todos os caminhos mencionados nos critérios e no teste."""
+    return config.arquivos_citados([*task.criterios, task.teste])
+
+
+def _normalizar_caminho(caminho: str) -> str:
+    """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+    return config.normalizar_caminho(caminho)
+
+
+def arquivo_de_teste(caminho: str) -> bool:
+    """Reconhece diretórios de testes e nomes convencionais de testes Python."""
+    caminho = PurePosixPath(_normalizar_caminho(caminho))
+    partes = {parte.casefold() for parte in caminho.parts[:-1]}
+    nome = caminho.name.casefold()
+    return bool(
+        partes & {"tests", "test"}
+        or nome == "conftest.py"
+        or (nome.endswith(".py") and (nome.startswith("test_") or nome.endswith("_test.py")))
+    )
+
+
+def _ondas_por_task(plano: Plano) -> dict[str, int] | None:
+    """Calcula ondas sem mascarar os erros de IDs duplicados ou ciclos."""
+    if len({task.id for task in plano.tasks}) != len(plano.tasks):
+        return None
+    try:
+        ondas = config.ordem_topologica({"tasks": [
+            {"id": task.id, "deps": task.deps} for task in plano.tasks
+        ]})
+    except ValueError:
+        return None
+    return {
+        task_id: indice + 1
+        for indice, onda in enumerate(ondas)
+        for task_id in onda
+    }
+
+
+def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+    """Retorna arquivos citados por tasks conflitantes no mesmo plano.
+
+    Na mesma onda, qualquer arquivo comum colide. Arquivos de
+    teste colidem em qualquer onda para evitar a sobrescrita observada no D-16.
+    """
+    onda_por_task = _ondas_por_task(plano)
+    if onda_por_task is None:
+        return []
+    arquivos_mencionados = [_arquivos_da_task(task) for task in plano.tasks]
+    colisoes: list[dict[str, str | int]] = []
+    for indice, task_a in enumerate(plano.tasks):
+        for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+            onda_a = onda_por_task[task_a.id]
+            onda_b = onda_por_task[task_b.id]
+            for arquivo in sorted(
+                arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+            ):
+6bd264f P04: Comando autodev prever: impacto do plano antes de rodar (codex t2)
+5b16e5c P04: Comando autodev prever: impacto do plano antes de rodar (codex t1)
+155602c integrate P03: sprint/DEVFACTORY-003/P03-codex
+
+codex
+A causa-raiz está confirmada no fluxo: `cmd_prever` usa `json.loads` e constrói `Plano` diretamente, enquanto o motor usa `config.carrega_dag`, que chama `valida_dag`. A hipótese mínima é que trocar a leitura pelo carregador canônico elimina a divergência; antes disso, vou criar regressões que falham para DAG inválido e traversal, além de tornar explícita a colisão no texto.
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex/.autodev/tests/test_plan_cli_prever.py
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+
+exec
+/usr/bin/bash -lc 'python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ exited 1 in 39ms:
+/usr/bin/python3: No module named pytest
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+
+codex
+O primeiro ciclo RED encontrou também uma limitação do ambiente: o `python3` do sistema não tem `pytest` instalado (`No module named pytest`). Isso não é defeito do código; vou localizar o ambiente Python já provisionado no repositório, sem instalar dependências, e usar a mesma suíte por ele para observar as falhas comportamentais.
+exec
+/usr/bin/bash -lc "find . -maxdepth 4 -type f \\( -path '*/bin/pytest' -o -path '*/bin/python' -o -path '*/bin/python3' \\) -print && rg -n \"pytest\" pyproject.toml requirements*.txt setup.cfg tox.ini . 2>/dev/null | head -80" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 4ms:
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+
+exec
+/usr/bin/bash -lc "ls -la .venv ../.venv ../../.venv 2>/dev/null || true; command -v pytest || true; python3 -m pip show pytest 2>/dev/null || true; find /home/saurus/Code/Coding_Machine -maxdepth 3 -type f -path '*/.venv/bin/python' -print 2>/dev/null" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 48ms:
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+
+exec
+/usr/bin/bash -lc 'for p in python python3 python3.11 python3.12 pytest py.test uv; do command -v "$p" 2>/dev/null || true; done; ls /usr/local/bin/pytest* /usr/bin/pytest* 2>/dev/null || true' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 0ms:
+/usr/bin/python
+/usr/bin/python3
+/home/saurus/.local/bin/python3.11
+/home/saurus/.local/bin/uv
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+
+exec
+/usr/bin/bash -lc 'UV_CACHE_DIR=/tmp/autodev-uv-cache uv run --with pytest --with pyyaml python -m pytest .autodev/tests/test_plan_cli_prever.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ exited 1 in 1503ms:
+.....FF.                                                                 [100%]
+=================================== FAILURES ===================================
+_________________ test_prever_dag_invalido_falha_sem_traceback _________________
+
+tmp_path = PosixPath('/home/saurus/.hermes/cache/scratch/pytest-of-saurus/pytest-319/test_prever_dag_invalido_falha0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fe44b093e50>
+capsys = <_pytest.capture.CaptureFixture object at 0x7fe44b092cd0>
+
+    def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "RAIZ", tmp_path)
+        _dag(tmp_path)
+        dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
+        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+        dag["tasks"][1]["id"] = "P01"
+        dag_path.write_text(json.dumps(dag), encoding="utf-8")
+    
+        assert cli.main(["prever", "S-001"]) == 1
+        captura = capsys.readouterr()
+>       assert "DAG inválido" in captura.out
+E       AssertionError: assert 'DAG inválido' in 'não foi possível prever o sprint S-001: DAG com ciclo — nenhuma onda progressa\n'
+E        +  where 'não foi possível prever o sprint S-001: DAG com ciclo — nenhuma onda progressa\n' = CaptureResult(out='não foi possível prever o sprint S-001: DAG com ciclo — nenhuma onda progressa\n', err='').out
+
+.autodev/tests/test_plan_cli_prever.py:91: AssertionError
+_________________ test_prever_rejeita_sprint_id_com_traversal __________________
+
+tmp_path = PosixPath('/home/saurus/.hermes/cache/scratch/pytest-of-saurus/pytest-319/test_prever_rejeita_sprint_id_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fe44b091fd0>
+capsys = <_pytest.capture.CaptureFixture object at 0x7fe44b091210>
+
+    def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "RAIZ", tmp_path)
+        fora = tmp_path / ".autodev/FORA"
+        fora.mkdir(parents=True)
+        (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
+    
+        assert cli.main(["prever", "../FORA"]) == 1
+        captura = capsys.readouterr()
+>       assert "sprint inválido" in captura.out
+E       AssertionError: assert 'sprint inválido' in 'sprint não encontrado: ../FORA\n'
+E        +  where 'sprint não encontrado: ../FORA\n' = CaptureResult(out='sprint não encontrado: ../FORA\n', err='').out
+
+.autodev/tests/test_plan_cli_prever.py:104: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_plan_cli_prever.py::test_prever_dag_invalido_falha_sem_traceback
+FAILED .autodev/tests/test_plan_cli_prever.py::test_prever_rejeita_sprint_id_com_traversal
+2 failed, 6 passed in 0.80s
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex/autodev/cli.py
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+exec
+/usr/bin/bash -lc 'UV_CACHE_DIR=/tmp/autodev-uv-cache uv run --with pytest --with pyyaml python -m pytest .autodev/tests/test_plan_cli_prever.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 942ms:
+........                                                                 [100%]
+8 passed in 0.19s
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+codex
+O ciclo GREEN passou com 8 testes no ambiente provisionado via `uv`. A correção agora usa exatamente `config.carrega_dag`, então IDs duplicados, dependências inexistentes, ciclos e demais regras do motor são recusados antes do relatório; o `sprint_id` também é validado antes de montar o caminho. Vou fazer a verificação final do diff, da lista de subcomandos e da suíte completa relevante.
+exec
+/usr/bin/bash -lc 'git diff --check && git diff -- autodev/cli.py .autodev/tests/test_plan_cli_prever.py && python3 -m autodev --help && UV_CACHE_DIR=/tmp/autodev-uv-cache uv run --with pytest --with pyyaml python -m pytest .autodev/tests/test_plan_cli_prever.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+ succeeded in 1414ms:
+usage: autodev [-h] [--sprint SPRINT]
+               {detect,init,plan,prever,status,run,resume,report,haq,quota,metrics,encerrar,evidenciar,desbloquear,stop,start} ...
+
+DEVFACTORY orchestrator
+
+positional arguments:
+  {detect,init,plan,prever,status,run,resume,report,haq,quota,metrics,encerrar,evidenciar,desbloquear,stop,start}
+    plan                planeja um pedido e escreve um novo sprint
+    prever              prevê o impacto dos arquivos de um sprint
+    encerrar            fecha o sprint (estado terminal)
+    evidenciar          conclui uma task a partir de evidencia existente
+    desbloquear         reabre tasks bloqueadas para uma nova rodada
+
+options:
+  -h, --help            show this help message and exit
+  --sprint SPRINT
+........                                                                 [100%]
+8 passed in 0.61s
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+exec
+/usr/bin/bash -lc 'UV_CACHE_DIR=/tmp/autodev-uv-cache uv run --with pytest --with pyyaml python -m pytest .autodev/tests/ -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+codex
+A suíte completa ainda está em execução além da primeira janela de 30 segundos; os testes específicos já estão verdes. Vou aguardar a conclusão antes de afirmar o resultado final.
+exec
+/usr/bin/bash -lc 'UV_CACHE_DIR=/tmp/autodev-uv-cache uv run --with pytest --with pyyaml python -m pytest .autodev/tests/ -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+ succeeded in 56863ms:
+........................................................................ [ 18%]
+........................................................................ [ 37%]
+........................................................................ [ 55%]
+........................................................................ [ 74%]
+........................................................................ [ 93%]
+..........................                                               [100%]
+386 passed in 56.10s
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+ succeeded in 55885ms:
+........................................................................ [ 18%]
+........................................................................ [ 37%]
+........................................................................ [ 55%]
+........................................................................ [ 74%]
+........................................................................ [ 93%]
+..........................                                               [100%]
+386 passed in 55.11s
+
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+codex
+RESULTADO: `prever` agora valida o DAG pelo caminho canônico, bloqueia traversal, mantém todos os subcomandos e possui regressões reforçadas | TESTES: suíte específica 8 passed; suíte completa 386 passed (via `uv`, pois o `python3` do ambiente não inclui pytest)
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+index 1a449b52544415b2542c9212702c30f183555354..e75b0e6bf574d17e9f0aa46f861d3d486e8984b6
+--- a/.autodev/tests/test_plan_cli_prever.py
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -29,7 +29,7 @@
+     saida = capsys.readouterr().out
+     assert "onda 1" in saida and "P01" in saida
+     assert "src/a.py" in saida and "tests/test_a.py" in saida
+-    assert "colis" in saida.lower()
++    assert "P01 x P02: tests/test_a.py" in saida
+ 
+ 
+ def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
+@@ -78,6 +78,33 @@
+     assert "Traceback" not in captura.out + captura.err
+ 
+ 
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
+ def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", tmp_path)
+     sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 1518d0b07b8500126302de44299f632aa5ca3249..49a70a2831f6c85662303942b87b3e5db4fad3e2
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -361,9 +362,19 @@
+ 
+ def cmd_prever(args) -> int:
+     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
+     from . import plan_impacto
+     from .planner import Plano, TaskPlano
+ 
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
+     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
+     dag_path = sprint_dir / "dag.json"
+     if not dag_path.is_file():
+@@ -374,11 +385,7 @@
+             print(mensagem)
+         return 1
+     try:
+-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+-        if not isinstance(dag, dict) or "tasks" not in dag:
+-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+-        if not isinstance(dag["tasks"], list):
+-            raise ValueError("dag.json: tasks deve ser uma lista")
++        dag = carrega_dag(dag_path)
+         plano = Plano(
+             titulo=dag.get("titulo", args.sprint_id),
+             objetivo=dag.get("objetivo", ""),
+
+tokens used
+42,179
+RESULTADO: `prever` agora valida o DAG pelo caminho canônico, bloqueia traversal, mantém todos os subcomandos e possui regressões reforçadas | TESTES: suíte específica 8 passed; suíte completa 386 passed (via `uv`, pois o `python3` do ambiente não inclui pytest)

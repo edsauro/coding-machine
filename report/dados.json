@@ -1,75 +1,78 @@
 {
- "total_codex": 35,
+ "total_codex": 47,
  "degraus": [
   {
    "degrau": 1,
-   "chamadas": 8,
-   "pct_chamadas": 22.857142857142858,
+   "chamadas": 11,
+   "pct_chamadas": 23.404255319148938,
    "modelos": {
-    "gpt-5.6-luna/low": 8
+    "gpt-5.6-luna/low": 11
    },
    "status": {
-    "FAILED": 5,
+    "FAILED": 8,
     "OK": 2,
-    "RUNNING": 1
+    "WAITING_RESOURCE": 1
    },
    "ok": 2
   },
   {
    "degrau": 2,
-   "chamadas": 5,
-   "pct_chamadas": 14.285714285714286,
+   "chamadas": 9,
+   "pct_chamadas": 19.148936170212767,
    "modelos": {
-    "gpt-5.6-terra/low": 5
+    "gpt-5.6-terra/low": 9
    },
    "status": {
-    "FAILED": 4,
+    "FAILED": 7,
+    "RUNNING": 1,
     "WAITING_RESOURCE": 1
    },
    "ok": 0
   },
   {
    "degrau": 3,
-   "chamadas": 5,
-   "pct_chamadas": 14.285714285714286,
+   "chamadas": 8,
+   "pct_chamadas": 17.02127659574468,
    "modelos": {
-    "gpt-5.6-sol/low": 5
+    "gpt-5.6-sol/low": 8
    },
    "status": {
-    "FAILED": 5
+    "FAILED": 6,
+    "OK": 2
    },
-   "ok": 0
+   "ok": 2
   },
   {
    "degrau": 4,
-   "chamadas": 4,
-   "pct_chamadas": 11.428571428571429,
+   "chamadas": 5,
+   "pct_chamadas": 10.638297872340425,
    "modelos": {
-    "gpt-5.6-sol/medium": 4
+    "gpt-5.6-sol/medium": 5
    },
    "status": {
-    "FAILED": 2,
+    "FAILED": 3,
     "OK": 2
    },
    "ok": 2
   },
   {
    "degrau": 5,
-   "chamadas": 3,
-   "pct_chamadas": 8.571428571428571,
+   "chamadas": 4,
+   "pct_chamadas": 8.51063829787234,
    "modelos": {
-    "gpt-6-astra/low": 2,
+    "gpt-6-astra/low": 3,
     "gpt-5.6-sol/medium": 1
    },
    "status": {
-    "FAILED": 3
+    "FAILED": 3,
+    "OK": 1
    },
-   "ok": 0
+   "ok": 1
   },
   {
    "degrau": 6,
    "chamadas": 3,
-   "pct_chamadas": 8.571428571428571,
+   "pct_chamadas": 6.382978723404255,
    "modelos": {
     "gpt-6-astra/low": 2,
     "gpt-5.6-luna/low": 1
@@ -83,7 +86,7 @@
   {
    "degrau": 7,
    "chamadas": 2,
-   "pct_chamadas": 5.714285714285714,
+   "pct_chamadas": 4.25531914893617,
    "modelos": {
     "gpt-5.6-luna/low": 1,
     "gpt-5.6-terra/low": 1
@@ -96,7 +99,7 @@
   {
    "degrau": 8,
    "chamadas": 2,
-   "pct_chamadas": 5.714285714285714,
+   "pct_chamadas": 4.25531914893617,
    "modelos": {
     "gpt-5.6-terra/low": 1,
     "gpt-5.6-sol/low": 1
@@ -109,7 +112,7 @@
   {
    "degrau": 9,
    "chamadas": 2,
-   "pct_chamadas": 5.714285714285714,
+   "pct_chamadas": 4.25531914893617,
    "modelos": {
     "gpt-5.6-sol/low": 1,
     "gpt-5.6-sol/medium": 1
@@ -123,7 +126,7 @@
   {
    "degrau": 10,
    "chamadas": 1,
-   "pct_chamadas": 2.857142857142857,
+   "pct_chamadas": 2.127659574468085,
    "modelos": {
     "gpt-6-astra/low": 1
    },
@@ -133,8 +136,8 @@
    "ok": 1
   }
  ],
- "chamadas_topo": 5,
- "chamadas_baratas": 10,
+ "chamadas_topo": 6,
+ "chamadas_baratas": 13,
  "chamadas_por_sprint_pacote": {
   "DEVFACTORY-003": {
    "P01": {
@@ -155,7 +158,25 @@
     "1": 1
    },
    "P04": {
-    "1": 1
+    "1": 1,
+    "2": 1,
+    "3": 1
+   },
+   "P05": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1
+   },
+   "P06": {
+    "1": 1,
+    "2": 1,
+    "3": 1
+   },
+   "P07": {
+    "1": 1,
+    "2": 1
    }
   },
   "DEVFACTORY-004": {
@@ -230,7 +251,56 @@
    "tokens_retrabalho": 295914,
    "usd_retrabalho": 0.1252853610621867,
    "usd_retrab_medido": 0.1252853610621867,
-   "usd_retrab_estimado": 0.0
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 54069,
+     "usd": 0.02289196924535971,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 1,
+     "tokens": 53911,
+     "usd": 0.02282507451564829,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 1,
+     "tokens": 66487,
+     "usd": 0.028149556293185208,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/medium": {
+     "chamadas": 1,
+     "tokens": 95364,
+     "usd": 0.04037562660886059,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": true
+    },
+    "gpt-6-astra/low": {
+     "chamadas": 2,
+     "tokens": 80152,
+     "usd": 0.03393510364449262,
+     "medidas": 2,
+     "estimadas": 0,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 5,
+   "modelo_unico": false,
+   "tem_modelo_antigo": true,
+   "findings": 33,
+   "commit_final": "9b6d4989ecb68048e4b953c9f37b56a95d1c8af7",
+   "inicio": "28/09 22:58",
+   "fim": "28/09 23:46"
   },
   {
    "sprint": "DEVFACTORY-003",
@@ -268,7 +338,48 @@
    "tokens_retrabalho": 162746,
    "usd_retrabalho": 0.06890411190895543,
    "usd_retrab_medido": 0.06890411190895543,
-   "usd_retrab_estimado": 0.0
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 38277,
+     "usd": 0.016205883349139683,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 1,
+     "tokens": 48863,
+     "usd": 0.020687830239804906,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 1,
+     "tokens": 47497,
+     "usd": 0.020109487196856797,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/medium": {
+     "chamadas": 1,
+     "tokens": 66386,
+     "usd": 0.02810679447229373,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": true
+    }
+   },
+   "modelos_distintos": 4,
+   "modelo_unico": false,
+   "tem_modelo_antigo": true,
+   "findings": 24,
+   "commit_final": "1d07438884a45f738c301f46ca74c87a939a2650",
+   "inicio": "28/09 23:56",
+   "fim": "29/09 00:17"
   },
   {
    "sprint": "DEVFACTORY-003",
@@ -303,17 +414,262 @@
    "tokens_retrabalho": 0,
    "usd_retrabalho": 0.0,
    "usd_retrab_medido": 0.0,
-   "usd_retrab_estimado": 0.0
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 53910,
+     "usd": 0.022824651131283027,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 1,
+   "modelo_unico": true,
+   "tem_modelo_antigo": false,
+   "findings": 4,
+   "commit_final": "fe605222182a950c51d1e0c684a984ae7a1cf65c",
+   "inicio": "29/09 00:28",
+   "fim": "29/09 00:28"
   },
   {
    "sprint": "DEVFACTORY-003",
    "task": "P04",
-   "chamadas": 1,
-   "max_tentativa": 1,
+   "chamadas": 3,
+   "max_tentativa": 3,
    "min_tentativa": 1,
    "titulo": "Comando autodev prever: impacto do plano antes de rodar",
-   "aprovacoes": 0,
+   "aprovacoes": 1,
+   "reprovacoes": 2,
+   "sem_avaliacao": 0,
+   "reprov_em_janela": 0,
+   "aprovada_na_chamada": 3,
+   "modelo_que_aprovou": "gpt-5.6-sol/low",
+   "infra": 0,
+   "culpa_teste_plano": 0,
+   "notas_culpa": [],
+   "do_modelo": 3,
+   "modelos": {
+    "gpt-5.6-luna/low": 1,
+    "gpt-5.6-terra/low": 1,
+    "gpt-5.6-sol/low": 1
+   },
+   "tokens_medidos": 135910,
+   "chamadas_com_token": 3,
+   "usd_medido": 0.05754216908278011,
+   "usd_estimado": 0.0,
+   "chamadas_esperado": 1,
+   "tokens_esperado": 42961,
+   "usd_esperado": 0.01818901571602764,
+   "usd_esperado_medido": 0.01818901571602764,
+   "usd_esperado_estimado": 0.0,
+   "chamadas_retrabalho": 2,
+   "tokens_retrabalho": 92949,
+   "usd_retrabalho": 0.03935315336675248,
+   "usd_retrab_medido": 0.03935315336675248,
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 42961,
+     "usd": 0.01818901571602764,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 1,
+     "tokens": 50770,
+     "usd": 0.021495224224359843,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 1,
+     "tokens": 42179,
+     "usd": 0.01785792914239263,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 3,
+   "modelo_unico": false,
+   "tem_modelo_antigo": false,
+   "findings": 15,
+   "commit_final": "a8b060629d97ebf93565342d832bf00f34fcdec8",
+   "inicio": "29/09 00:34",
+   "fim": "29/09 00:48"
+  },
+  {
+   "sprint": "DEVFACTORY-003",
+   "task": "P05",
+   "chamadas": 5,
+   "max_tentativa": 5,
+   "min_tentativa": 1,
+   "titulo": "Portao de aprovacao humana do plano",
+   "aprovacoes": 1,
+   "reprovacoes": 4,
+   "sem_avaliacao": 0,
+   "reprov_em_janela": 0,
+   "aprovada_na_chamada": 5,
+   "modelo_que_aprovou": "gpt-6-astra/low",
+   "infra": 0,
+   "culpa_teste_plano": 0,
+   "notas_culpa": [],
+   "do_modelo": 5,
+   "modelos": {
+    "gpt-5.6-luna/low": 1,
+    "gpt-5.6-terra/low": 1,
+    "gpt-5.6-sol/low": 1,
+    "gpt-5.6-sol/medium": 1,
+    "gpt-6-astra/low": 1
+   },
+   "tokens_medidos": 399452,
+   "chamadas_com_token": 5,
+   "usd_medido": 0.16912173147270018,
+   "usd_estimado": 0.0,
+   "chamadas_esperado": 1,
+   "tokens_esperado": 68849,
+   "usd_esperado": 0.029149590163934428,
+   "usd_esperado_medido": 0.029149590163934428,
+   "usd_esperado_estimado": 0.0,
+   "chamadas_retrabalho": 4,
+   "tokens_retrabalho": 330603,
+   "usd_retrabalho": 0.13997214130876576,
+   "usd_retrab_medido": 0.13997214130876576,
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 68849,
+     "usd": 0.029149590163934428,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 1,
+     "tokens": 87349,
+     "usd": 0.03698220092128438,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 1,
+     "tokens": 88383,
+     "usd": 0.03741998035496546,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/medium": {
+     "chamadas": 1,
+     "tokens": 102485,
+     "usd": 0.04339054667389243,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": true
+    },
+    "gpt-6-astra/low": {
+     "chamadas": 1,
+     "tokens": 52386,
+     "usd": 0.022179413358623494,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 5,
+   "modelo_unico": false,
+   "tem_modelo_antigo": true,
+   "findings": 28,
+   "commit_final": "7a4c701725de7f36f4b213493c00221119799ac7",
+   "inicio": "29/09 00:55",
+   "fim": "29/09 01:40"
+  },
+  {
+   "sprint": "DEVFACTORY-003",
+   "task": "P06",
+   "chamadas": 3,
+   "max_tentativa": 3,
+   "min_tentativa": 1,
+   "titulo": "Aceitacao ponta a ponta do portao do plano",
+   "aprovacoes": 1,
    "reprovacoes": 0,
+   "sem_avaliacao": 2,
+   "reprov_em_janela": 0,
+   "aprovada_na_chamada": 3,
+   "modelo_que_aprovou": "gpt-5.6-sol/low",
+   "infra": 1,
+   "culpa_teste_plano": 0,
+   "notas_culpa": [],
+   "do_modelo": 2,
+   "modelos": {
+    "gpt-5.6-luna/low": 1,
+    "gpt-5.6-terra/low": 1,
+    "gpt-5.6-sol/low": 1
+   },
+   "tokens_medidos": 119061,
+   "chamadas_com_token": 2,
+   "usd_medido": 0.05040856591247799,
+   "usd_estimado": 0.023890450706769636,
+   "chamadas_esperado": 1,
+   "tokens_esperado": 0,
+   "usd_esperado": 0.023890450706769636,
+   "usd_esperado_medido": 0.0,
+   "usd_esperado_estimado": 0.023890450706769636,
+   "chamadas_retrabalho": 2,
+   "tokens_retrabalho": 119061,
+   "usd_retrabalho": 0.05040856591247799,
+   "usd_retrab_medido": 0.05040856591247799,
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 0,
+     "usd": 0.023890450706769636,
+     "medidas": 0,
+     "estimadas": 1,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 1,
+     "tokens": 81753,
+     "usd": 0.03461294201327734,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 1,
+     "tokens": 37308,
+     "usd": 0.015795623899200653,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 3,
+   "modelo_unico": false,
+   "tem_modelo_antigo": false,
+   "findings": 0,
+   "commit_final": "1dfc1b7ebb7aea2bfda5a1c9bb72d5f682a7f07d",
+   "inicio": "29/09 01:50",
+   "fim": "29/09 08:01"
+  },
+  {
+   "sprint": "DEVFACTORY-003",
+   "task": "P07",
+   "chamadas": 2,
+   "max_tentativa": 2,
+   "min_tentativa": 1,
+   "titulo": "Documentar o portao do plano e o checklist derivado do D-16",
+   "aprovacoes": 0,
+   "reprovacoes": 1,
    "sem_avaliacao": 1,
    "reprov_em_janela": 0,
    "aprovada_na_chamada": null,
@@ -321,24 +677,50 @@
    "infra": 0,
    "culpa_teste_plano": 0,
    "notas_culpa": [],
-   "do_modelo": 1,
+   "do_modelo": 2,
    "modelos": {
-    "gpt-5.6-luna/low": 1
+    "gpt-5.6-luna/low": 1,
+    "gpt-5.6-terra/low": 1
    },
-   "tokens_medidos": 0,
-   "chamadas_com_token": 0,
-   "usd_medido": 0.0,
-   "usd_estimado": 0.020640834575260808,
+   "tokens_medidos": 140860,
+   "chamadas_com_token": 2,
+   "usd_medido": 0.05963792169082781,
+   "usd_estimado": 0.0,
    "chamadas_esperado": 1,
-   "tokens_esperado": 0,
-   "usd_esperado": 0.020640834575260808,
-   "usd_esperado_medido": 0.0,
-   "usd_esperado_estimado": 0.020640834575260808,
-   "chamadas_retrabalho": 0,
-   "tokens_retrabalho": 0,
-   "usd_retrabalho": 0.0,
-   "usd_retrab_medido": 0.0,
-   "usd_retrab_estimado": 0.0
+   "tokens_esperado": 80498,
+   "usd_esperado": 0.03408159463487333,
+   "usd_esperado_medido": 0.03408159463487333,
+   "usd_esperado_estimado": 0.0,
+   "chamadas_retrabalho": 1,
+   "tokens_retrabalho": 60362,
+   "usd_retrabalho": 0.02555632705595448,
+   "usd_retrab_medido": 0.02555632705595448,
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 80498,
+     "usd": 0.03408159463487333,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 1,
+     "tokens": 60362,
+     "usd": 0.02555632705595448,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 2,
+   "modelo_unico": false,
+   "tem_modelo_antigo": false,
+   "findings": 7,
+   "commit_final": "",
+   "inicio": "29/09 08:14",
+   "fim": "29/09 08:28"
   },
   {
    "sprint": "DEVFACTORY-004",
@@ -369,17 +751,66 @@
    "tokens_medidos": 0,
    "chamadas_com_token": 0,
    "usd_medido": 0.0,
-   "usd_estimado": 0.1720731438829427,
+   "usd_estimado": 0.1970368638750718,
    "chamadas_esperado": 1,
    "tokens_esperado": 0,
-   "usd_esperado": 0.020640834575260808,
+   "usd_esperado": 0.023890450706769636,
    "usd_esperado_medido": 0.0,
-   "usd_esperado_estimado": 0.020640834575260808,
+   "usd_esperado_estimado": 0.023890450706769636,
    "chamadas_retrabalho": 7,
    "tokens_retrabalho": 0,
-   "usd_retrabalho": 0.1514323093076819,
+   "usd_retrabalho": 0.17314641316830218,
    "usd_retrab_medido": 0.0,
-   "usd_retrab_estimado": 0.1514323093076819
+   "usd_retrab_estimado": 0.17314641316830218,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.04778090141353927,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.05069060038322334,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.04501323781782054,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/medium": {
+     "chamadas": 1,
+     "tokens": 0,
+     "usd": 0.03484728525944994,
+     "medidas": 0,
+     "estimadas": 1,
+     "fora_da_escada": true
+    },
+    "gpt-6-astra/low": {
+     "chamadas": 1,
+     "tokens": 0,
+     "usd": 0.018704839001038705,
+     "medidas": 0,
+     "estimadas": 1,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 5,
+   "modelo_unico": false,
+   "tem_modelo_antigo": true,
+   "findings": 15,
+   "commit_final": "00fc3a433f36a9351ffe7cd36dd75ae80c081937",
+   "inicio": "28/09 14:19",
+   "fim": "28/09 14:54"
   },
   {
    "sprint": "DEVFACTORY-004",
@@ -404,17 +835,34 @@
    "tokens_medidos": 0,
    "chamadas_com_token": 0,
    "usd_medido": 0.0,
-   "usd_estimado": 0.020640834575260808,
+   "usd_estimado": 0.023890450706769636,
    "chamadas_esperado": 1,
    "tokens_esperado": 0,
-   "usd_esperado": 0.020640834575260808,
+   "usd_esperado": 0.023890450706769636,
    "usd_esperado_medido": 0.0,
-   "usd_esperado_estimado": 0.020640834575260808,
+   "usd_esperado_estimado": 0.023890450706769636,
    "chamadas_retrabalho": 0,
    "tokens_retrabalho": 0,
    "usd_retrabalho": 0.0,
    "usd_retrab_medido": 0.0,
-   "usd_retrab_estimado": 0.0
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 0,
+     "usd": 0.023890450706769636,
+     "medidas": 0,
+     "estimadas": 1,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 1,
+   "modelo_unico": true,
+   "tem_modelo_antigo": false,
+   "findings": 3,
+   "commit_final": "cfe28c50ce600f38b364bfc07a0517a7076ebd2d",
+   "inicio": "28/09 15:30",
+   "fim": "28/09 15:30"
   },
   {
    "sprint": "DEVFACTORY-004",
@@ -442,17 +890,58 @@
    "tokens_medidos": 138127,
    "chamadas_com_token": 3,
    "usd_medido": 0.05848081222056632,
-   "usd_estimado": 0.020640834575260808,
+   "usd_estimado": 0.023890450706769636,
    "chamadas_esperado": 1,
    "tokens_esperado": 0,
-   "usd_esperado": 0.020640834575260808,
+   "usd_esperado": 0.023890450706769636,
    "usd_esperado_medido": 0.0,
-   "usd_esperado_estimado": 0.020640834575260808,
+   "usd_esperado_estimado": 0.023890450706769636,
    "chamadas_retrabalho": 3,
    "tokens_retrabalho": 138127,
    "usd_retrabalho": 0.05848081222056632,
    "usd_retrab_medido": 0.05848081222056632,
-   "usd_retrab_estimado": 0.0
+   "usd_retrab_estimado": 0.0,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 1,
+     "tokens": 0,
+     "usd": 0.023890450706769636,
+     "medidas": 0,
+     "estimadas": 1,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 1,
+     "tokens": 36037,
+     "usd": 0.015257502370952447,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 1,
+     "tokens": 37099,
+     "usd": 0.01570713656686086,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/medium": {
+     "chamadas": 1,
+     "tokens": 64991,
+     "usd": 0.027516173282753017,
+     "medidas": 1,
+     "estimadas": 0,
+     "fora_da_escada": true
+    }
+   },
+   "modelos_distintos": 4,
+   "modelo_unico": false,
+   "tem_modelo_antigo": true,
+   "findings": 17,
+   "commit_final": "852344d100e724708d88f010581506ca8588517b",
+   "inicio": "28/09 15:37",
+   "fim": "28/09 19:43"
   },
   {
    "sprint": "DEVFACTORY-004",
@@ -483,17 +972,66 @@
    "tokens_medidos": 0,
    "chamadas_com_token": 0,
    "usd_medido": 0.0,
-   "usd_estimado": 0.2210402271598248,
+   "usd_estimado": 0.2505889881355604,
    "chamadas_esperado": 1,
    "tokens_esperado": 0,
-   "usd_esperado": 0.020640834575260808,
+   "usd_esperado": 0.023890450706769636,
    "usd_esperado_medido": 0.0,
-   "usd_esperado_estimado": 0.020640834575260808,
+   "usd_esperado_estimado": 0.023890450706769636,
    "chamadas_retrabalho": 9,
    "tokens_retrabalho": 0,
-   "usd_retrabalho": 0.200399392584564,
+   "usd_retrabalho": 0.22669853742879084,
    "usd_retrab_medido": 0.0,
-   "usd_retrab_estimado": 0.200399392584564
+   "usd_retrab_estimado": 0.22669853742879084,
+   "por_modelo": {
+    "gpt-5.6-luna/low": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.04778090141353927,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-terra/low": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.05069060038322334,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/low": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.04501323781782054,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": false
+    },
+    "gpt-5.6-sol/medium": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.06969457051889988,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": true
+    },
+    "gpt-6-astra/low": {
+     "chamadas": 2,
+     "tokens": 0,
+     "usd": 0.03740967800207741,
+     "medidas": 0,
+     "estimadas": 2,
+     "fora_da_escada": false
+    }
+   },
+   "modelos_distintos": 5,
+   "modelo_unico": false,
+   "tem_modelo_antigo": true,
+   "findings": 21,
+   "commit_final": "3fada305165b9b1f461694f9f925c62c388680a1",
+   "inicio": "28/09 14:30",
+   "fim": "28/09 15:17"
   }
  ],
  "outros_agentes": {
@@ -502,6 +1040,6 @@
  "maior_degrau": 10,
  "janela": [
   "2026-09-28 14:19",
-  "2026-09-29 00:34"
+  "2026-09-29 08:28"
  ]
 }

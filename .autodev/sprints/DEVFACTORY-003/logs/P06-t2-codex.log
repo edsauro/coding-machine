@@ -1,0 +1,145 @@
+# exit_code=0 duracao=158.2s modelo=gpt-5.6-terra effort=low failure_class=None tokens=81753(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P06: Aceitacao ponta a ponta do portao do plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe o teste test_portao_do_plano em .autodev/tests/test_plan_portao_aceitacao.py
+- o teste usa o driver falso de agente e nao gasta cota real
+- o teste prova que um plano com colisao na mesma onda e recusado pelo validador antes de qualquer agente rodar
+- o teste prova que um sprint PLANEJADO sem aprovacao nao roda, e que apos autodev aprovar ele roda e integra
+- o teste prova que alterar o dag.json depois da aprovacao invalida a aprovacao
+- os testes rodam com python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+# CONTINUACAO DE TASK EXISTENTE — NAO RECOMECE
+
+Voce ja trabalhou nesta task antes e foi interrompido por esgotamento de cota.
+O estado abaixo foi persistido. CONTINUE a partir dele.
+
+## Task
+P06
+
+## Criterios de aceitacao
+  - existe o teste test_portao_do_plano em .autodev/tests/test_plan_portao_aceitacao.py
+  - o teste usa o driver falso de agente e nao gasta cota real
+  - o teste prova que um plano com colisao na mesma onda e recusado pelo validador antes de qualquer agente rodar
+  - o teste prova que um sprint PLANEJADO sem aprovacao nao roda, e que apos autodev aprovar ele roda e integra
+  - o teste prova que alterar o dag.json depois da aprovacao invalida a aprovacao
+  - os testes rodam com python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q
+
+## Estado atual da implementacao
+0 arquivo(s) ja modificado(s) por tentativa anterior; ultimo commit (nao registrado)
+
+## Arquivos relevantes
+  (nenhum)
+
+## Ultimo commit
+ae79f9f77c79ae9ff149b1d90323618bd786ff9c
+
+## Testes que JA PASSAM (nao mexa sem motivo)
+  (nenhum)
+
+## Testes que AINDA FALHAM
+  (nenhum)
+
+## Tentativas anteriores
+  - tentativa 1: CODEX_QUOTA — 
+
+## Findings de revisao em aberto
+  (nenhum)
+
+## PROXIMA ACAO ESPERADA
+Retomar de onde parou: os arquivos ja modificados estao no worktree. Corrija o que falta para os testes passarem e NAO reescreva o que ja funciona.
+
+## Regras
+1. NAO reescreva o que ja funciona.
+2. NAO recomece a task do zero.
+3. Faca a menor mudanca que resolve o proximo item em aberto.
+4. Ao terminar, responda com: RESULTADO: <o que mudou>
+
+
+===== STDOUT =====
+RESULTADO: criado `.autodev/tests/test_plan_portao_aceitacao.py` com aceitação do validador, aprovação e invalidação por hash usando driver falso | TESTES: `python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q` bloqueado — ambiente sem módulo `pytest`; `py_compile` passou
+
+===== STDERR =====
+

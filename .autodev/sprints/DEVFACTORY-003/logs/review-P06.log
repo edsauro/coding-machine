@@ -1,0 +1,251 @@
+# exit_code=0 duracao=416.5s modelo=deepseek-flash effort=high failure_class=None tokens=nao medido(-)
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- existe o teste test_portao_do_plano em .autodev/tests/test_plan_portao_aceitacao.py
+- o teste usa o driver falso de agente e nao gasta cota real
+- o teste prova que um plano com colisao na mesma onda e recusado pelo validador antes de qualquer agente rodar
+- o teste prova que um sprint PLANEJADO sem aprovacao nao roda, e que apos autodev aprovar ele roda e integra
+- o teste prova que alterar o dag.json depois da aprovacao invalida a aprovacao
+- os testes rodam com python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q
+
+## Task
+P06: Aceitacao ponta a ponta do portao do plano
+
+## Diff a revisar (base ae79f9f77c79ae9ff149b1d90323618bd786ff9c -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000..096be32
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,112 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {
++            "sequencia": [
++                {
++                    "acao": "editar",
++                    "arquivo": "src/calc.py",
++                    "conteudo": (
++                        "# entregue pelo driver falso\n\n"
++                        "def soma(a, b):\n"
++                        "    return a + b\n"
++                    ),
++                }
++            ]
++        },
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    integrada = _orquestrador(projeto_pytest).store.task(SPRINT, "P01")
++    assert integrada["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(
++        json.dumps(
++            {"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]},
++            indent=2,
++        ),
++        encoding="utf-8",
++    )
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+```
+
+## Saida dos testes
+```
+.                                                                        [100%]
+1 passed in 1.80s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+{
+  "veredito": "APPROVE",
+  "confianca": 0.85,
+  "criterios_atendidos": [
+    {
+      "criterio": "existe o teste test_portao_do_plano em .autodev/tests/test_plan_portao_aceitacao.py",
+      "atende": true,
+      "evidencia": "Arquivo novo de 112 linhas no branch sprint/DEVFACTORY-003/P06-codex (HEAD 1dfc1b7); `def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest)` na linha 52; `pytest --collect-only` no worktree coleta 1 item desse arquivo."
+    },
+    {
+      "criterio": "o teste usa o driver falso de agente e nao gasta cota real",
+      "atende": true,
+      "evidencia": "Linhas 72-73: AUTODEV_FAKE_AGENT=1 e AUTODEV_FAKE_SPEC apontando para o driver falso; linhas 44-49 desligam o revisor externo 'agy' (AgenteInfo disponivel=False). agents.invocar (agents.py:181-196) devolve _fake() quando driver_fake_ativo(), e a revisão cai no piso deterministico (review.py:311) — a evidencia P06-1790679814.txt mostra 'revisao por hermes-deterministico [reserva]'. Nenhum processo de LLM real foi executado (verificado tambem com a suite inteira: 423 passed em 104s, sem chamada externa)."
+    },
+    {
+      "criterio": "o teste prova que um plano com colisao na mesma onda e recusado pelo validador antes de qualquer agente rodar",
+      "atende": true,
+      "evidencia": "Linhas 77-83: duas tasks sem deps (mesma onda) citando src/calc.py; `pytest.raises(ValueError, match=\"colisão de arquivo\")` captura o erro vindo de config.valida_dag (config.py:300-310) via Orquestrador.checar_aprovacao -> _ler_plano -> carrega_dag, que roda ANTES de carregar() (materializacao) e do laco de execucao (orchestrator.py:702 vs 708); em seguida `assert not count.exists()` prova que o driver nao foi invocado. MUTACAO independente (desliguei o loop de colisao em config.valida_dag) fez o teste FALHAR, confirmando que a assercao e load-bearing."
+    },
+    {
+      "criterio": "o teste prova que um sprint PLANEJADO sem aprovacao nao roda, e que apos autodev aprovar ele roda e integra",
+      "atende": true,
+      "evidencia": "Linhas 87-98: sprint.yaml com status PLANEJADO -> `assert \"sem aprovacao\" in parado.parado_por` (mensagem de orchestrator._validar_aprovacao, linha 235) e contador do driver ausente; depois `cli.main([\"aprovar\", SPRINT, \"--por\", \"Aceitacao\"]) == 0` (caminho de CLI real, com cli.RAIZ monkeypatchado na linha 92) e a mesma rodada termina com parado_por None, estado INTEGRATED no store e contador == \"1\" (exatamente uma invocacao do driver). MUTACOES: desligar o portao de aprovacao e fazer 'autodev aprovar' gravar hash errado -> teste FALHA nos dois casos."
+    },
+    {
+      "criterio": "o teste prova que alterar o dag.json depois da aprovacao invalida a aprovacao",
+      "atende": true,
+      "evidencia": "Linhas 102-112: reescreve dag.json (indent=2, mesmo conteudo) apos a aprovacao; `assert \"divergencia\" in invalido.parado_por` (mensagem 'aprovacao invalida: divergencia no hash do dag.json', orchestrator.py:241, sha256 byte a byte) e o contador do driver continua \"1\", provando que a rodada nao reabriu nem gastou outra acao. MUTACAO (ignorar o mismatch de hash) fez o teste FALHAR."
+    },
+    {
+      "criterio": "os testes rodam com python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q",
+      "atende": true,
+      "evidencia": "Executado de verdade em duas copias: no worktree P06 `/<repo>/.venv/bin/python -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q` -> '1 passed in 5.86s' (idem em copia isolada); evidencia oficial P06-1790679814.txt registra a mesma invocacao com exit=0. Dentro do motor o comando literal `python3 -m pytest ...` e resolvido para o interpretador do projeto por testrunner._resolver/_python (testrunner.py:113-125) e o README (linha 92) documenta `.venv/bin/python -m pytest .autodev/tests/ -q`; o `python3` do host (3.14.7) nao tem pytest, o que vale para toda a suite.
+"
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_portao_aceitacao.py",
+      "linha": 83,
+      "descricao": "As duas assercoes negativas (linhas 83 e 90, `assert not fake_spec.with_suffix('.count').exists()`) so sao um atestado de 'nenhum agente rodou' porque a spec usa a chave \"sequencia\": o contador e gravado exclusivamente no ramo \"sequencia\" de agents._fake (agents.py:319-325). Foi exatamente o defeito da 1a tentativa (evidencia P06-1790679705.txt: spec com acao unica -> contador nunca criado -> negativas vacuamente verdadeiras), corrigido aqui trocando para \"sequencia\". Hoje o teste esta correto, mas uma futura edicao da spec para uma acao solta torna as negativas silenciosamente vazias (o assert final `== \"1\"` ainda pega o caso).",
+      "correcao_sugerida": "Gravar o contador de invocacoes em _fake independentemente de haver \"sequencia\" (ou afirmar explicitamente no teste que a spec precisa de \"sequencia\"), para que o contador seja testemunha de invocacao do driver e nao de um formato de spec."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_portao_aceitacao.py",
+      "linha": 20,
+      "descricao": "Codigo morto cosmetico: _escrever_sprint anota e devolve `Path` (linha 30) sem que nenhum chamador use o retorno (linhas 77 e 87).",
+      "correcao_sugerida": "Trocar o retorno para `-> None` e remover o `return sprint`."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_portao_aceitacao.py",
+      "linha": 45,
+      "descricao": "Cada `_orquestrador(...)` constroi um Orquestrador novo, e o __init__ chama agents.detectar(self.cfg) (orchestrator.py:107), que dispara `codex --version` e `agy --version` como subprocessos (timeout de 30s cada). Nao gasta cota de LLM, mas adiciona dependencia do host e uns segundos por instancia (4 no teste).",
+      "correcao_sugerida": "Reutilizar uma unica instancia de Orquestrador (ou injetar `disponiveis` pronto) para nao re-detectar agentes a cada etapa."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_portao_aceitacao.py",
+      "linha": 102,
+      "descricao": "A invalidacao por hash e provada apenas com mudanca de FORMATACAO (indent=2) do dag.json, nao com mudanca semantica de conteudo (tasks/deps). O criterio e atendido (hash byte a byte invalida em ambos os casos), mas a prova cobre uma direcao so.",
+      "correcao_sugerida": "Opcional: cobrir tambem uma alteracao semantica (ex.: trocar o criterio da task) para deixar explicito que o gate nao depende de formatacao."
+    }
+  ],
+  "resumo": "Aprovado: os 6 criterios foram verificados por execucao real (1 passed no arquivo, 423 passed na suite) e por 5 mutacoes independentes que fizeram o teste falhar em todos os casos, sem segredos, caminhos absolutos, escrita fora do projeto, dependencia nova ou codigo pela metade."
+}
+
+
+===== STDERR =====
+

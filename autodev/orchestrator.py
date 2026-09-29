@@ -18,7 +18,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import agents, errors, haq, integration, killswitch, report, retry, review
+from . import agents, cota, errors, haq, integration, killswitch, report, retry, review
 from . import sandbox as sbx
 from . import testrunner
 from .config import Config, carrega_dag, carrega_sprint, ordem_topologica
@@ -128,7 +128,7 @@ class Orquestrador:
         if self.deadline and time.time() > self.deadline:
             raise killswitch.ParadoPorKillSwitch("DEADLINE", "deadline do sprint atingido")
 
-    def _modelo_da_tentativa(self, d, n_tent: int) -> dict:
+    def _modelo_da_tentativa(self, d, n_tent: int, estrategia: str | None = None) -> dict:
         """Degrau de modelo da PRÓXIMA tentativa.
 
         Sem decisão (1ª tentativa), vale o contador da task (`n_tent + 1`) — chumbar 1
@@ -136,14 +136,17 @@ class Orquestrador:
         Com decisão, quem manda é o `tier` DELA: quando a classe de falha não recebe
         escalonamento (P-09 — cota, rede, ambiente, permissão, segredo), a decisão
         carrega o degrau ATUAL e a infra deixa de pagar a chamada cara.
+
+        `estrategia` (P-15) é a da TASK: sem ela, a escada legada de 5 degraus. A task
+        "3 degraus" não sobe um degrau por vez — ela aloca `luna -> astra -> luna`.
         """
         if d is None:
-            return self.cfg.modelo_para_tentativa(n_tent + 1)
+            return self.cfg.modelo_para_tentativa(n_tent + 1, estrategia)
         if d.tier:
             atual = self.cfg.degrau_por_tier(d.tier)
             if atual is not None:
                 return atual
-        return self.cfg.modelo_para_tentativa(d.tentativa_proxima)
+        return self.cfg.modelo_para_tentativa(d.tentativa_proxima, estrategia)
 
     def _ctx(self) -> str:
         p = self.dir_sprint / "spec.md"
@@ -295,7 +298,7 @@ class Orquestrador:
         if estado == "NEW":
             self.store.transicionar(self.sprint, task_id, "PLANNED")
             estado = "PLANNED"
-        if estado in ("PLANNED", "RETRY", "WAITING_RESOURCE", "BLOCKED"):
+        if estado in ("PLANNED", "RETRY", "WAITING_RESOURCE", "BLOCKED", "WAITING_HUMAN"):
             self._checa_parada("criar_worktree", task_id)
             self.store.forcar_estado(self.sprint, task_id, "QUEUED",
                                      "selecionado pelo orquestrador")
@@ -317,13 +320,20 @@ class Orquestrador:
                               {"base_antiga": wt.base_antiga, "base_nova": wt.base_commit})
         historico: list[dict] = []
         esperas = 0
+        # Estratégia da task: gravada na largada e IMUTÁVEL depois (P-15). Task que já
+        # tinha tentativas foi marcada como escada_5 na migração — trocar a política
+        # padrão não muda a escada de quem já entrou, só a de quem começa agora.
+        estrategia = self.store.definir_estrategia(
+            self.sprint, task_id, self.cfg.estrategia_padrao())
+        self.log(f"{task_id}: estrategia '{estrategia}'")
 
         while True:
             self._checa_parada("invocar_agente", task_id)
             r = self._row(task_id)
             n_tent = r["tentativas"]
 
-            if n_tent >= self.cfg.policies["retry"]["max_tentativas_implementacao"]:
+            max_est = self.cfg.max_tentativas(estrategia)
+            if n_tent >= max_est:
                 # Defensivo: nunca bloquear uma task que TEM tentativa viva (outro
                 # processo). Foi assim que a P04 foi bloqueada no meio da própria
                 # revisão, em 28/09, e o run morreu com BLOCKED -> DONE.
@@ -332,6 +342,20 @@ class Orquestrador:
                              f"tentativa VIVA desta task — nao bloqueio")
                     return ResumoTask(task_id, "RUNNING", n_tent, esperas,
                                       motivo="tentativa viva em outro processo")
+                if self.cfg.pede_confirmacao(estrategia):
+                    # P-15 ("3 degraus"): o último degrau não resolvido NÃO bloqueia — a
+                    # estratégia manda perguntar ao autor. Fica em WAITING_HUMAN; o vigia
+                    # leva a pergunta no Telegram e o autor decide repetir, mudar ou
+                    # encerrar (`desbloquear --repetir` recomeça do 1º degrau).
+                    self.store.aguarda_humano(
+                        self.sprint, task_id,
+                        f"estrategia '{estrategia}': {n_tent} degraus sem resolver")
+                    self.store.liberar_worktree(str(wt.caminho))
+                    self.log(f"{task_id}: estrategia '{estrategia}' esgotou os {n_tent} "
+                             f"degraus — PARADO em WAITING_HUMAN esperando o autor "
+                             f"(Telegram: repetir / mudar estrategia / encerrar)")
+                    return ResumoTask(task_id, "WAITING_HUMAN", n_tent, esperas,
+                                      motivo="aguardando confirmacao do autor")
                 self.store.bloqueia(self.sprint, task_id,
                                     f"limite de {n_tent} tentativas de implementacao")
                 self.store.liberar_worktree(str(wt.caminho))
@@ -364,14 +388,14 @@ class Orquestrador:
                         agente = alvo
                         wt = self.wm.criar(self.sprint, task_id, agente, base=base)
                         self.store.adquirir_worktree(str(wt.caminho), task_id, agente)
-                modelo_info = self._modelo_da_tentativa(d, n_tent)
+                modelo_info = self._modelo_da_tentativa(d, n_tent, estrategia)
             else:
                 d = None
                 # O modelo da tentativa vem do CONTADOR DA TASK (n_tent + 1), não de
                 # um "1" fixo: numa retomada o contador pode já estar em 2 (a próxima
                 # tentativa é a 3ª da escada) — chumbar 1 fazia a sprint retomada
                 # voltar para o degrau mais barato, ignorando o desbloqueio.
-                modelo_info = self._modelo_da_tentativa(None, n_tent)
+                modelo_info = self._modelo_da_tentativa(None, n_tent, estrategia)
 
             # ---- monta o prompt (com evidência nova, nunca o mesmo prompt) -----
             prompt = PROMPT_TASK.format(
@@ -474,19 +498,36 @@ class Orquestrador:
                     # reexecutar o MESMO agente sem cota e girar para sempre.
                     agente = "codex"
                     continue
-                espera = self.cfg.espera_cota(self.modo_teste)
-                # A política é um chute (5h10m). O agente costuma dizer quando a cota
-                # volta: nesta madrugada o codex avisou "try again at 9:10 AM" e o
-                # motor dormiu 5h por cima; na vez anterior, 56 min a mais. O reset
-                # informado vale só quando é MENOR que a política — a política segue
-                # como teto, para que um parse absurdo não estacione o sprint.
-                efetiva = errors.espera_efetiva(
-                    espera, f"{res.stdout or ''}\n{res.stderr or ''}")
-                if efetiva != espera:
-                    self.log(f"{task_id}: o agente informou o reset da cota em "
-                             f"{efetiva}s ({efetiva / 60:.0f} min); a política era "
-                             f"{espera}s")
-                    espera = efetiva
+                politica = self.cfg.espera_cota(self.modo_teste)
+                espera = politica
+                motivo = "cota do Codex esgotada"
+                # (P-14) Primeiro a fonte autoritativa: as janelas que o próprio Codex
+                # publica (5h e 7 dias, com usedPercent e resetsAt). Em 29/09 o que
+                # estourou foi a SEMANAL — 5h10m de política acordariam o motor ~19 vezes
+                # até o reset de verdade. Número do servidor não passa pelo teto da
+                # política: a semanal volta em dias, e a espera tem de refletir isso.
+                sugerida = None
+                try:
+                    sugerida = cota.espera_sugerida()
+                except Exception as e:      # ler cota não pode derrubar o motor
+                    self.log(f"{task_id}: nao consegui ler as janelas de cota ({e})")
+                if sugerida:
+                    espera, motivo = sugerida
+                    self.log(f"{task_id}: janelas do Codex lidas — {motivo} "
+                             f"({espera / 3600:.1f}h; a politica dava "
+                             f"{politica / 3600:.1f}h)")
+                else:
+                    # Sem leitura, a política é o chute (5h10m) e o agente costuma dizer
+                    # quando a cota volta ("try again at 9:10 AM"): nesta madrugada o
+                    # motor dormiu 5h por cima. O reset informado vale só quando é MENOR
+                    # que a política — a política segue como teto contra parse absurdo.
+                    efetiva = errors.espera_efetiva(
+                        espera, f"{res.stdout or ''}\n{res.stderr or ''}")
+                    if efetiva != espera:
+                        self.log(f"{task_id}: o agente informou o reset da cota em "
+                                 f"{efetiva}s ({efetiva / 60:.0f} min); a política era "
+                                 f"{espera}s")
+                        espera = efetiva
                 retry_after = time.time() + espera
                 esperas += 1
                 self.store.finalizar_tentativa(
@@ -495,7 +536,7 @@ class Orquestrador:
                     retry_after=retry_after,
                     test_result={"nota": "cota esgotada — task preservada, nao falhou"})
                 self.store.registrar_espera(self.sprint, task_id, agente,
-                                            retry_after, "cota do Codex esgotada")
+                                            retry_after, motivo)
                 self.store.transicionar(self.sprint, task_id, "WAITING_RESOURCE",
                                         "cota do Codex")
                 self.store.conn.execute(

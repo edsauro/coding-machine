@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     tentativas    INTEGER NOT NULL DEFAULT 0,   -- tentativas de IMPLEMENTACAO
     esperas_cota  INTEGER NOT NULL DEFAULT 0,   -- tentativas de ESPERA DE RECURSO
     tier_atual    INTEGER NOT NULL DEFAULT 0,
+    estrategia    TEXT,                 -- com que escada/estratégia a task COMEÇOU (P-15)
     fingerprint   TEXT,
     bloqueio      TEXT,
     criado_em     REAL NOT NULL,
@@ -295,6 +296,13 @@ class StateStore:
                         f"ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}")
                 except sqlite3.OperationalError as e:
                     faltando.append(f"{tabela}.{nome}: {e}")
+        # P-15 (29/09): task que JÁ tentou algo nasceu com a escada de 5 degraus. Gravar
+        # isso é o que cumpre o pedido do autor — "termine os que ainda não terminaram com
+        # as estratégias antigas": trocar a estratégia padrão não muda a escada de quem
+        # está no meio do caminho. Task nova (zero tentativas) fica NULL e pega a padrão.
+        self.conn.execute(
+            "UPDATE tasks SET estrategia='escada_5'"
+            " WHERE (estrategia IS NULL OR estrategia='') AND tentativas > 0")
         if faltando:
             raise SchemaDesatualizado(
                 "não foi possível reconciliar o schema: " + "; ".join(faltando))
@@ -444,6 +452,43 @@ class StateStore:
             reabertas.append(tid)
         self.conn.commit()
         return reabertas
+
+    # ------------------------------------------------------------- estratégias
+    def definir_estrategia(self, sprint_id: str, task_id: str, nome: str) -> str:
+        """Grava a estratégia da task na PRIMEIRA vez e devolve a que vale (P-15).
+
+        O `WHERE estrategia IS NULL` é o coração do pedido do autor: a task que já entrou
+        continua na escada com que começou, mesmo que a estratégia padrão mude no meio do
+        sprint. Quem começa depois pega a nova.
+        """
+        self.conn.execute(
+            "UPDATE tasks SET estrategia=?, atualizado_em=? WHERE sprint_id=? AND"
+            " task_id=? AND (estrategia IS NULL OR estrategia='')",
+            (nome, time.time(), sprint_id, task_id))
+        self.conn.commit()
+        r = self.conn.execute(
+            "SELECT estrategia FROM tasks WHERE sprint_id=? AND task_id=?",
+            (sprint_id, task_id)).fetchone()
+        return (r["estrategia"] if r else None) or nome
+
+    def trocar_estrategia(self, sprint_id: str, task_id: str, nome: str) -> None:
+        """Troca a estratégia de uma task a pedido do autor (`desbloquear --estrategia`)."""
+        self.conn.execute(
+            "UPDATE tasks SET estrategia=?, atualizado_em=? WHERE sprint_id=? AND task_id=?",
+            (nome, time.time(), sprint_id, task_id))
+        self.evento(sprint_id, task_id, "estrategia_trocada", {"para": nome,
+                                                              "por": "decisao do autor"})
+        self.conn.commit()
+
+    def aguarda_humano(self, sprint_id: str, task_id: str, motivo: str) -> None:
+        """Para a task esperando DECISÃO do autor — não é bloqueio por limite (P-15).
+
+        O contador de tentativas fica onde está: repetir o ciclo
+        (`desbloquear --repetir`) significa recomeçar do 1º degrau, não continuar do 4º.
+        """
+        self.transicionar(sprint_id, task_id, "WAITING_HUMAN", motivo)
+        self.evento(sprint_id, task_id, "confirmacao_pedida",
+                    {"motivo": motivo, "por": "estrategia com portao humano"})
 
     # ---------------------------------------------------------------- tentativas
     def proxima_tentativa(self, sprint_id: str, task_id: str) -> int:
@@ -931,6 +976,7 @@ class StateStore:
             "blocked": por_estado.get("BLOCKED", 0),
             "failed": por_estado.get("FAILED", 0),
             "waiting_resource": por_estado.get("WAITING_RESOURCE", 0),
+            "waiting_human": por_estado.get("WAITING_HUMAN", 0),
             "tentativas_implementacao": q(
                 "SELECT COUNT(*) FROM attempts WHERE sprint_id=?", sprint_id),
             "tentativas_total": q(

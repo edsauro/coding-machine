@@ -21,6 +21,29 @@ cota_codex:
 # --- Seções 10/11: escalonamento e prevenção de loop --------------------------
 retry:
   max_tentativas_implementacao: 5     # 5ª falha não resolvida -> BLOCK
+  # --------------------------------------------------------------- estratégias
+  # Decisão do autor em 29/09/2026 (P-15): cada task grava a estratégia com que COMEÇOU
+  # (coluna tasks.estrategia). Trocar a política não muda a escada de quem já entrou —
+  # "termine os que ainda não terminaram com as estratégias antigas". Task sem estratégia
+  # gravada (nova) usa a padrão; task que já tentou algo é marcada como escada_5.
+  estrategia_padrao: tres_degraus
+  estrategias:
+    escada_5:                 # vigente de 27/09 a 29/09 — escada de 5 degraus
+      degraus:
+        1: 0                  # luna/low
+        2: 1                  # terra/low
+        3: 2                  # sol/low
+        4: 3                  # astra/low
+        5: 4                  # astra/low (satura no topo desde a P-13)
+      max_tentativas: 5
+      pede_confirmacao: false
+    tres_degraus:             # 29/09 em diante — decisão do autor
+      degraus:
+        1: 0                  # luna/low
+        2: 3                  # astra/low  (pula direto para o topo)
+        3: 0                  # luna/low  (volta ao barato)
+      max_tentativas: 3
+      pede_confirmacao: true  # 3º degrau não resolvido -> WAITING_HUMAN: pergunta ao autor
   escalonamento:
     # número da tentativa -> tier da escada em models.yaml
     1: 0

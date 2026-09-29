@@ -1,0 +1,363 @@
+# exit_code=0 duracao=189.7s modelo=deepseek-flash effort=(default) failure_class=None tokens=nao medido(-)
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- a CLI aceita autodev prever <sprint_id> e imprime, por onda, os arquivos prometidos por cada task e as colisoes encontradas
+- autodev prever aceita --json e imprime o mesmo conteudo em JSON valido
+- sprint inexistente devolve exit code 1 com mensagem clara, sem traceback
+- os testes ficam em .autodev/tests/test_plan_cli_prever.py e rodam com python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q
+- estende autodev/cli.py preservando os subcomandos existentes (detect, init, status, run, resume, report, haq, quota, metrics, encerrar, evidenciar, desbloquear, stop, start) sem remover nenhum
+
+## Task
+P04: Comando autodev prever: impacto do plano antes de rodar
+
+## Diff a revisar (base 155602ca895746cf292e23d2f4e389e57c54604e -> HEAD)
+```diff
+diff --git a/.autodev/tests/test_plan_cli_prever.py b/.autodev/tests/test_plan_cli_prever.py
+new file mode 100644
+index 0000000..e75b0e6
+--- /dev/null
++++ b/.autodev/tests/test_plan_cli_prever.py
+@@ -0,0 +1,125 @@
++import json
++
++from autodev import cli
++
++
++def _dag(root):
++    sprint = root / ".autodev/sprints/S-001"
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text(json.dumps({
++        "sprint_id": "S-001",
++        "versao": 1,
++        "criterio_paralelizacao": "dependências definem as ondas",
++        "tasks": [
++            {"id": "P01", "titulo": "um", "criterios": ["edita src/a.py"],
++             "deps": [], "agente": "codex", "paralelizavel": True,
++             "estimativa": "S", "teste": "tests/test_a.py"},
++            {"id": "P02", "titulo": "dois", "deps": ["P01"],
++             "criterios": ["edita src/a.py"], "agente": "codex",
++             "paralelizavel": True, "estimativa": "S", "teste": "tests/test_a.py"},
++        ],
++    }), encoding="utf-8")
++
++
++def test_prever_imprime_impacto_por_onda(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++
++    assert cli.main(["prever", "S-001"]) == 0
++    saida = capsys.readouterr().out
++    assert "onda 1" in saida and "P01" in saida
++    assert "src/a.py" in saida and "tests/test_a.py" in saida
++    assert "P01 x P02: tests/test_a.py" in saida
++
++
++def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++
++    assert cli.main(["prever", "S-001", "--json"]) == 0
++    relatorio = json.loads(capsys.readouterr().out)
++    assert relatorio["ondas"] == [["P01"], ["P02"]]
++    assert relatorio["arquivos_por_task"]["P01"] == ["src/a.py", "tests/test_a.py"]
++    assert relatorio["colisoes"][0]["arquivo"] == "tests/test_a.py"
++
++
++def test_prever_sprint_inexistente_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++
++    assert cli.main(["prever", "NAO-EXISTE"]) == 1
++    captura = capsys.readouterr()
++    saida = captura.out + captura.err
++    assert "sprint" in saida.lower() and "não encontrado" in saida.lower()
++    assert "Traceback" not in saida
++
++
++def test_prever_dag_com_raiz_invalida_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    sprint = tmp_path / ".autodev/sprints/S-INVALIDO"
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text("[]", encoding="utf-8")
++
++    assert cli.main(["prever", "S-INVALIDO", "--json"]) == 1
++    captura = capsys.readouterr()
++    resposta = json.loads(captura.out)
++    assert "não foi possível prever" in resposta["erro"]
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_json_malformado_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    sprint = tmp_path / ".autodev/sprints/S-QUEBRADO"
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text("{oops", encoding="utf-8")
++
++    assert cli.main(["prever", "S-QUEBRADO"]) == 1
++    captura = capsys.readouterr()
++    assert "não foi possível prever" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    _dag(tmp_path)
++    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
++    dag = json.loads(dag_path.read_text(encoding="utf-8"))
++    dag["tasks"][1]["id"] = "P01"
++    dag_path.write_text(json.dumps(dag), encoding="utf-8")
++
++    assert cli.main(["prever", "S-001"]) == 1
++    captura = capsys.readouterr()
++    assert "DAG inválido" in captura.out
++    assert "ids duplicados" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    fora = tmp_path / ".autodev/FORA"
++    fora.mkdir(parents=True)
++    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
++
++    assert cli.main(["prever", "../FORA"]) == 1
++    captura = capsys.readouterr()
++    assert "sprint inválido" in captura.out
++    assert "Traceback" not in captura.out + captura.err
++
++
++def test_prever_mostra_task_sem_arquivo_e_sem_colisao(tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cli, "RAIZ", tmp_path)
++    sprint = tmp_path / ".autodev/sprints/S-SEM-ARQUIVO"
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text(json.dumps({
++        "sprint_id": "S-SEM-ARQUIVO", "versao": 1,
++        "criterio_paralelizacao": "dependências definem as ondas",
++        "tasks": [{"id": "P01", "titulo": "sem arquivo",
++                   "criterios": ["implementa a lógica"], "deps": [],
++                   "agente": "codex", "paralelizavel": True,
++                   "estimativa": "S", "teste": ""}],
++    }), encoding="utf-8")
++
++    assert cli.main(["prever", "S-SEM-ARQUIVO"]) == 0
++    saida = capsys.readouterr().out
++    assert "(sem arquivo nomeado)" in saida
++    assert "colisões:\n  nenhuma" in saida
++    assert "tasks sem arquivo nomeado: P01" in saida
+diff --git a/autodev/cli.py b/autodev/cli.py
+index a9c26e7..49a70a2 100644
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -3,6 +3,7 @@
+ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
++  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -359,6 +360,71 @@ def cmd_plan(args) -> int:
+     return 0
+ 
+ 
++def cmd_prever(args) -> int:
++    """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
++    from .config import carrega_dag
++    from . import plan_impacto
++    from .planner import Plano, TaskPlano
++
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        mensagem = f"sprint inválido: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
++    sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
++    dag_path = sprint_dir / "dag.json"
++    if not dag_path.is_file():
++        mensagem = f"sprint não encontrado: {args.sprint_id}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++    try:
++        dag = carrega_dag(dag_path)
++        plano = Plano(
++            titulo=dag.get("titulo", args.sprint_id),
++            objetivo=dag.get("objetivo", ""),
++            repositorio=dag.get("repositorio", ""),
++            prompt_original=dag.get("prompt_original", ""),
++            tasks=[TaskPlano(
++                id=t["id"], titulo=t.get("titulo", t["id"]),
++                criterios=t.get("criterios", []), deps=t.get("deps", []),
++                agente=t.get("agente", "codex"), teste=t.get("teste", ""),
++            ) for t in dag["tasks"]],
++        )
++        relatorio = plan_impacto.impacto(plano)
++    except (OSError, ValueError, KeyError, TypeError, AttributeError) as erro:
++        mensagem = f"não foi possível prever o sprint {args.sprint_id}: {erro}"
++        if args.json:
++            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
++        else:
++            print(mensagem)
++        return 1
++
++    if args.json:
++        print(json.dumps(relatorio, ensure_ascii=False, indent=2))
++        return 0
++    for numero, onda in enumerate(relatorio["ondas"], 1):
++        print(f"onda {numero}:")
++        for task_id in onda:
++            arquivos = relatorio["arquivos_por_task"][task_id]
++            print(f"  {task_id}: {', '.join(arquivos) if arquivos else '(sem arquivo nomeado)'}")
++    print("colisões:")
++    if relatorio["colisoes"]:
++        for colisao in relatorio["colisoes"]:
++            print(f"  {colisao['task_a']} x {colisao['task_b']}: {colisao['arquivo']}")
++    else:
++        print("  nenhuma")
++    if relatorio["sem_arquivo"]:
++        print("tasks sem arquivo nomeado: " + ", ".join(relatorio["sem_arquivo"]))
++    return 0
++
++
+ def main(argv: list[str] | None = None) -> int:
+     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
+     p.add_argument("--sprint", default=SPRINT_PADRAO)
+@@ -374,6 +440,12 @@ def main(argv: list[str] | None = None) -> int:
+                        help="lê o pedido de um arquivo Markdown")
+     s.set_defaults(fn=cmd_plan)
+ 
++    s = sub.add_parser("prever", help="prevê o impacto dos arquivos de um sprint")
++    s.add_argument("sprint_id")
++    s.add_argument("--json", action="store_true", dest="json",
++                   help="imprime o relatório em JSON")
++    s.set_defaults(fn=cmd_prever)
++
+     s = sub.add_parser("status")
+     s.add_argument("-v", "--verbose", action="store_true")
+     s.set_defaults(fn=cmd_status)
+```
+
+## Saida dos testes
+```
+........                                                                 [100%]
+8 passed in 0.16s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+```json
+{
+  "veredito": "APPROVE",
+  "confianca": 0.85,
+  "criterios_atendidos": [
+    {
+      "criterio": "a CLI aceita autodev prever <sprint_id> e imprime, por onda, os arquivos prometidos por cada task e as colisoes encontradas",
+      "atende": true,
+      "evidencia": "Subparser 'prever' em autodev/cli.py:443-448 (argparse exercitado de fato pelos testes, que chamam cli.main([...])). Execucao real no worktree a8b0606: 'python3 -m autodev prever DEVFACTORY-003' imprimiu 'onda 1: P01: .autodev/tests/test_plan_colisoes.py, autodev/planner.py' ate 'onda 7', seguido de 'colisoes:' + os pares task_a x task_b: arquivo (vazio => 'nenhuma') e a linha 'tasks sem arquivo nomeado'. Exit 0."
+    },
+    {
+      "criterio": "autodev prever aceita --json e imprime o mesmo conteudo em JSON valido",
+      "atende": true,
+      "evidencia": "cli.py:402-404 -> json.dumps(relatorio, ensure_ascii=False, indent=2); relatorio vem de plan_impacto.impacto com as chaves ondas, arquivos_por_task, colisoes, sem_arquivo. Verificado: 'python3 -m autodev prever DEVFACTORY-003 --json' parseia com json.load e devolve ['ondas','arquivos_por_task','colisoes','sem_arquivo'] / ondas [['P01'],['P02','P03'],['P04'],['P05'],['P06'],['P07']]. Flag antes do posicional ('prever --json C-TESTE') tambem funciona."
+    },
+    {
+      "criterio": "sprint inexistente devolve exit code 1 com mensagem clara, sem traceback",
+      "atende": true,
+      "evidencia": "cli.py:369-375 (dag_path.is_file() falso -> 'sprint não encontrado: <id>', return 1). Execucao real: 'prever NAO-EXISTE' -> exit=1, stdout 'sprint não encontrado: NAO-EXISTE', stderr vazio; com --json -> exit=1 e '{\"erro\": \"sprint não encontrado: NAO-EXISTE\"}'. Teste test_prever_sprint_inexistente_falha_sem_traceback cobre out+err."
+    },
+    {
+      "criterio": "os testes ficam em .autodev/tests/test_plan_cli_prever.py e rodam com python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q",
+      "atende": true,
+      "evidencia": "Arquivo presente (125 linhas, 8 testes) e re-executado por mim: '.venv/bin/python -m pytest .autodev/tests/test_plan_cli_prever.py -q -p no:cacheprovider' => '8 passed in 0.17s', igual ao reportado. 'python3' cru resolve para o interpretador do motor/sandbox (D-23), por isso rodei com o interpretador do projeto no venv."
+    },
+    {
+      "criterio": "estende autodev/cli.py preservando os subcomandos existentes (detect, init, status, run, resume, report, haq, quota, metrics, encerrar, evidenciar, desbloquear, stop, start) sem remover nenhum",
+      "atende": true,
+      "evidencia": "git diff --numstat base..HEAD = 125/0 no teste e 72/0 em cli.py: zero linhas removidas. 'python3 -m autodev --help' lista {detect,init,plan,prever,status,run,resume,report,haq,quota,metrics,encerrar,evidenciar,desbloquear,stop,start}. Suite completa do worktree em copia isolada: 386 passed in 62.15s, 0 falhas (nenhuma regressao nos testes de CLI/plano/README)."
+    }
+  ],
+  "findings": [
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/cli.py",
+      "linha": 376,
+      "descricao": "Quando o dag.json tem colisao de arquivo de producao na MESMA onda, carrega_dag (config.valida_dag) rejeita o DAG e o comando cai no ramo de erro: 'não foi possível prever o sprint X: DAG inválido: - colisão de arquivo entre P01 e P02: src/x.py (onda 1)' com exit 1, sem imprimir o relatorio por onda. Verificado com DAG de teste. A informacao da colisao nao se perde (aparece na mensagem) e o comportamento e coerente com init/run, que tambem recusam esse DAG — mas o relatorio 'impacto antes de rodar' nao sai justamente no caso de risco maximo, e o texto nao diz que era so isso que faltava.",
+      "correcao_sugerida": "Se o DAG for invalido APENAS por colisao na mesma onda, imprimir mesmo assim as ondas/arquivos e listar as colisoes do DAG invalido (ou documentar no --help que so DAGs validos sao previstos)."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/cli.py",
+      "linha": 394,
+      "descricao": "Para dag.json estruturalmente quebrado a mensagem repassa o texto cru da excecao Python. Medido: tasks=['P01'] -> \"'str' object has no attribute 'get'\"; id numerico -> \"'<' not supported between instances of 'str' and 'int'\"; bytes invalidos -> \"'utf-8' codec can't decode byte 0xff...\". Sem traceback (criterio atendido), mas nao e 'mensagem clara' para o operador. Alem disso, no ramo sem --json o erro sai em stdout, nao em stderr.",
+      "correcao_sugerida": "Prefixar com uma causa legivel (ex.: 'dag.json inválido/malformado: {erro}') e, no ramo texto, escrever o erro em stderr mantendo o exit 1."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_cli_prever.py",
+      "linha": 46,
+      "descricao": "Cobertura incompleta no caminho de erro com --json: existe teste para DAG de raiz invalida com --json, mas nao para 'sprint inexistente --json' nem para 'sprint id invalido/traversal --json'. Verifiquei manualmente que ambos devolvem JSON valido com chave 'erro' e exit 1, porem um bug futuro (ex.: erro em stderr, ou texto puro misturado ao JSON) passaria pela suite.",
+      "correcao_sugerida": "Adicionar 2 asserts: cli.main(['prever','NAO-EXISTE','--json']) == 1 com json.loads(out)['erro'] contendo 'não encontrado'; e o mesmo para '../FORA' com 'sprint inválido'."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/cli.py",
+      "linha": 388,
+      "descricao": "O mapeamento dag.json -> TaskPlano e reescrito aqui (id/titulo/criterios/deps/agente/teste) em vez de reusar planner._construir_task, que ja faz esse mapeamento com checagem de tipos. O risco hoje e baixo porque carrega_dag valida antes (config.Task.validar exige id/titulo/criterios), mas ficam duas regras de conversao para manter em sincronia — e campos como paralelizavel/estimativa sao silenciosamente descartados.",
+      "correcao_sugerida": "Extrair em planner.py um helper publico (ex.: tasks_do_dag(dag) -> list[TaskPlano]) e chamar de cmd_prever, mantendo uma unica conversao."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": "autodev/cli.py",
+      "linha": 367,
+      "descricao": "A guarda de traversal rejeita qualquer id com '/', o que inclui entradas legitimas redundantes como './DEVFACTORY-003' (verificado: 'sprint inválido: ./C-TESTE'). E nit de UX, nao de seguranca: diretorios de sprint sao planos e '..'/absolutos ficam corretamente bloqueados.",
+      "correcao_sugerida": "Normalizar antes de validar (strip de './' e de barras nas pontas) ou aceitar o caminho redundante e checar o resultado resolvido dentro de .autodev/sprints."
+    }
+  ],
+  "resumo": "Todos os 5 criterios de aceitacao estao atendidos e comprovados por execucao real (8 testes verdes, suite completa 386 verdes na copia do worktree a8b0606, probes adversariais sempre exit 1 sem traceback); as ressalvas sao de robustez de mensagem, cobertura do ramo --json em erro e duplicacao de mapeamento, nenhuma bloqueante."
+}
+```
+
+
+===== STDERR =====
+

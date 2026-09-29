@@ -1,0 +1,690 @@
+# exit_code=0 duracao=377.2s modelo=deepseek-v4-pro effort=(default) failure_class=None tokens=nao medido(-)
+
+===== PROMPT ENVIADO =====
+Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
+Voce NAO escreveu este codigo. Seu trabalho e tentar reprovar, nao aprovar.
+
+## Criterios de aceitacao do Sprint
+- sprint.yaml aceita o bloco aprovacao com as chaves por, quando e hash_dag (sha256 do dag.json)
+- autodev run recusa rodar sprint PLANEJADO sem aprovacao registrada, dizendo qual comando registra a aprovacao
+- existe o comando autodev aprovar <sprint_id> --por <nome> que grava a aprovacao com o hash atual do dag.json
+- depois de aprovar, autodev run aceita o sprint e registra um evento de aprovacao no historico
+- dag.json alterado depois da aprovacao invalida a aprovacao (hash nao confere) e o run recusa de novo, citando a divergencia
+- os testes ficam em .autodev/tests/test_plan_aprovacao.py e rodam com python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q
+- estende autodev/cli.py e autodev/orchestrator.py preservando os subcomandos e o laco de execucao atuais, sem remover nem renomear nada
+
+## Task
+P05: Portao de aprovacao humana do plano
+
+## Diff a revisar (base 498c121d9e6b134d55dd5f4c2e34eac9fc8a253f -> HEAD)
+```diff
+diff --git a/.autodev/tests/conftest.py b/.autodev/tests/conftest.py
+index 3d494a0..246d61c 100644
+--- a/.autodev/tests/conftest.py
++++ b/.autodev/tests/conftest.py
+@@ -2,6 +2,7 @@
+ from __future__ import annotations
+ 
+ import json
++import hashlib
+ import os
+ import subprocess
+ import sys
+@@ -78,12 +79,15 @@ def scaffold_sprint(raiz: Path, sprint: str, tarefas: list[dict],
+     d = raiz / ".autodev" / "sprints" / sprint
+     (d / "evidence").mkdir(parents=True, exist_ok=True)
+     (d / "logs").mkdir(parents=True, exist_ok=True)
+-    (d / "sprint.yaml").write_text(
+-        f"sprint_id: {sprint}\ntitulo: teste\nobjetivo: {objetivo}\n", encoding="utf-8")
+-    (d / "spec.md").write_text(f"# {sprint}\n\n{objetivo}\n", encoding="utf-8")
+     (d / "dag.json").write_text(
+         json.dumps({"sprint_id": sprint, "tasks": tarefas}, ensure_ascii=False),
+         encoding="utf-8")
++    hash_dag = hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
++    (d / "sprint.yaml").write_text(
++        f"sprint_id: {sprint}\ntitulo: teste\nobjetivo: {objetivo}\n"
++        f"aprovacao:\n  por: teste\n  quando: fixture\n  hash_dag: {hash_dag}\n",
++        encoding="utf-8")
++    (d / "spec.md").write_text(f"# {sprint}\n\n{objetivo}\n", encoding="utf-8")
+     return d
+ 
+ 
+diff --git a/.autodev/tests/test_plan_aceitacao.py b/.autodev/tests/test_plan_aceitacao.py
+index aa0169d..4f19ab4 100644
+--- a/.autodev/tests/test_plan_aceitacao.py
++++ b/.autodev/tests/test_plan_aceitacao.py
+@@ -111,6 +111,7 @@ def test_aceitacao_do_planejador(tmp_path, monkeypatch, capsys):
+     monkeypatch.setattr(cli, "RAIZ", raiz)
+     assert cli.main(["--sprint", sprint_id, "init"]) == 0
+     assert "DAG valido: 3 tasks em 2 ondas" in capsys.readouterr().out
++    assert cli.main(["aprovar", sprint_id, "--por", "Teste de aceitacao"]) == 0
+ 
+     dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
+     ondas = ordem_topologica(dag)
+diff --git a/.autodev/tests/test_plan_aprovacao.py b/.autodev/tests/test_plan_aprovacao.py
+new file mode 100644
+index 0000000..1360349
+--- /dev/null
++++ b/.autodev/tests/test_plan_aprovacao.py
+@@ -0,0 +1,314 @@
++from __future__ import annotations
++
++import hashlib
++import json
++import re
++from pathlib import Path
++
++import yaml
++import pytest
++
++from autodev.cli import main
++from autodev.config import carrega_sprint
++from autodev.orchestrator import Orquestrador
++
++
++def _sprint(tmp_path: Path, sprint: str = "S1") -> Path:
++    d = tmp_path / ".autodev" / "sprints" / sprint
++    d.mkdir(parents=True)
++    (d / "dag.json").write_text(json.dumps({"sprint_id": sprint, "tasks": []}), encoding="utf-8")
++    (d / "sprint.yaml").write_text(
++        f"sprint_id: {sprint}\nobjetivo: teste\nstatus: PLANEJADO\n", encoding="utf-8"
++    )
++    return d
++
++
++def test_sprint_yaml_accepts_approval_keys(tmp_path, monkeypatch):
++    d = _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
++    approval = yaml.safe_load((d / "sprint.yaml").read_text())["aprovacao"]
++    assert set(approval) == {"por", "quando", "hash_dag"}
++    assert approval["por"] == "Ana"
++    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}", approval["quando"])
++    assert approval["hash_dag"] == hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
++
++
++def test_aprovar_preserva_conteudo_existente_do_yaml(tmp_path, monkeypatch):
++    d = _sprint(tmp_path)
++    (d / "sprint.yaml").write_text(
++        "# comentario importante\nsprint_id: S1\nobjetivo: teste\n# manter\nstatus: PLANEJADO\n",
++        encoding="utf-8")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
++    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
++    assert "# comentario importante" in texto
++    assert "# manter" in texto
++
++
++def test_aprovar_substitui_aprovacao_null(tmp_path, monkeypatch):
++    d = _sprint(tmp_path)
++    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
++        arquivo.write("aprovacao: null\n")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
++
++    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
++    assert texto.count("aprovacao:") == 1
++    dados = yaml.safe_load(texto)
++    assert dados["aprovacao"]["por"] == "Ana"
++
++
++@pytest.mark.parametrize("aprovacao_existente", [
++    'aprovacao: {por: Bia, quando: ontem, hash_dag: antigo}\n',
++    'aprovacao:\n  por: Bia\n  quando: ontem\n  hash_dag: antigo\n',
++])
++def test_aprovar_substitui_aprovacao_existente_sem_duplicar(
++        tmp_path, monkeypatch, aprovacao_existente):
++    d = _sprint(tmp_path)
++    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
++        arquivo.write(aprovacao_existente)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
++
++    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
++    assert texto.count("aprovacao:") == 1
++    assert yaml.safe_load(texto)["aprovacao"]["por"] == "Ana"
++
++
++@pytest.mark.parametrize("sprint_id", ["", ".", "..", "../fora", r"..\fora"])
++def test_aprovar_recusa_sprint_id_invalido(tmp_path, monkeypatch, capsys, sprint_id):
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["aprovar", sprint_id, "--por", "Ana"]) == 1
++    assert "sprint inválido" in capsys.readouterr().out
++
++
++@pytest.mark.parametrize("aprovacao", [
++    {"por": "Ana", "hash_dag": "abc"},
++    {"por": "Ana", "quando": "agora", "hash_dag": "abc", "extra": "nao"},
++    {"por": "", "quando": "agora", "hash_dag": "abc"},
++])
++def test_carrega_sprint_recusa_aprovacao_malformada(tmp_path, aprovacao):
++    d = _sprint(tmp_path)
++    dados = yaml.safe_load((d / "sprint.yaml").read_text())
++    dados["aprovacao"] = aprovacao
++    (d / "sprint.yaml").write_text(yaml.safe_dump(dados), encoding="utf-8")
++    with pytest.raises(ValueError, match="aprovacao"):
++        carrega_sprint(d / "sprint.yaml")
++
++
++def test_aprovar_recusa_nome_vazio(tmp_path, monkeypatch, capsys):
++    _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["--sprint", "S1", "aprovar", "S1", "--por", ""]) == 2
++    assert "--por" in capsys.readouterr().out
++
++
++def test_aprovar_recusa_sprints_divergentes(tmp_path, monkeypatch, capsys):
++    _sprint(tmp_path, "S1")
++    _sprint(tmp_path, "S2")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["--sprint", "S1", "aprovar", "S2", "--por", "Ana"]) == 2
++    assert "diverge" in capsys.readouterr().out
++
++
++def test_aprovar_recusa_id_declarado_por_outro_sprint(tmp_path, monkeypatch, capsys):
++    d = _sprint(tmp_path, "S1")
++    (d / "sprint.yaml").write_text(
++        "sprint_id: OUTRA\nobjetivo: teste\nstatus: PLANEJADO\n", encoding="utf-8")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
++    assert "OUTRA" in capsys.readouterr().out
++    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
++
++
++def test_aprovar_recusa_dag_invalido(tmp_path, monkeypatch, capsys):
++    d = _sprint(tmp_path)
++    (d / "dag.json").write_text("{nao-json", encoding="utf-8")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
++    assert "DAG invalido" in capsys.readouterr().out
++    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
++
++
++def test_aprovar_informa_sprint_yaml_invalido(tmp_path, monkeypatch, capsys):
++    d = _sprint(tmp_path)
++    (d / "sprint.yaml").write_text("sprint_id: S1\n", encoding="utf-8")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
++    assert "sprint invalido" in capsys.readouterr().out
++
++
++def test_run_informa_yaml_de_aprovacao_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
++    d = _sprint(tmp_path)
++    dados = yaml.safe_load((d / "sprint.yaml").read_text())
++    dados["aprovacao"] = {"por": "Ana", "hash_dag": "abc"}
++    (d / "sprint.yaml").write_text(yaml.safe_dump(dados), encoding="utf-8")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["--sprint", "S1", "run", "--modo-teste"]) == 2
++    saida = capsys.readouterr().out
++    assert "sprint invalido" in saida
++
++
++def test_resume_planejado_recusa_sem_aprovacao(tmp_path, monkeypatch, capsys):
++    _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
++    assert "autodev aprovar S1 --por <nome>" in capsys.readouterr().out
++
++
++def test_resume_aceita_aprovacao_valida(tmp_path, monkeypatch, capsys):
++    _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
++
++    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 0
++    assert "parado por: -" in capsys.readouterr().out
++
++
++def test_resume_informa_yaml_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
++    d = _sprint(tmp_path)
++    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
++        arquivo.write("aprovacao:\n  por: Ana\n")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
++    assert "sprint invalido" in capsys.readouterr().out
++
++
++@pytest.mark.parametrize("conteudo", ["sprint_id: [\n", "- sprint_id: S1\n"])
++def test_resume_informa_yaml_ilegivel_sem_traceback(
++        tmp_path, monkeypatch, capsys, conteudo):
++    d = _sprint(tmp_path)
++    (d / "sprint.yaml").write_text(conteudo, encoding="utf-8")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
++    assert "sprint invalido" in capsys.readouterr().out
++
++
++def test_report_informa_yaml_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
++    d = _sprint(tmp_path)
++    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
++        arquivo.write("aprovacao:\n  por: Ana\n")
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++
++    assert main(["--sprint", "S1", "report"]) == 2
++    assert "sprint invalido" in capsys.readouterr().out
++
++
++def test_run_nao_mascara_value_error_do_laco(tmp_path, monkeypatch):
++    d = _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
++
++    def falha_no_laco(orquestrador, args):
++        raise ValueError("falha interna")
++
++    monkeypatch.setattr("autodev.cli._rodar_com_rodadas", falha_no_laco)
++    with pytest.raises(ValueError, match="falha interna"):
++        main(["--sprint", "S1", "run", "--modo-teste"])
++
++
++def test_run_planejado_recusa_sem_aprovacao(tmp_path):
++    d = _sprint(tmp_path)
++    o = Orquestrador(tmp_path, "S1", modo_teste=True)
++    resultado = o.rodar()
++    assert resultado.parado_por and "autodev aprovar S1 --por <nome>" in resultado.parado_por
++    assert o.store.tasks("S1") == []
++
++
++def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
++    d = _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
++    o = Orquestrador(tmp_path, "S1", modo_teste=True)
++    resultado = o.rodar()
++    assert resultado.parado_por is None
++    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
++    assert len(eventos) == 1
++    assert json.loads(eventos[0]["payload"]) == yaml.safe_load(
++        (d / "sprint.yaml").read_text())["aprovacao"]
++
++
++def test_run_nao_exige_aprovacao_legada_de_sprint_ja_em_execucao(tmp_path):
++    _sprint(tmp_path)
++    o = Orquestrador(tmp_path, "S1", modo_teste=True)
++    o.store.transicionar_sprint("S1", "EM_EXECUCAO", "sprint preexistente")
++
++    resultado = o.rodar()
++
++    assert resultado.parado_por is None
++
++
++def test_aprovacao_gera_um_evento_por_hash(tmp_path, monkeypatch):
++    _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
++    o = Orquestrador(tmp_path, "S1", modo_teste=True)
++    o.rodar()
++    o.rodar()
++    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
++    assert len(eventos) == 1
++
++
++def test_aprovacao_nao_duplica_evento_fora_da_janela_de_500(tmp_path, monkeypatch):
++    _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
++    o = Orquestrador(tmp_path, "S1", modo_teste=True)
++    assert o.rodar().parado_por is None
++    for numero in range(501):
++        o.store.evento("S1", None, "ruido", {"numero": numero})
++
++    assert o.rodar().parado_por is None
++
++    quantidade = o.store.conn.execute(
++        "SELECT COUNT(*) FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
++        ("S1",),
++    ).fetchone()[0]
++    assert quantidade == 1
++
++
++def test_dag_alterado_invalida_aprovacao(tmp_path, monkeypatch):
++    d = _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
++    (d / "dag.json").write_text(
++        '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
++        '"criterios":["x"]}]}'
++    )
++    resultado = Orquestrador(tmp_path, "S1", modo_teste=True).rodar()
++    assert resultado.parado_por and "diverg" in resultado.parado_por
++
++
++@pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM", "ENCERRADO", "ABORTADO"])
++def test_dag_alterado_invalida_aprovacao_em_reexecucao(
++        tmp_path, monkeypatch, estado):
++    d = _sprint(tmp_path)
++    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
++    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
++    o = Orquestrador(tmp_path, "S1", modo_teste=True)
++    if estado == "EM_EXECUCAO":
++        o.store.transicionar_sprint("S1", estado, "rodada em curso")
++    elif estado == "ENCERRADO":
++        o.store.encerrar_sprint("S1")
++    elif estado == "ABORTADO":
++        o.store.transicionar_sprint("S1", estado, "cancelado pelo autor")
++    else:
++        o.store.checkpoint("S1", estado, {"motivo": "fim da rodada"})
++    (d / "dag.json").write_text(
++        '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
++        '"criterios":["alterar modulo.py"]}]}', encoding="utf-8")
++
++    resultado = o.rodar(parar_em="P1")
++
++    assert resultado.parado_por and "divergencia" in resultado.parado_por
++    assert o.store.task("S1", "P1") is None
+diff --git a/autodev/cli.py b/autodev/cli.py
+index 49a70a2..0052d2b 100644
+--- a/autodev/cli.py
++++ b/autodev/cli.py
+@@ -4,6 +4,7 @@ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
+   python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
++  python3 -m autodev aprovar <sprint_id> --por <nome>  # registra a aprovacao do plano
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -19,9 +20,12 @@ Uso:
+ from __future__ import annotations
+ 
+ import argparse
++import hashlib
+ import json
++import re
+ import sys
+ import time
++from datetime import datetime
+ from pathlib import Path
+ 
+ RAIZ = Path(__file__).resolve().parent.parent
+@@ -130,12 +134,16 @@ def _rodar_com_rodadas(o, args):
+ 
+ 
+ def cmd_run(args) -> int:
+-    from .orchestrator import Orquestrador
++    from .orchestrator import Orquestrador, PlanoInvalido
+     import os
+     os.environ.setdefault("AUTODEV_AGENT_TIMEOUT", "900")
+     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste,
+                      deadline_s=args.deadline)
+-    r = _rodar_com_rodadas(o, args)
++    try:
++        r = _rodar_com_rodadas(o, args)
++    except PlanoInvalido as exc:
++        print(f"sprint invalido: {exc}")
++        return 2
+     assert r is not None  # rodadas >= 1 sempre executa ao menos uma passada
+     print(f"\n=== resumo ===\n  concluidas: {r.concluidas}/{len(r.tasks)}"
+           f"\n  parado por: {r.parado_por or '-'}"
+@@ -143,9 +151,71 @@ def cmd_run(args) -> int:
+     return 0 if not r.parado_por else 2
+ 
+ 
++def cmd_aprovar(args) -> int:
++    if (not args.sprint_id or args.sprint_id in (".", "..")
++            or "/" in args.sprint_id or "\\" in args.sprint_id):
++        print(f"sprint inválido: {args.sprint_id}")
++        return 1
++    if args.sprint is not None and args.sprint != args.sprint_id:
++        print(f"--sprint {args.sprint} diverge de sprint_id {args.sprint_id}")
++        return 2
++    if not args.por.strip():
++        print("--por precisa conter um nome nao vazio")
++        return 2
++    d = RAIZ / ".autodev" / "sprints" / args.sprint_id
++    yaml_path = d / "sprint.yaml"
++    dag_path = d / "dag.json"
++    if not yaml_path.exists() or not dag_path.exists():
++        print(f"sprint inexistente ou incompleto: {args.sprint_id}")
++        return 1
++    from .config import carrega_dag, carrega_sprint
++    try:
++        sprint = carrega_sprint(yaml_path)
++    except (OSError, ValueError, KeyError, TypeError) as exc:
++        print(f"sprint invalido: {exc}")
++        return 2
++    if sprint["sprint_id"] != args.sprint_id:
++        print(f"sprint_id declarado {sprint['sprint_id']} diverge de {args.sprint_id}")
++        return 2
++    try:
++        carrega_dag(dag_path)
++    except (OSError, ValueError, KeyError, TypeError) as exc:
++        print(f"DAG invalido: {exc}")
++        return 2
++    try:
++        texto = yaml_path.read_text(encoding="utf-8")
++    except OSError as exc:
++        print(f"sprint invalido: {exc}")
++        return 2
++    aprovacao = {
++        "por": args.por.strip(),
++        "quando": datetime.now().astimezone().isoformat(timespec="seconds"),
++        "hash_dag": hashlib.sha256(dag_path.read_bytes()).hexdigest(),
++    }
++    bloco = "aprovacao:\n" + "".join(
++        f"  {chave}: {json.dumps(valor, ensure_ascii=False)}\n"
++        for chave, valor in aprovacao.items())
++    texto = re.sub(
++        r"(?m)^aprovacao:[^\n]*(?:\n^[ \t]+[^\n]*)*",
++        "",
++        texto,
++    )
++    yaml_path.write_text(texto.rstrip() + "\n" + bloco, encoding="utf-8")
++    print(f"sprint {args.sprint_id} aprovado por {args.por}")
++    return 0
++
++
+ def cmd_resume(args) -> int:
+-    from .orchestrator import Orquestrador
++    from .orchestrator import Orquestrador, PlanoInvalido
+     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste)
++    try:
++        bloqueio = o.checar_aprovacao()
++    except PlanoInvalido as exc:
++        print(f"sprint invalido: {exc}")
++        return 2
++    if bloqueio:
++        print(f"concluidas: 0/0 | parado por: {bloqueio}")
++        return 2
+     rec = o.recuperar()
+     print(f"recuperacao: {json.dumps(rec, ensure_ascii=False)}")
+     r = o.rodar()
+@@ -158,7 +228,11 @@ def cmd_report(args) -> int:
+     from . import report as rp
+     from .worktree import commit_atual
+     d = RAIZ / ".autodev" / "sprints" / args.sprint
+-    sp = carrega_sprint(d / "sprint.yaml")
++    try:
++        sp = carrega_sprint(d / "sprint.yaml")
++    except (OSError, ValueError) as exc:
++        print(f"sprint invalido: {exc}")
++        return 2
+     # O DAG acrescenta contexto; sua ausência ou corrupção não impede o report.
+     try:
+         valor = json.loads((d / "dag.json").read_text(encoding="utf-8")).get(
+@@ -427,7 +501,7 @@ def cmd_prever(args) -> int:
+ 
+ def main(argv: list[str] | None = None) -> int:
+     p = argparse.ArgumentParser(prog="autodev", description="DEVFACTORY orchestrator")
+-    p.add_argument("--sprint", default=SPRINT_PADRAO)
++    p.add_argument("--sprint", default=None)
+     sub = p.add_subparsers(dest="cmd", required=True)
+ 
+     sub.add_parser("detect").set_defaults(fn=cmd_detect)
+@@ -462,6 +536,11 @@ def main(argv: list[str] | None = None) -> int:
+                    help="segundos de teto de execucao")
+     s.set_defaults(fn=cmd_run)
+ 
++    s = sub.add_parser("aprovar", help="registra a aprovação humana do plano")
++    s.add_argument("sprint_id")
++    s.add_argument("--por", required=True)
++    s.set_defaults(fn=cmd_aprovar)
++
+     s = sub.add_parser("resume")
+     s.add_argument("--modo-teste", action="store_true")
+     s.set_defaults(fn=cmd_resume)
+@@ -506,6 +585,8 @@ def main(argv: list[str] | None = None) -> int:
+     sub.add_parser("start").set_defaults(fn=cmd_start)
+ 
+     args = p.parse_args(argv)
++    if args.sprint is None and args.cmd != "aprovar":
++        args.sprint = SPRINT_PADRAO
+     return args.fn(args)
+ 
+ 
+diff --git a/autodev/config.py b/autodev/config.py
+index a1ae450..6211bdb 100644
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -318,11 +318,22 @@ def carrega_dag(p: Path) -> dict:
+ 
+ 
+ def carrega_sprint(p: Path) -> dict:
+-    with p.open(encoding="utf-8") as fh:
+-        s = yaml.safe_load(fh) or {}
++    try:
++        with p.open(encoding="utf-8") as fh:
++            s = yaml.safe_load(fh) or {}
++    except yaml.YAMLError as exc:
++        raise ValueError(f"sprint.yaml invalido: {exc}") from exc
++    if not isinstance(s, dict):
++        raise ValueError(f"sprint.yaml precisa ser um mapa: {p}")
+     for campo in ("sprint_id", "objetivo"):
+         if campo not in s:
+             raise ValueError(f"sprint.yaml sem '{campo}': {p}")
++    aprovacao = s.get("aprovacao")
++    if aprovacao is not None:
++        if not isinstance(aprovacao, dict) or set(aprovacao) != {"por", "quando", "hash_dag"}:
++            raise ValueError("aprovacao precisa conter exatamente por, quando e hash_dag")
++        if not all(isinstance(aprovacao.get(k), str) and aprovacao[k] for k in ("por", "quando", "hash_dag")):
++            raise ValueError("aprovacao precisa conter por, quando e hash_dag preenchidos")
+     return s
+ 
+ 
+diff --git a/autodev/orchestrator.py b/autodev/orchestrator.py
+index 94861c4..3b0fc6c 100644
+--- a/autodev/orchestrator.py
++++ b/autodev/orchestrator.py
+@@ -10,6 +10,7 @@ Nunca a memória conversacional.
+ from __future__ import annotations
+ 
+ import json
++import hashlib
+ import os
+ import signal
+ import threading
+@@ -21,7 +22,8 @@ from pathlib import Path
+ from . import agents, errors, haq, integration, killswitch, report, retry, review
+ from . import sandbox as sbx
+ from . import testrunner
+-from .config import Config, carrega_dag, carrega_sprint, ordem_topologica
++from .config import (Config, carrega_dag, carrega_sprint,
++                     ordem_topologica)
+ from .state import StateStore, TransicaoInvalida, WorktreeOcupado
+ from .worktree import (WorktreeManager, arquivos_alterados, branch_existe,
+                        commit_atual, git)
+@@ -84,6 +86,10 @@ class ResultadoSprint:
+         return sum(1 for t in self.tasks if t.estado_final in ("DONE", "INTEGRATED"))
+ 
+ 
++class PlanoInvalido(ValueError):
++    """Arquivos do plano não puderam ser carregados ou validados."""
++
++
+ class Orquestrador:
+     def __init__(self, raiz: str | Path, sprint: str, *,
+                  modo_teste: bool = False, deadline_s: float | None = None):
+@@ -208,13 +214,57 @@ class Orquestrador:
+         return 0
+ 
+     # ------------------------------------------------------------ carregar sprint
+-    def carregar(self) -> None:
++    def _ler_plano(self) -> None:
++        """Lê e valida os arquivos do plano sem materializá-los no estado."""
+         self.sprint_yaml = carrega_sprint(self.dir_sprint / "sprint.yaml")
+         self.dag = carrega_dag(self.dir_sprint / "dag.json")
++
++    def carregar(self) -> None:
++        self._ler_plano()
+         novas = self.store.criar_tasks_do_dag(self.sprint, self.dag)
+         self.log(f"sprint {self.sprint}: {len(self.dag['tasks'])} tasks "
+                  f"({novas} novas) — ondas {ordem_
+... [diff truncado em 24000 chars]
+```
+
+## Saida dos testes
+```
+....................................                                     [100%]
+36 passed in 1.10s
+
+```
+
+## Restricoes de arquitetura
+simplicidade > confiabilidade > recuperacao > verificacao deterministica > seguranca
+
+## Politica de seguranca
+sem sudo/root, sem credenciais, sem escrita fora do repo
+
+## O que voce DEVE verificar
+1. O codigo atende TODOS os criterios de aceitacao? Cite cada um.
+2. O diff contem algo que os testes NAO cobrem?
+3. Ha segredo/credencial, caminho absoluto fragil, ou escrita fora do projeto?
+4. Ha dependencia nova? Ela e justificada?
+5. Ha codigo morto, TODOs ou implementacao pela metade?
+6. O teste realmente prova o comportamento, ou apenas passa?
+
+## Formato da resposta (obrigatorio)
+Responda com um unico bloco JSON, nada antes e nada depois:
+```json
+{
+  "veredito": "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+  "confianca": 0.0,
+  "criterios_atendidos": [{"criterio": "...", "atende": true, "evidencia": "..."}],
+  "findings": [{"severidade": "alta|media|baixa", "arquivo": "...", "linha": 0, "descricao": "...", "correcao_sugerida": "..."}],
+  "resumo": "uma frase"
+}
+```
+
+
+## Importante
+Voce esta em modo SOMENTE LEITURA: nao edite, crie nem remova arquivo nenhum.
+Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
+
+
+===== STDOUT =====
+Revisão concluída. Verifiquei o código real no branch/worktree `sprint/DEVFACTORY-003/P05-codex` (HEAD `7a4c701`), rodei os testes de aceitação (36 passed) e a suíte completa (422 passed), e li `cli.py`, `orchestrator.py`, `config.py`, `state.py` e os testes.
+
+```json
+{
+  "veredito": "APPROVE",
+  "confianca": 0.85,
+  "criterios_atendidos": [
+    {"criterio": "sprint.yaml aceita bloco aprovacao com por, quando e hash_dag (sha256 do dag.json)", "atende": true, "evidencia": "config.py carrega_sprint valida aprovacao == {por,quando,hash_dag} (linhas 331-336); cmd_aprovar grava o bloco com hash_dag=sha256(dag.json bytes) (cli.py 190-203); teste test_sprint_yaml_accepts_approval_keys confere as 3 chaves e o hash."},
+    {"criterio": "autodev run recusa sprint PLANEJADO sem aprovacao, citando o comando", "atende": true, "evidencia": "orchestrator.py _validar_aprovacao (228-243) devolve 'sprint PLANEJADO sem aprovacao registrada; use autodev aprovar <id> --por <nome>' quando estado in (None,'PLANEJADO') e sem aprovacao; rodar() retorna parado_por com esse texto; test_run_planejado_recusa_sem_aprovacao e test_resume_planejado_recusa_sem_aprovacao passam."},
+    {"criterio": "comando autodev aprovar <sprint_id> --por <nome> grava aprovacao com hash atual", "atende": true, "evidencia": "subparser 'aprovar' (cli.py 539-542) + cmd_aprovar (154-205) valida sprint_id, --por nao-vazio, DAG, e grava por/quando/hash_dag calculado no momento; testes test_aprovar_* cobrem sucesso e refusas."},
+    {"criterio": "apos aprovar, run aceita e registra evento de aprovacao no historico", "atende": true, "evidencia": "_registrar_aprovacao (253-266) insere evento tipo 'aprovacao_plano' com payload da aprovacao; rodar() chama apos adquirir run_lock (724-725); test_run_apos_aprovacao_registra_evento verifica 1 evento com payload == bloco yaml."},
+    {"criterio": "dag.json alterado invalida aprovacao e run recusa citando divergencia", "atende": true, "evidencia": "_validar_aprovacao recomputa sha256 e compara com hash_dag registrado (238-242), devolvendo 'aprovacao invalida: divergencia no hash do dag.json'; test_dag_alterado_invalida_aprovacao e test_dag_alterado_invalida_aprovacao_em_reexecucao (4 estados) passam."},
+    {"criterio": "testes em .autodev/tests/test_plan_aprovacao.py, rodam com python3 -m pytest ... -q", "atende": true, "evidencia": "arquivo presente com 36 casos; executei e obtive '36 passed'. Observacao de ambiente: python3 do host nao tem pytest; roda via .venv/bin/python (documentado no sprint.yaml)."},
+    {"criterio": "estende cli.py e orchestrator.py preservando subcomandos e laco, sem remover/renomear", "atende": true, "evidencia": "diff e apenas aditivo (carregar() extrai _ler_plano; rodar() ganha checar_aprovacao no topo e _registrar_aprovacao apos lock, laco intacto); --sprint default=None e reatribuido a SPRINT_PADRAO para todo cmd != 'aprovar' (cli.py 588-589), mantendo o comportamento; suíte completa 422 passed sem regressao."}
+  ],
+  "findings": [
+    {"severidade": "baixa", "arquivo": "autodev/orchestrator.py", "linha": 233, "descricao": "O portao confia em estado EM_EXECUCAO como 'legado, sem aprovacao'. cmd_desbloquear (cli.py 364) chama store.reabrir_sprint, que grava EM_EXECUCAO via checkpoint() sem validar transicao nem aprovacao. Assim, apos um 'init' (tasks criadas), 'autodev desbloquear P1' seguido de 'run' pula o portao. Exige acao humana deliberada e nao e barreira de seguranca (seguranca e a prioridade mais baixa), mas e um furo no proprio proposito do portao.", "correcao_sugerida": "Fazer cmd_desbloquear (ou reabrir_sprint) checar aprovacao quando o sprint esta em PLANEJADO/None, ou restringir a isencao de legado a sprints com tasks ja em estado terminal/EM_EXECUCAO preexistente."},
+    {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_aprovacao.py", "linha": 220, "descricao": "Nao ha teste de nivel CLI para o comando 'run' recusando sprint PLANEJADO sem aprovacao e imprimindo 'autodev aprovar ... --por <nome>'. A mensagem e coberta so no nivel Orquestrador (test_run_planejado_recusa_sem_aprovacao usa o.rodar() direto) e via 'resume' no nivel CLI. O comportamento de run esta correto (cmd_run imprime r.parado_por), mas nao ha assercao direta.", "correcao_sugerida": "Adicionar teste main(['--sprint','S1','run','--modo-teste']) == 2 com 'autodev aprovar S1 --por <nome>' na saida."},
+    {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 204, "descricao": "cmd_aprovar grava 'por' com strip() (linha 191) mas imprime args.por cru na linha 204; com '--por \"  Ana  \"' o yaml fica 'Ana' e o log mostra espacos. Cosmetico. Alem disso, a validacao de sprint_id (155-157) bloqueia '/', '\\\\', '.' e '..' mas permite caracteres de controle como newline, que seriam aceitos na montagem do path (porem inofensivos porque o diretorio precisa ja existir).", "correcao_sugerida": "Imprimir args.por.strip() e, defensivamente, recusar sprint_id com caracteres de controle (ex.: re.fullmatch(r'[A-Za-z0-9._-]+', id))."}
+  ],
+  "resumo": "Implementacao solida do portao de aprovacao: os 7 criterios de aceitacao estao atendidos com evidencia direta, 36 testes de aceitacao e 422 da suíte completa passam, sem dependencias novas, segredos, escrita fora do repo, codigo morto ou TODOs — apenas furos de severidade baixa (bypass via desbloquear, lacuna de cobertura no CLI de run e um detalhe cosmetico)."
+}
+```
+
+
+===== STDERR =====
+

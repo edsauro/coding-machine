@@ -66,6 +66,30 @@ TOKENS_DA_PREVIA = {
 }
 MEDIDAS: dict = {}       # preenchido em carrega(): as réguas usadas na estimativa
 
+# ---- escada VIGENTE (P-13): o que não estiver aqui é modelo/esforço antigo ---------
+# Serve para demarcar, nos gráficos, a tentativa que usou matriz aposentada (o
+# `sol/medium` de 27/09, por exemplo). A escada mudou em 29/09 e o relatório tem de
+# mostrar as duas coisas: quem rodou no modelo antigo e quem rodou no novo.
+ESCADA_ATUAL = {("gpt-5.6-luna", "low"), ("gpt-5.6-terra", "low"),
+                ("gpt-5.6-sol", "low"), ("gpt-6-astra", "low")}
+
+
+def _fora_da_escada(linha) -> bool:
+    return (linha["model"] or "", linha["effort"] or "") not in ESCADA_ATUAL
+
+
+def _curto(nome: str) -> str:
+    """`gpt-5.6-luna/low` → `luna/low`.
+
+    A tabela 1 tem 14 colunas e o prefixo `gpt-5.6-`/`gpt-6-` se repete em todas: por
+    extenso, a lista de modelos ocupava meia página e empurrava as últimas colunas para
+    fora da folha A4 (a tabela foi cortada na borda direita). O nome curto é inequívoco
+    e a legenda acima da tabela diz o de-para.
+    """
+    s = nome.replace("gpt-5.6-", "").replace("gpt-6-", "")
+    return "sol/med*" if s == "sol/medium" else s
+
+
 def pacotes_do_banco() -> dict[str, list[str]]:
     """Pacotes de cada sprint lidos do BANCO (não escritos à mão).
 
@@ -129,7 +153,8 @@ def carrega() -> tuple[dict, dict, dict]:
     con.row_factory = sqlite3.Row
     linhas = [dict(r) for r in con.execute(
         "SELECT sprint_id, task_id, attempt, agent, model, effort, status,"
-        " failure_class, review_result, test_result, tokens_total, start_time FROM attempts"
+        " failure_class, review_result, test_result, tokens_total, start_time,"
+        " final_commit FROM attempts"
         " WHERE sprint_id IN ({})"
         " ORDER BY sprint_id, task_id, attempt".format(
             ",".join("?" * len(SPRINTS))), SPRINTS)]
@@ -260,6 +285,37 @@ def carrega() -> tuple[dict, dict, dict]:
             if abs(_sobra) > 1e-9:      # esperado + retrabalho TEM de dar o total
                 raise AssertionError(
                     f"custo de {sprint}/{tid} não fecha: sobra {_sobra:.6f} US$")
+            # ---- separação por MODELO/degrau (pedido do autor, 29/09) --------------
+            # Os gráficos abrem a barra por modelo de TENTATIVA; estes são os números por
+            # trás. Tentativa cujo par modelo/esforço não existe na escada de hoje recebe
+            # a marca de "modelo antigo" — é o pedido de demarcar matriz aposentada.
+            from datetime import datetime as _d
+            por_modelo: dict[str, dict] = {}
+            for l in linhas_do_pacote:
+                chave = f"{l['model'] or '-'}/{l['effort'] or '-'}"
+                m = por_modelo.setdefault(chave, {
+                    "chamadas": 0, "tokens": 0, "usd": 0.0, "medidas": 0,
+                    "estimadas": 0, "fora_da_escada": _fora_da_escada(l)})
+                m["chamadas"] += 1
+                if l["tokens_total"] is not None:
+                    m["tokens"] += l["tokens_total"]
+                    m["usd"] += l["tokens_total"] * USD_POR_TOKEN
+                    m["medidas"] += 1
+                else:
+                    m["usd"] += _regua(l) * USD_POR_TOKEN
+                    m["estimadas"] += 1
+            _ts_pac = [l["start_time"] for l in linhas_do_pacote if l["start_time"]]
+            _nfind = 0
+            for l in linhas_do_pacote:
+                try:
+                    rv = json.loads(l["review_result"] or "{}")
+                except (TypeError, ValueError):
+                    rv = {}
+                f = rv.get("findings") if isinstance(rv, dict) else None
+                _nfind += len(f) if isinstance(f, list) else int(
+                    (rv or {}).get("n_findings") or 0)
+            _commit_final = next((l["final_commit"] for l in linhas_do_pacote
+                                  if l["final_commit"]), "")
             resumo_pacotes.append({
                 "sprint": sprint, "task": tid, "chamadas": sum(c.values()),
                 "max_tentativa": maximo, "min_tentativa": min(c),
@@ -293,6 +349,18 @@ def carrega() -> tuple[dict, dict, dict]:
                 "chamadas_retrabalho": r_n, "tokens_retrabalho": r_tok,
                 "usd_retrabalho": r_med + r_est, "usd_retrab_medido": r_med,
                 "usd_retrab_estimado": r_est,
+                # ---- por modelo, janela do pacote (auditoria) e complexidade ---------
+                "por_modelo": por_modelo,
+                "modelos_distintos": len(por_modelo),
+                "modelo_unico": len(por_modelo) == 1,
+                "tem_modelo_antigo": any(m["fora_da_escada"]
+                                         for m in por_modelo.values()),
+                "findings": _nfind,
+                "commit_final": _commit_final,
+                "inicio": (_d.fromtimestamp(min(_ts_pac)).strftime("%d/%m %H:%M")
+                           if _ts_pac else ""),
+                "fim": (_d.fromtimestamp(max(_ts_pac)).strftime("%d/%m %H:%M")
+                        if _ts_pac else ""),
             })
 
     # ---- outros agentes (não são chamadas do Codex) ---------------------------
@@ -562,6 +630,299 @@ def desenha_custo(dados: dict) -> Path:
     return destino
 
 
+_GIT_STATS: dict[str, tuple[int, int]] = {}
+
+
+def _git_stats(commit: str | None) -> tuple[int, int]:
+    """(linhas alteradas, arquivos alterados) do commit de fechamento do pacote.
+
+    Complexidade tem de vir do git, não de heurística: é o tamanho REAL do que o pacote
+    entregou. Commit ausente (pacote ainda não fechado) devolve zeros.
+    """
+    if not commit:
+        return 0, 0
+    if commit in _GIT_STATS:
+        return _GIT_STATS[commit]
+    import subprocess
+    linhas = arquivos = 0
+    try:
+        out = subprocess.run(["git", "show", "--numstat", "--format=", commit],
+                             cwd=RAIZ, capture_output=True, text=True,
+                             timeout=30).stdout
+    except Exception:
+        out = ""
+    for linha in out.splitlines():
+        campos = linha.split("\t")
+        if len(campos) >= 3:
+            arquivos += 1
+            for n in campos[:2]:
+                if n.strip().isdigit():
+                    linhas += int(n)
+    _GIT_STATS[commit] = (linhas, arquivos)
+    return linhas, arquivos
+
+
+# Cores por par modelo/esforço. O laranja é reservado ao MODELO ANTIGO (matriz que a
+# escada de hoje não usa): é a demarcação que o autor pediu, e ela não depende do nome.
+CORES_MODELO = {
+    "gpt-5.6-luna/low": "#9ecae1",
+    "gpt-5.6-terra/low": "#4292c6",
+    "gpt-5.6-sol/low": "#08519c",
+    "gpt-6-astra/low": "#31a354",
+    "gpt-5.6-sol/medium": "#e6550d",
+    "gpt-5.6-terra/medium": "#fdae6b",
+}
+COR_ANTIGO = "#e6550d"
+
+
+def desenha_paineis(dados: dict) -> Path:
+    """OS QUATRO GRÁFICOS, empilhados e com o MESMO eixo x (pedido de 29/09/2026).
+
+    Antes eram três imagens soltas: comparar custo com tentativa e com tokens obrigava a
+    pular entre arquivos de escalas diferentes. Aqui os quatro painéis estão alinhados
+    pacote a pacote — mesma ordem, mesma largura, um embaixo do outro — e cada barra é
+    aberta por MODELO DE TENTATIVA, que é o que o autor pediu para enxergar.
+
+    Painéis: 1) chamadas, 2) custo US$, 3) tokens, 4) complexidade (linhas e arquivos do
+    commit de fechamento, do git, mais os findings do revisor como linha).
+    Padrão hachurado = pedaço ESTIMADO pela régua (chamada sem medição, P-10): a hachura
+    não é enfeite, é a parte que não foi medida.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    plt.rcParams["text.parse_math"] = False      # US$ literal (ParseException)
+
+    pacotes = [p for p in dados["pacotes"] if p["chamadas"]]
+    pacotes.sort(key=lambda p: (p["sprint"], p["task"]))
+    if not pacotes:
+        raise SystemExit("sem pacotes com chamadas no escopo")
+
+    def _modelos_de(p) -> list[str]:
+        # ordem econômica da escada atual; antigos depois, para a legenda ser estável
+        ordem = list(CORES_MODELO)
+        return sorted((k for k in p["por_modelo"]),
+                      key=lambda k: (ordem.index(k) if k in ordem else len(ordem), k))
+
+    modelos = sorted({k for p in pacotes for k in p["por_modelo"]},
+                     key=lambda k: (list(CORES_MODELO).index(k)
+                                    if k in CORES_MODELO else 99, k))
+    x = range(len(pacotes))
+    rotulos = []
+    for p in pacotes:
+        if not p["commit_final"]:
+            marca = "· em andamento"
+        elif p["modelo_unico"]:
+            marca = "· 1 modelo"
+        else:
+            marca = f"· {p['modelos_distintos']} modelos"
+        if p["tem_modelo_antigo"]:
+            marca += " (antigo)"
+        rotulos.append(f"{p['sprint'].split('-')[-1]}/{p['task']}\n{marca}")
+
+    fig, eixos = plt.subplots(4, 1, figsize=(13.5, 17.5), sharex=True,
+                              gridspec_kw={"height_ratios": [1, 1.05, 1, 1.05]})
+
+    def _empilha(ax, campo: str, *, estimado: bool) -> None:
+        for i, p in enumerate(pacotes):
+            base = 0.0
+            for k in _modelos_de(p):
+                m = p["por_modelo"][k]
+                valor = m["chamadas"] if campo == "chamadas" else (
+                    m["usd"] if campo == "usd" else m["tokens"])
+                if not valor:
+                    continue
+                cor = CORES_MODELO.get(k, "#7f7f7f")
+                if estimado and m["estimadas"]:
+                    # split medido/estimado dentro do próprio modelo
+                    frac = m["estimadas"] / m["chamadas"]
+                    med, est = valor * (1 - frac), valor * frac
+                    if med:
+                        ax.bar(i, med, bottom=base, width=0.72, color=cor,
+                               edgecolor="white", linewidth=0.5, zorder=3)
+                        base += med
+                    if est:
+                        ax.bar(i, est, bottom=base, width=0.72, color="#f4f4f4",
+                               edgecolor=cor, linewidth=0.9, hatch="////", zorder=3)
+                        base += est
+                else:
+                    ax.bar(i, valor, bottom=base, width=0.72, color=cor,
+                           edgecolor="white", linewidth=0.5, zorder=3)
+                    base += valor
+
+    # ---- painel 1: chamadas por pacote ------------------------------------------
+    ax = eixos[0]
+    _empilha(ax, "chamadas", estimado=False)
+    for i, p in enumerate(pacotes):
+        ax.text(i, p["chamadas"] + 0.12, str(p["chamadas"]), ha="center", va="bottom",
+                fontsize=7.4, color="#333333")
+        if p["modelo_unico"] and p["commit_final"]:
+            ax.text(i, p["chamadas"] + 0.9, "★", ha="center", va="bottom", fontsize=11,
+                    color="#1a7f37")
+    ax.set_ylabel("chamadas do Codex\n(abertas por modelo)", fontsize=9.5)
+    ax.set_title(
+        "Coding_Machine — os quatro gráficos do mesmo eixo: cada pacote, aberto por "
+        "modelo de tentativa\n" + NOTA_CURTA + "\n"
+        "★ = pacote fechado do início ao fim com UM modelo só · "
+        "laranja = modelo de matriz antiga (fora da escada vigente) · "
+        "hachurado = pedaço estimado (sem medição)", fontsize=12, pad=16)
+
+    # ---- painel 2: custo por pacote ---------------------------------------------
+    ax = eixos[1]
+    _empilha(ax, "usd", estimado=True)
+    total = sum(p["usd_esperado"] + p["usd_retrabalho"] for p in pacotes)
+    esp = sum(p["usd_esperado"] for p in pacotes)
+    ret = sum(p["usd_retrabalho"] for p in pacotes)
+    for i, p in enumerate(pacotes):
+        valor = p["usd_esperado"] + p["usd_retrabalho"]
+        if valor:
+            ax.text(i, valor + (total * 0.012 if total else 0.002),
+                    f"{valor:.3f}".replace(".", ","), ha="center", va="bottom",
+                    fontsize=6.6, color="#333333")
+    ax.set_ylabel("custo (US$)\nmedido + estimado", fontsize=9.5)
+    if total:
+        ax.text(0.995, 0.93, f"total US$ {total:.2f}  ·  esperado {100 * esp / total:.0f}%"
+                             f"  ·  retrabalho {100 * ret / total:.0f}%",
+                transform=ax.transAxes, ha="right", va="top", fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.35", fc="#f7f7f7", ec="#cccccc"))
+
+    # ---- painel 3: tokens por pacote --------------------------------------------
+    ax = eixos[2]
+    _empilha(ax, "tokens", estimado=True)
+    for i, p in enumerate(pacotes):
+        tok = sum(m["tokens"] for m in p["por_modelo"].values())
+        if tok:
+            ax.text(i, tok * 1.02, f"{tok / 1000:.0f}k", ha="center", va="bottom",
+                    fontsize=6.6, color="#333333")
+    ax.set_ylabel("tokens do Codex\n(medidos + estimados)", fontsize=9.5)
+
+    # ---- painel 4: complexidade do pacote ---------------------------------------
+    ax = eixos[3]
+    linhas_por_pacote, arquivos_por_pacote = [], []
+    for p in pacotes:
+        linhas, arquivos = _git_stats(p["commit_final"])
+        linhas_por_pacote.append(linhas)
+        arquivos_por_pacote.append(arquivos)
+    ax.bar(x, linhas_por_pacote, width=0.62, color="#6a51a3", edgecolor="white",
+           linewidth=0.5, zorder=3, label="linhas alteradas (commit de fechamento)")
+    for i, (linhas, arquivos) in enumerate(zip(linhas_por_pacote, arquivos_por_pacote)):
+        if not pacotes[i]["commit_final"]:
+            texto = "sem commit\n(pacote aberto)"
+        else:
+            texto = f"{linhas} linhas\n{arquivos} arq."
+        ax.text(i, linhas + max(linhas_por_pacote or [1]) * 0.015, texto,
+                ha="center", va="bottom", fontsize=6.6, color="#3f2b73")
+    ax2 = ax.twinx()
+    ax2.plot(list(x), [p["findings"] for p in pacotes], marker="o", ms=5, lw=1.6,
+             color="#c62828", zorder=4, label="findings do revisor (dificuldade)")
+    for i, p in enumerate(pacotes):
+        ax2.annotate(str(p["findings"]), (i, p["findings"]), textcoords="offset points",
+                     xytext=(0, 7), ha="center", fontsize=6.6, color="#c62828")
+    ax2.set_ylabel("findings do revisor\n(soma das revisões)", fontsize=9.5,
+                   color="#c62828")
+    ax2.tick_params(axis="y", colors="#c62828")
+    ax.set_ylabel("complexidade\nlinhas alteradas (git)", fontsize=9.5)
+
+    # ---- eixo x comum -----------------------------------------------------------
+    # Rótulos em TODOS os painéis (não só no de baixo): o pedido era comparar um na
+    # sequência do outro, e sem o rótulo em cima é preciso rolar a imagem para saber
+    # qual pacote é qual.
+    for ax_ in eixos:
+        ax_.set_xticks(list(x))
+        ax_.set_xticklabels(rotulos, fontsize=6.6)
+        ax_.tick_params(axis="x", length=2)
+        ax_.grid(axis="y", alpha=0.25, zorder=0)
+        ax_.set_axisbelow(True)
+        for lado in ("top", "right"):
+            ax_.spines[lado].set_visible(False)
+        ax_.set_xlim(-0.7, len(pacotes) - 0.3)
+    eixos[1].legend(handles=[Patch(facecolor=CORES_MODELO.get(k, "#7f7f7f"), label=k,
+                                   edgecolor="white")
+                             for k in modelos] +
+                            [Patch(facecolor="#f4f4f4", edgecolor="#555555",
+                                   hatch="////", label="pedaço ESTIMADO (sem medição)")],
+                    loc="upper left", fontsize=7.6, ncol=2, framealpha=0.95)
+
+    destino = OUT / "paineis-comparacao.png"
+    fig.savefig(destino, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return destino
+
+
+def secao_estrategias(dados: dict) -> str:
+    """Seção 1: como os modelos foram alocados, e o que muda a partir de 29/09/2026.
+
+    O autor pediu que a PRIMEIRA seção do documento fosse isto — a última estratégia de
+    escalada (com janela e pacotes participantes) e a estratégia nova. O resto do
+    relatório é medição; esta seção é a regra do jogo que a medição pressupõe.
+    """
+    pacotes = sorted((p for p in dados["pacotes"] if p["chamadas"]),
+                     key=lambda p: (p["sprint"], p["task"]))
+    fechados = [p for p in pacotes if p["commit_final"]]
+    abertos = [p for p in pacotes if not p["commit_final"]]
+    ini = min((p["inicio"] for p in pacotes if p["inicio"]), default="—")
+    fim = max((p["fim"] for p in pacotes if p["fim"]), default="—")
+    lista = ", ".join(f"{p['sprint'].split('-')[-1]}/{p['task']}" for p in fechados)
+
+    def _bloco(p) -> str:
+        mods = ", ".join(f"`{k}`×{v['chamadas']}"
+                         for k, v in sorted(p["por_modelo"].items(),
+                                            key=lambda kv: -kv[1]["chamadas"]))
+        return (f"  - {p['sprint'].split('-')[-1]}/{p['task']} — {p['chamadas']} chamadas"
+                f" ({mods}), {p['inicio']} → {p['fim']}")
+
+    abertos_txt = "\n".join(_bloco(p) for p in abertos) or "  - nenhum"
+
+    return f"""## 1. Estratégias de alocação de modelo
+
+Esta é a seção que explica o resto do documento: o que se mede aqui é consequência de
+**como o modelo foi escolhido em cada tentativa**.
+
+### 1.1 Padrão de esforço (fixado pelo teste A/B)
+
+O teste A/B de custo mediu as combinações de modelo × esforço e o resultado foi direto:
+**o DeepSeek sai mais barato no `high` e o Codex no `low`**. Por chamada, o
+`deepseek-flash/high` custou **US$ 0,0027** contra **US$ 0,0066** do `sol/low`,
+**US$ 0,0105** do `luna/low`, **US$ 0,0133** do `pro/high` e **US$ 0,0201** do
+`astra/low` (prévia medida, 12 braços). **Todos os testes daqui em diante seguem esse
+padrão:** DeepSeek sempre `high`, Codex sempre `low` — inclusive o revisor, que passou a
+rodar `deepseek-flash/high` em 29/09.
+
+### 1.2 A última estratégia de escalada (degraus 1→5) — encerrada em 29/09
+
+Escalada por tentativa, um degrau por chamada, com o modelo vindo do **contador da task**:
+`1ª luna/low → 2ª terra/low → 3ª sol/low → 4ª astra/low → 5ª+ astra/low` (o 4º degrau era
+`sol/medium` até a P-13, em 29/09 — era o único degrau que escalava por ESFORÇO).
+
+- **Janela de uso:** {ini} a {fim} (as chamadas no escopo deste relatório).
+- **Pacotes que fecharam nela ({len(fechados)}):** {lista}.
+- **Abertos quando a estratégia foi trocada ({len(abertos)}):**
+{abertos_txt}
+- **Encerrada porque:** o autor decidiu que a escada passa a escalar **só por modelo**
+  (P-13) e, em seguida, definiu uma estratégia nova (1.3), depois de o motor gastar a
+  escada inteira em pacotes cujo defeito era de contrato/plano nosso, não de capacidade
+  do modelo.
+
+### 1.3 A estratégia nova — "3 degraus" (vigente desde 29/09/2026)
+
+Três degraus, com **parada obrigatória para decisão do autor**:
+
+`1º luna/low → 2º astra/low → 3º luna/low` — e, se o 3º não resolver, o motor **não
+insiste nem bloqueia**: para em `WAITING_HUMAN`, avisa no Telegram e espera resposta
+(*repetir* os três degraus, *mudar de estratégia* ou *encerrar*).
+
+- **Regra de convivência:** cada task grava a estratégia com que **começou**. Trocar a
+  política não muda a escada de quem já entrou — os pacotes em andamento terminam na
+  escada antiga (é por isso que os dois blocos convivem neste relatório).
+- **Primeiro pacote na estratégia nova:** 003/P07 (em andamento).
+- **Modelos antigos continuam demarcados** nos gráficos (laranja): `sol/medium` foi a
+  matriz até 27/09 e aparece nas chamadas das 003/004 que rodaram antes da troca.
+
+"""
+
+
 def escreve_relatorio(dados: dict) -> Path:
     """Gera o Markdown do MESMO dicionário que alimenta os gráficos.
 
@@ -623,17 +984,25 @@ def escreve_relatorio(dados: dict) -> Path:
                 continue
             p = next(x for x in d["pacotes"] if x["sprint"] == s and x["task"] == tid)
             tent = sorted(int(k) for k in m)
-            mods = ", ".join(sorted(p["modelos"]))
+            mods = ", ".join(_curto(x) for x in sorted(p["modelos"]))
             buraco = "" if tent == list(range(tent[0], tent[-1] + 1)) else " ⚠"
             aprov = (f"{p['aprovada_na_chamada']}ª ({p['modelo_que_aprovou']})"
                      if p["aprovada_na_chamada"] else "—")
+            linhas, arquivos = _git_stats(p["commit_final"])
+            _ini, _fim = p["inicio"], p["fim"]
+            # mesma data nos dois extremos = não repetir o dia (a coluna é estreita)
+            # mesma data nos dois extremos = não repetir o dia; `<br>` para a hora não
+            # quebrar no meio ("23:4 / 6") quando a coluna aperta
+            janela = (f"{_ini}<br>→ {_fim.split(' ')[-1]}"
+                      if _ini and _fim and _ini[:5] == _fim[:5]
+                      else f"{_ini}<br>→ {_fim}")
             linhas_pacote.append(
                 f"| {s.split('-')[-1]} | {tid} | {sum(m.values())} | "
                 f"{p['aprovacoes']}/{p['reprovacoes']}/{p['sem_avaliacao']} | "
                 f"{tent[0]}ª–{tent[-1]}ª{buraco} | {aprov} | "
                 f"{p['infra']} | {p['culpa_teste_plano']} | {p['do_modelo']} | "
                 f"{_retrab(p, False)} | {_retrab(p, True)} | "
-                f"{mods} |")
+                f"{mods} | {janela} | {linhas}/{arquivos} |")
     tabela_pacotes = "\n".join(linhas_pacote)
 
     # ---- retrabalho: números globais (bruto e ajustado, nas duas leituras) -----
@@ -759,6 +1128,8 @@ invocação).
 **Total no período:** **{total} chamadas do Codex**, {aprovadas} delas aprovadas
 (revisão + integração).
 
+{secao_estrategias(dados)}
+
 ## Avisos
 
 1. **Chamada é custo — com a procedência declarada.** Cada linha conta **uma invocação** do
@@ -767,10 +1138,10 @@ invocação).
    as outras foram **estimadas** pela régua do modelo. Todo valor em US$ diz de qual dos
    dois vem — sólido é medição, hachurado é estimativa.
 2. **Por que só as sprints 003 e 004.** {NOTA_PROTOCOLO}
-3. **A 003 ainda está em execução.** Entrou em 28/09 22:58 e tem 1 pacote integrado de 7 (a
-   P01 fechou em 6 chamadas, aprovada no 5º degrau, `astra/low`) com a P02 rodando; os outros
-   5 ainda não começaram. Os números dela **mudam a cada rodada** — este documento é uma
-   foto do momento, não um fechamento.
+3. **A 003 ainda está em execução.** Entrou em 28/09 22:58; no fecho desta foto tem
+   **{sum(1 for p in d['pacotes'] if p['sprint'].endswith('003') and p['commit_final'])} de 7
+   pacotes integrados** e o próximo em andamento. Os números dela **mudam a cada rodada** —
+   este documento é uma foto do momento, não um fechamento.
 4. **A sprint 004 está fechada** (4/4 integradas em 28/09) — os números dela não mudam mais.
 5. **"Nª tentativa" não é o degrau da escada de modelos — são dois contadores.** O número
    nas tabelas é a **chamada** (`attempt`, sequência do banco, sempre `max+1`); o modelo vem
@@ -789,8 +1160,10 @@ invocação).
    {d['chamadas_baratas']} no degrau mais barato ({100.0 * d['chamadas_baratas'] / d['total_codex']:.1f}%) — a
    cauda é curta porque a maioria dos pacotes aprovou antes do 5º degrau (tabela 3).
 7. **{len(fora_escada)} combinação(ões) fora da escada declarada:** {', '.join(f'`{x}`' for x in fora_escada) or 'nenhuma'}.
-   As combinações `…/medium` de 27/09 saíram junto com as sprints 001/002 (foi o dia em que
-   a escada foi padronizada); nas 003 e 004 a escada é seguida à risca.
+   As combinações `…/medium` são o **modelo antigo**: `sol/medium` ocupou o 4º degrau até
+   27/09 (e continuou sendo usado por quem já estava no meio do caminho, até a P-13 de
+   29/09). Não é desvio de protocolo — é a matriz aposentada, demarcada em **laranja** nos
+   gráficos para o autor ver quanto rodou no modelo velho.
 8. **A numeração por pacote tem buracos.** Rearme por dependência integrada e reabertura
    por defeito de contrato removem/renomeiam tentativas, então {len(com_buraco)} pacote(s)
    ({', '.join(f"{p['task']} (sprint {p['sprint'].split('-')[-1]})" for p in com_buraco) or 'nenhum'}) têm sequência descontínua — marcados com ⚠ na
@@ -824,6 +1197,17 @@ invocação).
   O degrau caro (`astra/low`) assinou {sum(1 for p in d['pacotes'] if p['modelo_que_aprovou'].startswith('gpt-6-astra'))} aprovação(ões) —
   sempre em pacote que carregava, junto, defeito de contrato nosso.
 
+## Gráfico 0 — os quatro painéis, no mesmo eixo x
+
+![Quatro painéis empilhados por pacote, abertos por modelo de tentativa (chamadas, custo, tokens e complexidade)](report/paineis-comparacao.png)
+
+Os quatro na mesma sequência de pacotes, para comparar sem trocar de imagem: **chamadas**
+(1), **custo em US$** (2), **tokens** (3) e **complexidade** (4 — linhas e arquivos do
+commit de fechamento, do git, mais a linha vermelha com os findings do revisor). Cor = par
+modelo/esforço; **laranja é modelo de matriz antiga** (fora da escada vigente);
+hachurado = pedaço **estimado** por não ter medição (P-10); **★** = pacote fechado do
+início ao fim com um **único** modelo. O detalhe de cada um vem nas seções seguintes.
+
 ## Gráfico 1 — chamadas por pacote, empilhadas pela tentativa
 
 ![Chamadas de API do Codex por pacote do backlog, empilhadas pelo número da tentativa](report/histograma-tentativas.png)
@@ -834,11 +1218,11 @@ escada). Total: {total} chamadas.
 
 ## Tabela 1 — por pacote
 
-`chamadas` é o custo; `aprov./reprov./s/aval.` são as **avaliações do modelo aprovador**
-naquele pacote (aprovado / reprovado / chamadas que nem chegaram a ser avaliadas);
-`aprovada na` diz **em que chamada** (e com que modelo) a aprovação saiu; `infra` e
-`culpa teste/plano` separam o que **não era do modelo** (cota/crash e defeito de
-teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
+`chamadas` é o custo; `A/R/S` são as **avaliações do modelo aprovador** naquele pacote
+(aprovadas / reprovadas / chamadas que nem chegaram a ser avaliadas); `1ª–última` mostra a
+faixa de chamadas do pacote; `aprovada na` diz **em que chamada** (e com que modelo) a
+aprovação saiu; `infra` e `culpa teste/plano` separam o que **não era do modelo** (cota/crash
+e defeito de teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
 
 `retrab. bruto` = **reprovações do aprovador ÷ aprovações do aprovador**, em **múltiplo**:
 `2x` significa duas reprovações para cada aprovação entregue (não é porcentagem de nada —
@@ -846,8 +1230,14 @@ pode passar de 1x, e é por isso que vai em `x` e não em `%`); `retrab. ajust.`
 reprovações que foram culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem
 aprovação nenhuma fica `—`. {retrab_global}
 
-| sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados |
-|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---|
+As três últimas colunas são para **auditoria**: `início–fim` é a janela de data-hora das
+chamadas do pacote (fuso local, `28/09 22:58→23:46`), e `linhas/arq.` é o tamanho que o
+pacote realmente entregou — contado no commit de fechamento com `git show --numstat` (a
+mesma fonte da complexidade no painel 4). Na coluna de modelos, o nome vai encurtado
+(`luna/low` = `gpt-5.6-luna/low`; `sol/med*` = matriz aposentada em 27/09).
+
+| sprint | pacote | cham. | A/R/S | 1ª–última | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados | início–fim | linhas/arq |
+|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
 {tabela_pacotes}
 
 ## Tabela 3 — em que chamada a aprovação veio
@@ -1010,6 +1400,7 @@ if __name__ == "__main__":
               f"{len(tasks)} pacotes")
         print("   " + " · ".join(f"{t}={sum(c.values())}" for t, c in sorted(tasks.items())))
     print()
-    for p in desenha_histograma(dados), desenha_distribuicao(dados), desenha_custo(dados):
+    for p in (desenha_histograma(dados), desenha_distribuicao(dados),
+              desenha_custo(dados), desenha_paineis(dados)):
         print("PNG:", p)
     print("MD:", escreve_relatorio(dados))

@@ -1,0 +1,3554 @@
+Reading additional input from stdin...
+OpenAI Codex v0.154.0
+--------
+workdir: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a0ecd1-7f43-71b2-8b31-9f0d93f2a98f
+--------
+user
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P06: Aceitacao ponta a ponta do portao do plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- existe o teste test_portao_do_plano em .autodev/tests/test_plan_portao_aceitacao.py
+- o teste usa o driver falso de agente e nao gasta cota real
+- o teste prova que um plano com colisao na mesma onda e recusado pelo validador antes de qualquer agente rodar
+- o teste prova que um sprint PLANEJADO sem aprovacao nao roda, e que apos autodev aprovar ele roda e integra
+- o teste prova que alterar o dag.json depois da aprovacao invalida a aprovacao
+- os testes rodam com python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+# CONTINUACAO DE TASK EXISTENTE — NAO RECOMECE
+
+Voce ja trabalhou nesta task antes e foi interrompido por esgotamento de cota.
+O estado abaixo foi persistido. CONTINUE a partir dele.
+
+## Task
+P06
+
+## Criterios de aceitacao
+  - existe o teste test_portao_do_plano em .autodev/tests/test_plan_portao_aceitacao.py
+  - o teste usa o driver falso de agente e nao gasta cota real
+  - o teste prova que um plano com colisao na mesma onda e recusado pelo validador antes de qualquer agente rodar
+  - o teste prova que um sprint PLANEJADO sem aprovacao nao roda, e que apos autodev aprovar ele roda e integra
+  - o teste prova que alterar o dag.json depois da aprovacao invalida a aprovacao
+  - os testes rodam com python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q
+
+## Estado atual da implementacao
+0 arquivo(s) ja modificado(s) por tentativa anterior; ultimo commit (nao registrado)
+
+## Arquivos relevantes
+  (nenhum)
+
+## Ultimo commit
+ae79f9f77c79ae9ff149b1d90323618bd786ff9c
+
+## Testes que JA PASSAM (nao mexa sem motivo)
+  (nenhum)
+
+## Testes que AINDA FALHAM
+  (nenhum)
+
+## Tentativas anteriores
+  - tentativa 1: CODEX_QUOTA — 
+
+## Findings de revisao em aberto
+  (nenhum)
+
+## PROXIMA ACAO ESPERADA
+Retomar de onde parou: os arquivos ja modificados estao no worktree. Corrija o que falta para os testes passarem e NAO reescreva o que ja funciona.
+
+## Regras
+1. NAO reescreva o que ja funciona.
+2. NAO recomece a task do zero.
+3. Faca a menor mudanca que resolve o proximo item em aberto.
+4. Ao terminar, responda com: RESULTADO: <o que mudou>
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+Vou retomar no worktree e mapear o fluxo atual de plano, aprovação e execução para acrescentar uma aceitação ponta a ponta mínima, inteiramente com driver falso.
+exec
+/usr/bin/bash -lc "sed -n '1,240p' /home/saurus/.codex/skills/using-superpowers/SKILL.md && sed -n '1,260p' /home/saurus/.codex/skills/test-driven-development/SKILL.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 0ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+---
+
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, ignore this skill.
+</SUBAGENT-STOP>
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## The Rule
+
+**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+
+**Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
+
+Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+
+## Skill Priority
+
+When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
+
+- "Let's build X" → superpowers:brainstorming first, then implementation skills.
+- "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+
+## Red Flags
+
+These thoughts mean STOP—you're rationalizing:
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+
+## Platform Adaptation
+
+If your harness appears here, read its reference file for special instructions:
+
+- Codex: `references/codex-tools.md`
+- Pi: `references/pi-tools.md`
+- Antigravity: `references/antigravity-tools.md`
+- Hermes Agent: `references/hermes-tools.md`
+
+## User Instructions
+
+User instructions (CLAUDE.md, AGENTS.md, GEMINI.md, etc, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows or instructions when your human partner has explicitly told you to.
+---
+name: test-driven-development
+description: Use when implementing any feature or bugfix, before writing implementation code
+---
+
+# Test-Driven Development (TDD)
+
+## Overview
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+**Violating the letter of the rules is violating the spirit of the rules.**
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+- Refactoring
+- Behavior changes
+
+**Exceptions (ask your human partner):**
+- Throwaway prototypes
+- Generated code
+- Configuration files
+
+Thinking "skip TDD just this once"? Stop. That's rationalization.
+
+## The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Write code before the test? Delete it. Start over.
+
+**No exceptions:**
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+
+Implement fresh from tests. Period.
+
+## Red-Green-Refactor
+
+```dot
+digraph tdd_cycle {
+    rankdir=LR;
+    red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
+    verify_red [label="Verify fails\ncorrectly", shape=diamond];
+    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
+    verify_green [label="Verify passes\nAll green", shape=diamond];
+    refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
+    next [label="Next", shape=ellipse];
+
+    red -> verify_red;
+    verify_red -> green [label="yes"];
+    verify_red -> red [label="wrong\nfailure"];
+    green -> verify_green;
+    verify_green -> refactor [label="yes"];
+    verify_green -> green [label="no"];
+    refactor -> verify_green [label="stay\ngreen"];
+    verify_green -> next;
+    next -> red;
+}
+```
+
+### RED - Write Failing Test
+
+Write one minimal test showing what should happen.
+
+<Good>
+```typescript
+test('retries failed operations 3 times', async () => {
+  let attempts = 0;
+  const operation = () => {
+    attempts++;
+    if (attempts < 3) throw new Error('fail');
+    return 'success';
+  };
+
+  const result = await retryOperation(operation);
+
+  expect(result).toBe('success');
+  expect(attempts).toBe(3);
+});
+```
+Clear name, tests real behavior, one thing
+</Good>
+
+<Bad>
+```typescript
+test('retry works', async () => {
+  const mock = jest.fn()
+    .mockRejectedValueOnce(new Error())
+    .mockRejectedValueOnce(new Error())
+    .mockResolvedValueOnce('success');
+  await retryOperation(mock);
+  expect(mock).toHaveBeenCalledTimes(3);
+});
+```
+Vague name, tests mock not code
+</Bad>
+
+**Requirements:**
+- One behavior
+- Clear name
+- Real code (no mocks unless unavoidable)
+
+### Verify RED - Watch It Fail
+
+**MANDATORY. Never skip.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test fails (not errors)
+- Failure message is expected
+- Fails because feature missing (not typos)
+
+**Test passes?** You're testing existing behavior. Fix test.
+
+**Test errors?** Fix error, re-run until it fails correctly.
+
+### GREEN - Minimal Code
+
+Write simplest code to pass the test.
+
+<Good>
+```typescript
+async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === 2) throw e;
+    }
+  }
+  throw new Error('unreachable');
+}
+```
+Just enough to pass
+</Good>
+
+<Bad>
+```typescript
+async function retryOperation<T>(
+  fn: () => Promise<T>,
+  options?: {
+    maxRetries?: number;
+    backoff?: 'linear' | 'exponential';
+    onRetry?: (attempt: number) => void;
+  }
+): Promise<T> {
+  // YAGNI
+}
+```
+Over-engineered
+</Bad>
+
+Don't add features, refactor other code, or "improve" beyond the test.
+
+### Verify GREEN - Watch It Pass
+
+**MANDATORY.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test passes
+- Other tests still pass
+- Output pristine (no errors, warnings)
+
+**Test fails?** Fix code, not test.
+
+**Other tests fail?** Fix now.
+
+### REFACTOR - Clean Up
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green. Don't add behavior.
+
+### Repeat
+
+Next failing test for next feature.
+
+## Good Tests
+
+| Quality | Good | Bad |
+|---------|------|-----|
+| **Minimal** | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
+| **Clear** | Name describes behavior | `test('test1')` |
+| **Shows intent** | Demonstrates desired API | Obscures what code should do |
+
+When writing or changing any test, read [writing-good-tests.md](writing-good-tests.md) for the rules that keep tests honest:
+- Name the production change that would make the test fail — before writing it
+- Assert on real behavior, never on mock behavior
+- Keep test-only code in test utilities, out of production classes
+- Understand a dependency's side effects before mocking it
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests written after pass immediately — which proves nothing. They may test the wrong thing, test the implementation instead of the behavior, or miss the edge case you forgot. You never watched it fail, so you never proved it can catch the bug. Test-first forces that failure. |
+| "Tests after achieve same goals (spirit not ritual)" | Tests-after answer "what does this do?"; tests-first answer "what should this do?" Tests written after are biased by the code you already wrote — you verify the cases you remembered, not the ones you'd have discovered. Coverage without proof the tests work. |
+| "Already manually tested" | Manual testing is ad-hoc: no record of what you covered, no way to re-run it when the code changes, easy to forget cases under pressure. "Worked when I tried it" ≠ comprehensive. Automated tests run the same way every time. |
+| "Deleting X hours is wasteful" | Sunk cost fallacy — that time is already spent either way. The real choice: rewrite with TDD (high confidence) vs. keep it and bolt tests on after (low confidence, likely bugs). Keeping code you can't trust is the waste. |
+| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
+| "TDD will slow me down" | TDD IS the pragmatic path: catches bugs before commit, prevents regressions, lets you refactor without fear. "Pragmatic" shortcuts mean debugging in production — slower, not faster. |
+| "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
+| "Existing code has no tests" | You're improving it. Add tests for existing code. |
+
+## Red Flags - STOP and Start Over
+
+- Code before test
+- Test after implementation
+- Test passes immediately
+- Can't explain why test failed
+- Tests added "later"
+- Rationalizing "just this once"
+- "I already manually tested it"
+- "Tests after achieve the same purpose"
+- "It's about spirit not ritual"
+- "Keep as reference" or "adapt existing code"
+- "Already spent X hours, deleting is wasteful"
+- "TDD is dogmatic, I'm being pragmatic"
+- "This is different because..."
+
+**All of these mean: Delete code. Start over with TDD.**
+
+## Example: Bug Fix
+
+**Bug:** Empty email accepted
+
+**RED**
+```typescript
+test('rejects empty email', async () => {
+  const result = await submitForm({ email: '' });
+  expect(result.error).toBe('Email required');
+});
+```
+
+**Verify RED**
+```bash
+$ npm test
+
+codex
+Estou seguindo TDD: primeiro vou localizar as interfaces reais e acrescentar o teste de aceitação; em seguida confirmo o estado RED antes de tocar na implementação.
+exec
+/usr/bin/bash -lc "git status --short && rg --files .autodev | sort && rg -n \"aprovar|aprov|dag\\.json|PLANEJADO|driver|validad\" .autodev --glob '*.py'" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 23ms:
+.autodev/config/agents.yaml
+.autodev/config/models.yaml
+.autodev/config/policies.yaml
+.autodev/fixtures/criar_fixture.py
+.autodev/fixtures/readme_estrutura/como_rodar.md
+.autodev/fixtures/readme_estrutura/planejador.md
+.autodev/scripts/aceitacao_real.py
+.autodev/scripts/backfill_tokens.py
+.autodev/scripts/estado_003.sh
+.autodev/scripts/rodada_em_andamento.py
+.autodev/scripts/tela.py
+.autodev/scripts/verificar_plano.py
+.autodev/sprints/DEVFACTORY-001/HAQ.md
+.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md
+.autodev/sprints/DEVFACTORY-001/dag.json
+.autodev/sprints/DEVFACTORY-001/decisions.md
+.autodev/sprints/DEVFACTORY-001/plan.md
+.autodev/sprints/DEVFACTORY-001/spec.md
+.autodev/sprints/DEVFACTORY-001/sprint.yaml
+.autodev/sprints/DEVFACTORY-002/HAQ.md
+.autodev/sprints/DEVFACTORY-002/SPRINT-REPORT.md
+.autodev/sprints/DEVFACTORY-002/dag.json
+.autodev/sprints/DEVFACTORY-002/dag.json.antes-da-correcao-D16
+.autodev/sprints/DEVFACTORY-002/dag.json.antes-da-correcao-D19
+.autodev/sprints/DEVFACTORY-002/decisions.md
+.autodev/sprints/DEVFACTORY-002/evidence/P01-1790489433.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790489618.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790489671.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790493171.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790495070.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790496992.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790555435.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790555637.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790556511.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790556831.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790557177.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790557414.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790558003.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P02-1790558970.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790489789.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790493370.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790495282.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790497151.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790497952.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790556154.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790557741.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790559461.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P03-1790559792.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790490054.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790490254.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790493548.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790495497.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790497330.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790560162.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790560683.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P04-1790561337.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P05-1790490420.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P05-1790490645.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P05-1790490923.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P05-1790493728.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P05-1790495674.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P05-1790561627.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P06-1790491252.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P06-1790493901.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P06-1790495878.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P06-1790497529.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P06-1790562162.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P06-1790579486.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P07-1790491601.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P07-1790491974.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P07-1790492017.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P07-1790494097.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P07-1790496052.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P07-1790579923.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P08-1790492293.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P08-1790494296.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P08-1790496231.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P08-1790580354.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790492536.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790494466.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790496404.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790580677.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790581002.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790581413.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790599188.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P09-1790599779.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P10-1790492713.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P10-1790492974.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P10-1790494678.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P10-1790496576.txt
+.autodev/sprints/DEVFACTORY-002/evidence/P10-1790600034.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790493124.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790559294.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790560031.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790561486.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790561965.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790579788.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790580228.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790580536.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790599927.txt
+.autodev/sprints/DEVFACTORY-002/evidence/integracao-1790600057.txt
+.autodev/sprints/DEVFACTORY-002/logs/P01-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P02-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P02-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P02-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P02-t4-agy.log
+.autodev/sprints/DEVFACTORY-002/logs/P02-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P02-t5-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P03-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P03-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P03-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P03-t4-agy.log
+.autodev/sprints/DEVFACTORY-002/logs/P03-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P03-t5-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P04-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P04-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P04-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P04-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P04-t5-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P05-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P05-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P05-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P05-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P05-t5-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P06-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P06-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P06-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P06-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P06-t5-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P07-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P07-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P07-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P07-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P07-t5-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P08-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P08-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P08-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P09-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P09-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P09-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P09-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P09-t5-agy.log
+.autodev/sprints/DEVFACTORY-002/logs/P09-t5-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P10-t1-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P10-t2-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P10-t3-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/P10-t4-codex.log
+.autodev/sprints/DEVFACTORY-002/logs/orquestrador.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P01.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P02.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P03.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P04.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P05.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P06.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P07.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P08.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P09.log
+.autodev/sprints/DEVFACTORY-002/logs/review-P10.log
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/P09-veredito-relido.json
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/P10-veredito-relido.json
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/prova_cobertura_p09.py
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/review-P09-relido.log
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/review-P10-relido.log
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/revisar_p09_p10.py
+.autodev/sprints/DEVFACTORY-002/spec.md
+.autodev/sprints/DEVFACTORY-002/sprint.yaml
+.autodev/sprints/DEVFACTORY-003/dag.json
+.autodev/sprints/DEVFACTORY-003/evidence/P01-1790647208.txt
+.autodev/sprints/DEVFACTORY-003/logs/P01-t1-codex.log
+.autodev/sprints/DEVFACTORY-003/logs/P01-t1-codex.log.uso
+.autodev/sprints/DEVFACTORY-003/logs/P01-t1-codex.log.uso.bruto
+.autodev/sprints/DEVFACTORY-003/logs/orquestrador.log
+.autodev/sprints/DEVFACTORY-003/logs/review-P01.log
+.autodev/sprints/DEVFACTORY-003/spec.md
+.autodev/sprints/DEVFACTORY-003/sprint.yaml
+.autodev/sprints/DEVFACTORY-004/HAQ.md
+.autodev/sprints/DEVFACTORY-004/SPRINT-REPORT.md
+.autodev/sprints/DEVFACTORY-004/dag.json
+.autodev/sprints/DEVFACTORY-004/dag.json.antes-da-correcao-D23
+.autodev/sprints/DEVFACTORY-004/decisions.md
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790616068.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790616155.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790616227.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790616602.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790616650.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790617343.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790617888.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P01-1790618165.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P02-1790620305.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P03-1790620775.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P03-1790634957.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P03-1790635711.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P03-suite-completa.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790616759.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790616868.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790616984.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790617059.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790617108.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790618448.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790618846.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790618910.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790619266.txt
+.autodev/sprints/DEVFACTORY-004/evidence/P04-1790619489.txt
+.autodev/sprints/DEVFACTORY-004/evidence/integracao-1790619662.txt
+.autodev/sprints/DEVFACTORY-004/evidence/integracao-1790620192.txt
+.autodev/sprints/DEVFACTORY-004/evidence/integracao-1790620203.txt
+.autodev/sprints/DEVFACTORY-004/evidence/integracao-1790621020.txt
+.autodev/sprints/DEVFACTORY-004/evidence/integracao-1790636008.txt
+.autodev/sprints/DEVFACTORY-004/logs/P01-t1-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P01-t2-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P01-t3-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P01-t4-agy.log
+.autodev/sprints/DEVFACTORY-004/logs/P01-t4-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P01-t5-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P02-t1-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P03-t1-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P03-t2-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P03-t3-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P03-t3-codex.log.uso
+.autodev/sprints/DEVFACTORY-004/logs/P03-t3-codex.log.uso.bruto
+.autodev/sprints/DEVFACTORY-004/logs/P03-t4-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P03-t4-codex.log.uso
+.autodev/sprints/DEVFACTORY-004/logs/P03-t4-codex.log.uso.bruto
+.autodev/sprints/DEVFACTORY-004/logs/P04-t1-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P04-t2-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P04-t3-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P04-t4-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/P04-t5-codex.log
+.autodev/sprints/DEVFACTORY-004/logs/orquestrador.log
+.autodev/sprints/DEVFACTORY-004/logs/review-P01.log
+.autodev/sprints/DEVFACTORY-004/logs/review-P02.log
+.autodev/sprints/DEVFACTORY-004/logs/review-P03.log
+.autodev/sprints/DEVFACTORY-004/logs/review-P04.log
+.autodev/sprints/DEVFACTORY-004/spec.md
+.autodev/sprints/DEVFACTORY-004/sprint.yaml
+.autodev/tests/conftest.py
+.autodev/tests/test_acceptance.py
+.autodev/tests/test_adapters.py
+.autodev/tests/test_cli.py
+.autodev/tests/test_core.py
+.autodev/tests/test_d18_worktree_e_rodadas.py
+.autodev/tests/test_escalonamento_revisao.py
+.autodev/tests/test_git_sandbox.py
+.autodev/tests/test_plan_aceitacao.py
+.autodev/tests/test_plan_agente.py
+.autodev/tests/test_plan_aprovacao.py
+.autodev/tests/test_plan_cli.py
+.autodev/tests/test_plan_cli_prever.py
+.autodev/tests/test_plan_colisoes.py
+.autodev/tests/test_plan_docs.py
+.autodev/tests/test_plan_escrita.py
+.autodev/tests/test_plan_guarda.py
+.autodev/tests/test_plan_impacto.py
+.autodev/tests/test_plan_parser.py
+.autodev/tests/test_plan_prompt.py
+.autodev/tests/test_plan_rastreabilidade.py
+.autodev/tests/test_plan_validacao.py
+.autodev/tests/test_planner.py
+.autodev/tests/test_plano_comando.py
+.autodev/tests/test_readme_afirmacoes.py
+.autodev/tests/test_readme_estrutura.py
+.autodev/tests/test_reset_de_cota.py
+.autodev/tests/test_rodada_unica_e_portao.py
+.autodev/tests/test_tela.py
+.autodev/tests/test_tokens.py
+.autodev/worktrees/.gitkeep
+.autodev/tests/test_tokens.py:130:# ------------------------------------------------- 5. a fiação no driver fake
+.autodev/tests/test_tokens.py:131:def test_invocar_entrega_tokens_do_driver_fake(tmp_path: Path, monkeypatch):
+.autodev/scripts/verificar_plano.py:12:    python3 .autodev/scripts/verificar_plano.py .autodev/sprints/X/dag.json
+.autodev/scripts/verificar_plano.py:249:            # so modulos de codigo entram aqui: editar o dag.json/spec.md do
+.autodev/scripts/verificar_plano.py:281:        p = RAIZ / ".autodev" / "sprints" / alvo / "dag.json"
+.autodev/scripts/verificar_plano.py:283:        raise SystemExit(f"nao encontrei {alvo} nem .autodev/sprints/{alvo}/dag.json")
+.autodev/scripts/verificar_plano.py:289:    ap.add_argument("alvo", nargs="*", help="sprint_id ou caminho do dag.json")
+.autodev/scripts/verificar_plano.py:294:        alvos = sorted((RAIZ / ".autodev" / "sprints").glob("*/dag.json"))
+.autodev/scripts/verificar_plano.py:298:        ap.error("informe a sprint, o dag.json ou --todos")
+.autodev/tests/test_rodada_unica_e_portao.py:13:  4. BLOCKED -> DONE é transição legal (aprovação que chega depois do bloqueio).
+.autodev/tests/test_plan_docs.py:26:    assert "dag.json" in secao
+.autodev/tests/test_escalonamento_revisao.py:7:  * piso determinístico: revisor LLM não aprova o que o portão objetivo reprova;
+.autodev/tests/test_escalonamento_revisao.py:210:def test_piso_deterministico_impede_aprovacao_sem_codigo(repo, cfg, monkeypatch):
+.autodev/tests/test_escalonamento_revisao.py:211:    """Revisor LLM aprovou, mas o worktree não tem alteração nenhuma: reprova."""
+.autodev/tests/test_escalonamento_revisao.py:221:def test_piso_nao_mexe_em_aprovacao_de_task_com_codigo(repo, cfg, monkeypatch):
+.autodev/tests/test_escalonamento_revisao.py:229:    assert r.aprovado and not r.findings
+.autodev/tests/test_escalonamento_revisao.py:305:    Caso real: o codex devolveu 'Voce aprova esse design para eu implementar?' e o
+.autodev/tests/test_escalonamento_revisao.py:322:        "texto": "Você aprova esse design para eu implementar?",
+.autodev/tests/test_plano_comando.py:113:    dag_path = sprint / "dag.json"
+.autodev/scripts/aceitacao_real.py:3:de verdade (sem driver fake), sobre o projeto-fixture.
+.autodev/tests/test_plan_colisoes.py:202:@pytest.mark.parametrize("arquivo", ["dag.json", "spec.md", "sprint.yaml", "decisions.md"])
+.autodev/tests/test_core.py:50:    p = Path(__file__).resolve().parent.parent / "sprints" / "DEVFACTORY-001" / "dag.json"
+.autodev/tests/test_core.py:343:        store.transicionar_sprint(SPRINT, "PLANEJADO")
+.autodev/tests/test_plan_rastreabilidade.py:36:    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
+.autodev/tests/test_plan_rastreabilidade.py:55:    dag = destino / "dag.json"
+.autodev/tests/test_plan_rastreabilidade.py:64:    dag = destino / "dag.json"
+.autodev/tests/test_acceptance.py:4:  sprint aprovado -> Hermes planeja -> task atribuída -> worktree isolado criado
+.autodev/tests/test_acceptance.py:12:O agente de teste é o driver determinístico (AUTODEV_FAKE_AGENT): reproduzível e
+.autodev/tests/test_acceptance.py:65:    """Fixture + sprint + driver determinístico, prontos para o orquestrador."""
+.autodev/tests/test_acceptance.py:362:    # a 1ª tentativa falhou nos testes (não foi aprovada silenciosamente)
+.autodev/tests/test_acceptance.py:487:    # faz o driver devolver uma falha de permissão
+.autodev/tests/test_plan_cli_prever.py:9:    (sprint / "dag.json").write_text(json.dumps({
+.autodev/tests/test_plan_cli_prever.py:60:    (sprint / "dag.json").write_text("[]", encoding="utf-8")
+.autodev/tests/test_plan_cli_prever.py:73:    (sprint / "dag.json").write_text("{oops", encoding="utf-8")
+.autodev/tests/test_plan_cli_prever.py:84:    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
+.autodev/tests/test_plan_cli_prever.py:100:    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
+.autodev/tests/test_plan_cli_prever.py:112:    (sprint / "dag.json").write_text(json.dumps({
+.autodev/tests/test_adapters.py:186:def test_cota_detectada_no_driver_fake(tmp_path, fake_agent):
+.autodev/tests/test_adapters.py:205:def test_sequencia_do_driver_fake_alterna(tmp_path, fake_agent):
+.autodev/tests/test_adapters.py:243:    assert not r.aprovado
+.autodev/tests/test_adapters.py:250:    assert not r.aprovado
+.autodev/tests/test_adapters.py:253:def test_revisao_deterministica_aprova_caso_limpo(repo):
+.autodev/tests/test_adapters.py:259:    assert r.aprovado and r.veredito == "APPROVE"
+.autodev/tests/test_adapters.py:264:    """Task que não produziu alteração nenhuma não pode ser aprovada."""
+.autodev/tests/test_adapters.py:267:    assert not r.aprovado
+.autodev/tests/test_adapters.py:299:    assert not r.aprovado
+.autodev/tests/conftest.py:82:    (d / "dag.json").write_text(
+.autodev/tests/conftest.py:85:    hash_dag = hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
+.autodev/tests/conftest.py:88:        f"aprovacao:\n  por: teste\n  quando: fixture\n  hash_dag: {hash_dag}\n",
+.autodev/tests/conftest.py:96:    """Ativa o driver determinístico de agente."""
+.autodev/tests/test_plan_guarda.py:147:    (diretorio / "dag.json").write_text(json.dumps(dag_com(
+.autodev/tests/test_plan_escrita.py:27:                criterios=["dag.json preserva os campos da task"],
+.autodev/tests/test_plan_escrita.py:44:        "spec.md", "dag.json", "sprint.yaml"
+.autodev/tests/test_plan_escrita.py:47:    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
+.autodev/tests/test_plan_escrita.py:68:        "status": "PLANEJADO",
+.autodev/tests/test_plan_agente.py:45:def test_planejar_devolve_plano_usando_driver_falso(tmp_path, monkeypatch):
+.autodev/tests/test_plan_aceitacao.py:97:    fake_spec = tmp_path / "driver-falso.json"
+.autodev/tests/test_plan_aceitacao.py:114:    assert cli.main(["aprovar", sprint_id, "--por", "Teste de aceitacao"]) == 0
+.autodev/tests/test_plan_aceitacao.py:116:    dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/revisar_p09_p10.py:4:aprovou as duas tasks finais (a cadeia de reserva do autor permite: o revisor nunca
+.autodev/sprints/DEVFACTORY-002/revisao-retroativa/revisar_p09_p10.py:51:    dag = carrega_dag(RAIZ / ".autodev" / "sprints" / SPRINT / "dag.json")
+.autodev/tests/test_plan_aprovacao.py:19:    (d / "dag.json").write_text(json.dumps({"sprint_id": sprint, "tasks": []}), encoding="utf-8")
+.autodev/tests/test_plan_aprovacao.py:21:        f"sprint_id: {sprint}\nobjetivo: teste\nstatus: PLANEJADO\n", encoding="utf-8"
+.autodev/tests/test_plan_aprovacao.py:29:    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:30:    approval = yaml.safe_load((d / "sprint.yaml").read_text())["aprovacao"]
+.autodev/tests/test_plan_aprovacao.py:34:    assert approval["hash_dag"] == hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
+.autodev/tests/test_plan_aprovacao.py:37:def test_aprovar_preserva_conteudo_existente_do_yaml(tmp_path, monkeypatch):
+.autodev/tests/test_plan_aprovacao.py:40:        "# comentario importante\nsprint_id: S1\nobjetivo: teste\n# manter\nstatus: PLANEJADO\n",
+.autodev/tests/test_plan_aprovacao.py:43:    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:49:def test_aprovar_substitui_aprovacao_null(tmp_path, monkeypatch):
+.autodev/tests/test_plan_aprovacao.py:52:        arquivo.write("aprovacao: null\n")
+.autodev/tests/test_plan_aprovacao.py:55:    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:58:    assert texto.count("aprovacao:") == 1
+.autodev/tests/test_plan_aprovacao.py:60:    assert dados["aprovacao"]["por"] == "Ana"
+.autodev/tests/test_plan_aprovacao.py:63:@pytest.mark.parametrize("aprovacao_existente", [
+.autodev/tests/test_plan_aprovacao.py:64:    'aprovacao: {por: Bia, quando: ontem, hash_dag: antigo}\n',
+.autodev/tests/test_plan_aprovacao.py:65:    'aprovacao:\n  por: Bia\n  quando: ontem\n  hash_dag: antigo\n',
+.autodev/tests/test_plan_aprovacao.py:67:def test_aprovar_substitui_aprovacao_existente_sem_duplicar(
+.autodev/tests/test_plan_aprovacao.py:68:        tmp_path, monkeypatch, aprovacao_existente):
+.autodev/tests/test_plan_aprovacao.py:71:        arquivo.write(aprovacao_existente)
+.autodev/tests/test_plan_aprovacao.py:74:    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:77:    assert texto.count("aprovacao:") == 1
+.autodev/tests/test_plan_aprovacao.py:78:    assert yaml.safe_load(texto)["aprovacao"]["por"] == "Ana"
+.autodev/tests/test_plan_aprovacao.py:82:def test_aprovar_recusa_sprint_id_invalido(tmp_path, monkeypatch, capsys, sprint_id):
+.autodev/tests/test_plan_aprovacao.py:85:    assert main(["aprovar", sprint_id, "--por", "Ana"]) == 1
+.autodev/tests/test_plan_aprovacao.py:89:@pytest.mark.parametrize("aprovacao", [
+.autodev/tests/test_plan_aprovacao.py:94:def test_carrega_sprint_recusa_aprovacao_malformada(tmp_path, aprovacao):
+.autodev/tests/test_plan_aprovacao.py:97:    dados["aprovacao"] = aprovacao
+.autodev/tests/test_plan_aprovacao.py:99:    with pytest.raises(ValueError, match="aprovacao"):
+.autodev/tests/test_plan_aprovacao.py:103:def test_aprovar_recusa_nome_vazio(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:106:    assert main(["--sprint", "S1", "aprovar", "S1", "--por", ""]) == 2
+.autodev/tests/test_plan_aprovacao.py:110:def test_aprovar_recusa_sprints_divergentes(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:114:    assert main(["--sprint", "S1", "aprovar", "S2", "--por", "Ana"]) == 2
+.autodev/tests/test_plan_aprovacao.py:118:def test_aprovar_recusa_id_declarado_por_outro_sprint(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:121:        "sprint_id: OUTRA\nobjetivo: teste\nstatus: PLANEJADO\n", encoding="utf-8")
+.autodev/tests/test_plan_aprovacao.py:124:    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+.autodev/tests/test_plan_aprovacao.py:126:    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
+.autodev/tests/test_plan_aprovacao.py:129:def test_aprovar_recusa_dag_invalido(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:131:    (d / "dag.json").write_text("{nao-json", encoding="utf-8")
+.autodev/tests/test_plan_aprovacao.py:134:    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+.autodev/tests/test_plan_aprovacao.py:136:    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
+.autodev/tests/test_plan_aprovacao.py:139:def test_aprovar_informa_sprint_yaml_invalido(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:144:    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+.autodev/tests/test_plan_aprovacao.py:148:def test_run_informa_yaml_de_aprovacao_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:151:    dados["aprovacao"] = {"por": "Ana", "hash_dag": "abc"}
+.autodev/tests/test_plan_aprovacao.py:159:def test_resume_planejado_recusa_sem_aprovacao(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:164:    assert "autodev aprovar S1 --por <nome>" in capsys.readouterr().out
+.autodev/tests/test_plan_aprovacao.py:167:def test_resume_aceita_aprovacao_valida(tmp_path, monkeypatch, capsys):
+.autodev/tests/test_plan_aprovacao.py:170:    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:179:        arquivo.write("aprovacao:\n  por: Ana\n")
+.autodev/tests/test_plan_aprovacao.py:200:        arquivo.write("aprovacao:\n  por: Ana\n")
+.autodev/tests/test_plan_aprovacao.py:210:    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:220:def test_run_planejado_recusa_sem_aprovacao(tmp_path):
+.autodev/tests/test_plan_aprovacao.py:224:    assert resultado.parado_por and "autodev aprovar S1 --por <nome>" in resultado.parado_por
+.autodev/tests/test_plan_aprovacao.py:228:def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
+.autodev/tests/test_plan_aprovacao.py:231:    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:235:    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
+.autodev/tests/test_plan_aprovacao.py:238:        (d / "sprint.yaml").read_text())["aprovacao"]
+.autodev/tests/test_plan_aprovacao.py:241:def test_run_nao_exige_aprovacao_legada_de_sprint_ja_em_execucao(tmp_path):
+.autodev/tests/test_plan_aprovacao.py:251:def test_aprovacao_gera_um_evento_por_hash(tmp_path, monkeypatch):
+.autodev/tests/test_plan_aprovacao.py:254:    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:258:    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
+.autodev/tests/test_plan_aprovacao.py:262:def test_aprovacao_nao_duplica_evento_fora_da_janela_de_500(tmp_path, monkeypatch):
+.autodev/tests/test_plan_aprovacao.py:265:    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:274:        "SELECT COUNT(*) FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
+.autodev/tests/test_plan_aprovacao.py:280:def test_dag_alterado_invalida_aprovacao(tmp_path, monkeypatch):
+.autodev/tests/test_plan_aprovacao.py:283:    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:284:    (d / "dag.json").write_text(
+.autodev/tests/test_plan_aprovacao.py:293:def test_dag_alterado_invalida_aprovacao_em_reexecucao(
+.autodev/tests/test_plan_aprovacao.py:297:    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+.autodev/tests/test_plan_aprovacao.py:307:    (d / "dag.json").write_text(
+.autodev/tests/test_plan_cli.py:45:    assert (destino / "dag.json").exists()
+
+exec
+/usr/bin/bash -lc "sed -n '1,380p' .autodev/tests/test_plan_aprovacao.py && sed -n '1,180p' .autodev/tests/conftest.py && sed -n '1,180p' .autodev/tests/test_plan_aceitacao.py && rg -n \"def run|class Orquestrador|validar.*plano|carrega_dag|invocar\" autodev . --glob '*.py' -g '"'!**/.autodev/sprints/**'"'" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 11ms:
+autodev/config.py:311:def carrega_dag(p: Path) -> dict:
+autodev/state.py:703:    def run_lock(self, sprint_id: str) -> dict | None:
+./autodev/state.py:703:    def run_lock(self, sprint_id: str) -> dict | None:
+autodev/review.py:26:from .agents import Invocacao, invocar
+autodev/review.py:181:    res = invocar(inv, cfg)
+autodev/cli.py:57:    from .config import Config, carrega_dag, ordem_topologica, valida_dag
+autodev/cli.py:77:    from .config import carrega_dag, ordem_topologica
+autodev/cli.py:171:    from .config import carrega_dag, carrega_sprint
+autodev/cli.py:181:        carrega_dag(dag_path)
+autodev/cli.py:413:        erros = planner.validar_plano(plano)
+autodev/cli.py:423:        planner.validar_e_ordenar(plano)
+autodev/cli.py:439:    from .config import carrega_dag
+autodev/cli.py:462:        dag = carrega_dag(dag_path)
+autodev/agents.py:185:def invocar(inv: Invocacao, cfg) -> Resultado:
+./autodev/review.py:26:from .agents import Invocacao, invocar
+./autodev/review.py:181:    res = invocar(inv, cfg)
+autodev/planner.py:74:    resultado = agents.invocar(
+autodev/planner.py:325:def validar_plano(plano: Plano) -> list[str]:
+autodev/planner.py:367:def validar_e_ordenar(plano: Plano) -> list[list[str]]:
+autodev/killswitch.py:21:ACOES = ["invocar_agente", "criar_worktree", "rodar_testes", "integrar",
+autodev/orchestrator.py:25:from .config import (Config, carrega_dag, carrega_sprint,
+autodev/orchestrator.py:93:class Orquestrador:
+autodev/orchestrator.py:220:        self.dag = carrega_dag(self.dir_sprint / "dag.json")
+autodev/orchestrator.py:372:            self._checa_parada("invocar_agente", task_id)
+autodev/orchestrator.py:472:            res = agents.invocar(agents.Invocacao(
+./autodev/planner.py:74:    resultado = agents.invocar(
+./autodev/planner.py:325:def validar_plano(plano: Plano) -> list[str]:
+./autodev/planner.py:367:def validar_e_ordenar(plano: Plano) -> list[list[str]]:
+./autodev/agents.py:185:def invocar(inv: Invocacao, cfg) -> Resultado:
+./autodev/orchestrator.py:25:from .config import (Config, carrega_dag, carrega_sprint,
+./autodev/orchestrator.py:93:class Orquestrador:
+./autodev/orchestrator.py:220:        self.dag = carrega_dag(self.dir_sprint / "dag.json")
+./autodev/orchestrator.py:372:            self._checa_parada("invocar_agente", task_id)
+./autodev/orchestrator.py:472:            res = agents.invocar(agents.Invocacao(
+./autodev/killswitch.py:21:ACOES = ["invocar_agente", "criar_worktree", "rodar_testes", "integrar",
+./autodev/cli.py:57:    from .config import Config, carrega_dag, ordem_topologica, valida_dag
+./autodev/cli.py:77:    from .config import carrega_dag, ordem_topologica
+./autodev/cli.py:171:    from .config import carrega_dag, carrega_sprint
+./autodev/cli.py:181:        carrega_dag(dag_path)
+./autodev/cli.py:413:        erros = planner.validar_plano(plano)
+./autodev/cli.py:423:        planner.validar_e_ordenar(plano)
+./autodev/cli.py:439:    from .config import carrega_dag
+./autodev/cli.py:462:        dag = carrega_dag(dag_path)
+./autodev/config.py:311:def carrega_dag(p: Path) -> dict:
+
+exec
+/usr/bin/bash -lc "sed -n '1,280p' .autodev/tests/test_plan_colisoes.py && sed -n '90,270p' autodev/orchestrator.py && sed -n '180,255p' autodev/orchestrator.py && sed -n '300,390p' autodev/planner.py && sed -n '300,350p' autodev/config.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 3ms:
+exec
+/usr/bin/bash -lc "rg -n \"def rodar|_validar_aprovacao|carregar\\(\" autodev/orchestrator.py && sed -n '710,840p' autodev/orchestrator.py && sed -n '1,160p' autodev/agents.py && sed -n '1,120p' .autodev/tests/test_acceptance.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 0ms:
+exec
+/usr/bin/bash -lc "sed -n '680,720p' autodev/orchestrator.py && sed -n '180,270p' autodev/agents.py && sed -n '1,110p' autodev/config.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 0ms:
+
+        Sem isto, o heartbeat do writer_lock fica no instante do início da tentativa
+        e uma revisão de LLM (5 min) parece "rodada morta" para qualquer observador
+        externo — guarda, tela, vigia de cron.
+        """
+        while not parar.wait(20):
+            try:
+                self.store.renovar_lock(self.sprint)
+            except Exception:  # noqa: BLE001 — batimento nunca derruba a rodada
+                pass
+
+    def _tentativa_viva(self, task_id: str, janela_s: float = 1800) -> bool:
+        """Existe tentativa RUNNING recente desta task (possivelmente de outro processo)?"""
+        r = self.store.conn.execute(
+            "SELECT start_time FROM attempts WHERE sprint_id=? AND task_id=?"
+            " AND status='RUNNING' ORDER BY start_time DESC LIMIT 1",
+            (self.sprint, task_id)).fetchone()
+        return bool(r and (time.time() - float(r["start_time"] or 0)) < janela_s)
+
+    def rodar(self, *, parar_em: str | None = None) -> ResultadoSprint:
+        t0 = time.time()
+        res = ResultadoSprint(sprint=self.sprint)
+        bloqueio_aprovacao = self.checar_aprovacao()
+        if bloqueio_aprovacao:
+            self.log(f"RODADA NAO INICIADA: {bloqueio_aprovacao}")
+            res.parado_por = bloqueio_aprovacao
+            res.duracao_s = time.time() - t0
+            return res
+        self.carregar()
+        self.recuperar()
+
+        # ---- rodada única por sprint -------------------------------------------
+        # Quem impede rodada dupla é o MOTOR. A versão anterior deixava isso para
+        # fora (guarda por pgrep/heartbeat) e pagou caro: em 28/09 um vigia de cron
+        # disparou outra rodada enquanto a primeira revisava uma task por 5 min;
+        # ela integrou a P01 no meio da revisão da P04, o portão de segurança deu
+        # falso positivo e a P04 foi bloqueada por limite — o run morreu com
+        # TransicaoInvalida: BLOCKED -> DONE.
+        ok_lock, motivo_lock = self.store.adquirir_run_lock(self.sprint)
+        if not ok_lock:
+            self.log(f"RODADA NAO INICIADA: {motivo_lock}")
+
+def driver_fake_ativo() -> bool:
+    return os.environ.get("AUTODEV_FAKE_AGENT", "") == "1"
+
+
+def invocar(inv: Invocacao, cfg) -> Resultado:
+    """Executa o agente no worktree indicado e devolve resultado classificado."""
+    t0 = time.time()
+    log_path = Path(inv.log_path) if inv.log_path else None
+    if log_path:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if driver_fake_ativo():
+        res = _fake(inv)
+        res.prompt = inv.prompt
+        res.duracao = time.time() - t0
+        _gravar_log(log_path, res)
+        return res
+
+    if inv.agente not in WRAPPERS:
+        return Resultado(exit_code=127, stderr=f"agente sem adaptador: {inv.agente}",
+                         failure_class=errors.FailureClass.ENVIRONMENT_ERROR.value,
+                         duracao=time.time() - t0)
+
+    w = WRAPPERS[inv.agente]
+    modelo = inv.modelo
+    effort = inv.effort
+    res_effort = "(default)"
+    if w.get("prompt_arg"):
+        # Revisor Hermes: prompt no argumento, sem -d/--timeout/-f (não existem)
+        # e sem -e (effort do Hermes não é flag de CLI). O teto de tempo é o do
+        # próprio subprocess.
+        cmd = [w["cmd"]]
+        if modelo:
+            cmd += [w["flags"]["modelo"], modelo]
+            res_modelo = modelo
+        else:
+            res_modelo = "(default do agente)"
+        cmd += [w["flags"]["oneshot"], inv.prompt]
+    else:
+        cmd = [w["cmd"]]
+        if modelo:
+            cmd += [w["flags"]["modelo"], modelo]
+            res_modelo = modelo
+        else:
+            res_modelo = "(default do agente)"
+        if effort:
+            cmd += [w["flags"]["effort"], effort]
+            res_effort = effort
+        cmd += [w["flags"]["dir"], inv.worktree]
+        cmd += [w["flags"]["timeout"], w["timeout_fmt"].format(n=inv.timeout)]
+        if inv.agente == "codex":
+            cmd += [w["flags"]["sandbox"],
+                    SANDBOX_FLAG["codex"]["editar" if inv.edita else "ler"]]
+        else:
+            cmd += [w["flags"]["modo"],
+                    SANDBOX_FLAG["agy"]["editar" if inv.edita else "ler"]]
+            if inv.edita:
+                # O AGY só edita de fato em modo headless com -D. É seguro AQUI
+                # porque toda execução de agente roda dentro do worktree + bwrap
+                # (HOME real fora de alcance). Sem isto, a edição simplesmente não
+                # acontece e a task falha sem motivo aparente.
+                cmd += [w["flags"]["permissao"]]
+            else:
+                # Mesmo em modo plano/revisão o AGY headless precisa de -D: qualquer
+                # ferramenta exige a permissão "command", que o modo headless não
+                # consegue pedir e AUTO-NEGA em silêncio (stdout vazio, exit 0).
+                # Achado real da aceitação. A mitigação é o sandbox, que é
+                # exatamente o uso que a própria documentação do AGY recomenda.
+                cmd += [w["flags"]["permissao"]]
+        # prompt via stdin — evita estourar o limite de argumento e não vaza no ps.
+        # O wrapper lê stdin com `-f -`, NÃO com um `-` solto (que ele rejeita como
+        # opção desconhecida). Bug real encontrado no teste com o Codex de verdade.
+        cmd += [w["flags"]["arquivo"], "-"]
+
+    try:
+        # ASK_CODEX_USO: o wrapper grava o consumo ao lado do nosso log ANTES de
+        # apagar o mktemp onde o rodapé "tokens used" vive. Opt-in: quem não define
+        # a variável não muda de comportamento (ver ~/.local/bin/ask-codex).
+        env = os.environ.copy()
+        if log_path:
+            env.setdefault("ASK_CODEX_USO", str(log_path) + ".uso")
+        p = subprocess.run(cmd, input=inv.prompt, capture_output=True, text=True,
+                           timeout=inv.timeout + 30, cwd=inv.worktree, env=env)
+        res = Resultado(exit_code=p.returncode, stdout=p.stdout or "",
+                        stderr=p.stderr or "", modelo_usado=res_modelo,
+                        effort_usado=res_effort)
+    except subprocess.TimeoutExpired:
+        res = Resultado(exit_code=124, stderr=f"timeout de {inv.timeout}s",
+                        failure_class=errors.FailureClass.ENVIRONMENT_ERROR.value,
+                        modelo_usado=res_modelo, effort_usado=res_effort)
+"""DEVFACTORY — carregamento de configuração e schemas do Sprint (T02).
+
+Os schemas ficam aqui, em código, e são validados na carga: um sprint.yaml ou
+dag.json malformado deve falhar cedo e alto, não no meio de uma execução.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
+
+import yaml
+
+RAIZ = Path(__file__).resolve().parent.parent
+AUTODEV = RAIZ / ".autodev"
+CONFIG = AUTODEV / "config"
+
+# Referências textuais a arquivos. O planejador e o validador do motor usam a
+# mesma regra de extração para que um caminho não mude de significado no `init`.
+_EXTENSOES_ARQUIVO = (
+    "bash|c|cc|cfg|conf|cpp|css|csv|db|go|h|hpp|html|ini|ipynb|java|js|json|"
+    "jsx|kt|lock|log|md|pdf|php|png|py|rb|rs|sh|sql|svelte|svg|toml|ts|tsx|"
+    "txt|vue|xml|yaml|yml"
+)
+_ARQUIVO = re.compile(
+    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
+    r"|\b(?:Makefile|Dockerfile)\b",
+    re.IGNORECASE,
+)
+
+ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+           "REVIEW", "RETRY", "DONE", "FAILED", "INTEGRATED", "WAITING_RESOURCE"]
+
+TRANSICOES = {
+    "NEW": {"PLANNED", "BLOCKED"},
+    "PLANNED": {"QUEUED", "BLOCKED"},
+    "QUEUED": {"RUNNING", "BLOCKED", "WAITING_RESOURCE"},
+    "RUNNING": {"VERIFYING", "RETRY", "FAILED", "BLOCKED", "WAITING_RESOURCE"},
+    "VERIFYING": {"REVIEW", "RETRY", "DONE", "FAILED", "BLOCKED"},
+    "REVIEW": {"DONE", "RETRY", "FAILED", "BLOCKED"},
+    "RETRY": {"QUEUED", "BLOCKED", "FAILED", "WAITING_RESOURCE"},
+    "WAITING_RESOURCE": {"QUEUED", "RUNNING", "BLOCKED"},
+    "DONE": {"INTEGRATED"},
+    "INTEGRATED": set(),
+    "FAILED": {"QUEUED"},
+    # BLOCKED -> DONE: um bloqueio por limite de tentativas é uma decisão sobre
+    # TENTATIVAS, não sobre o trabalho. Se a revisão da última tentativa volta
+    # APPROVE depois disso (revisão de LLM leva minutos), a entrega está validada e
+    # precisa poder ser finalizada. Sem esta aresta o motor quebrava com
+    # "TransicaoInvalida: P04: BLOCKED -> DONE não permitido" e derrubava a rodada.
+    "BLOCKED": {"QUEUED", "DONE"},
+}
+
+# Estados TERMINAIS de tarefa: nada mais a fazer, com ou sem sucesso.
+TERMINAIS_TASK = {"INTEGRATED"}
+
+# --------------------------------------------------------------------------- #
+# Estados do SPRINT
+# --------------------------------------------------------------------------- #
+# A máquina acima governa UMA tarefa. O sprint tem ciclo de vida próprio, e sem
+# um estado terminal explícito "encerrar a sprint" não existe como operação —
+# o `status:` do sprint.yaml fica congelado no que foi escrito à mão.
+#
+# Aqui a fonte é o banco (sprint_state.estado), não o yaml: o yaml declara a
+# intenção, o banco registra o fato.
+ESTADOS_SPRINT = ["PLANEJADO", "EM_EXECUCAO", "EM_VERIFICACAO", "ENCERRADO",
+                  "ABORTADO"]
+# Caminho de avanço (o ABORTADO fica de fora: é saída lateral, não etapa)
+ORDEM_SPRINT = ["PLANEJADO", "EM_EXECUCAO", "EM_VERIFICACAO", "ENCERRADO"]
+SPRINT_TERMINAIS = {"ENCERRADO", "ABORTADO"}
+TRANSICOES_SPRINT = {
+    "PLANEJADO": {"EM_EXECUCAO", "ABORTADO"},
+    "EM_EXECUCAO": {"EM_VERIFICACAO", "ABORTADO"},
+    "EM_VERIFICACAO": {"ENCERRADO", "EM_EXECUCAO", "ABORTADO"},
+    "ENCERRADO": set(),
+    "ABORTADO": set(),
+}
+
+
+def _carrega_yaml(p: Path) -> dict:
+    if not p.exists():
+        raise FileNotFoundError(f"config ausente: {p}")
+    with p.open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+
+@dataclass
+class Config:
+    agents: dict
+    policies: dict
+    models: dict
+    raiz: Path = RAIZ
+
+    @classmethod
+    def carregar(cls, config_dir: Path | None = None) -> "Config":
+        d = config_dir or CONFIG
+        return cls(agents=_carrega_yaml(d / "agents.yaml"),
+                   policies=_carrega_yaml(d / "policies.yaml"),
+                   models=_carrega_yaml(d / "models.yaml"))
+
+    # -- helpers de política -------------------------------------------------
+    def escada(self) -> list[dict]:
+        return self.models["codex"]["ladder"]
+
+    def degrau_por_tier(self, tier: int) -> dict | None:
+        """Degrau da escada de um tier — o MESMO critério de `modelo_para_tentativa`.
+
+        Existe para a decisão de retry poder dizer QUAL degrau usar quando a classe de
+
+exec
+/usr/bin/bash -lc "sed -n '240,325p' autodev/config.py && sed -n '160,250p' autodev/agents.py && sed -n '250,340p' autodev/agents.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 0ms:
+        if isinstance(texto, str)
+        for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+    }
+
+
+def valida_dag(dag: dict) -> list[str]:
+    """Valida o DAG e devolve os erros encontrados (lista vazia = ok).
+
+    Checa: ids únicos, deps existem, sem ciclos, e que nenhuma task
+    paralelizável dependa de outra do mesmo grupo paralelo sem ser marcada.
+    """
+    erros: list[str] = []
+    tasks = dag.get("tasks", [])
+    ids = [t.get("id") for t in tasks]
+    if len(ids) != len(set(ids)):
+        erros.append("ids duplicados no DAG")
+    conhecidos = set(ids)
+    for t in tasks:
+        try:
+            Task.validar(t)
+        except ValueError as e:
+            erros.append(str(e))
+        for d in t.get("deps", []):
+            if d not in conhecidos:
+                erros.append(f"{t['id']} depende de {d}, que não existe no DAG")
+    # detecção de ciclo (DFS com marcação de cor)
+    grafo = {t["id"]: list(t.get("deps", [])) for t in tasks}
+    BRANCO, CINZA, PRETO = 0, 1, 2
+    cor = {i: BRANCO for i in grafo}
+
+    def visita(n: str, pilha: list[str]) -> None:
+        cor[n] = CINZA
+        for d in grafo.get(n, []):
+            if cor.get(d) == CINZA:
+                erros.append(f"ciclo: {' -> '.join(pilha + [n, d])}")
+            elif cor.get(d) == BRANCO:
+                visita(d, pilha + [n])
+        cor[n] = PRETO
+
+    for n in grafo:
+        if cor[n] == BRANCO:
+            visita(n, [])
+
+    # A topologia só é calculada para um DAG estruturalmente válido. Isso evita
+    # que uma dependência ausente seja mascarada como uma onda incompleta.
+    if erros:
+        return erros
+
+    # Uma onda é executada em paralelo; duas tasks que citam o mesmo caminho
+    # nela podem sobrescrever o trabalho uma da outra. Dependências colocam o
+    # mesmo caminho em ondas distintas e, portanto, não são erro aqui.
+    arquivos = {
+        t.get("id"): arquivos_citados([
+            *t.get("criterios", []), t.get("teste", ""),
+        ])
+        for t in tasks
+    }
+    ondas = ordem_topologica({"tasks": tasks})
+    for numero, onda in enumerate(ondas):
+        for indice, id_a in enumerate(onda):
+            for id_b in onda[indice + 1:]:
+                for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
+                    if registro_compartilhado(arquivo):
+                        continue
+                    erros.append(
+                        f"colisão de arquivo entre {id_a} e {id_b}: "
+                        f"{arquivo} (onda {numero + 1})"
+                    )
+    return erros
+
+
+def carrega_dag(p: Path) -> dict:
+    with p.open(encoding="utf-8") as fh:
+        dag = json.load(fh)
+    erros = valida_dag(dag)
+    if erros:
+        raise ValueError("DAG inválido:\n  - " + "\n  - ".join(erros))
+    return dag
+
+
+def carrega_sprint(p: Path) -> dict:
+    try:
+        with p.open(encoding="utf-8") as fh:
+            s = yaml.safe_load(fh) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"sprint.yaml invalido: {exc}") from exc
+        caminho = shutil.which(binario)
+        wrapper = spec.get("wrapper")
+        wrap_ok = True if not wrapper else shutil.which(wrapper) is not None
+        info = AgenteInfo(nome=nome, disponivel=bool(caminho) and wrap_ok,
+                          binario=caminho or "", wrapper=wrapper or "")
+        if not caminho:
+            info.erro = f"binario '{binario}' nao encontrado no PATH"
+        if caminho:
+            try:
+                r = subprocess.run([binario, "--version"], capture_output=True,
+                                   text=True, timeout=30)
+                info.versao = (r.stdout or r.stderr).strip().splitlines()[0][:80]
+            except Exception as e:  # noqa: BLE001
+                info.erro = str(e)[:120]
+        if not wrap_ok:
+            info.disponivel = False
+            info.erro = f"wrapper {wrapper} ausente"
+        out[nome] = info
+    return out
+
+
+def driver_fake_ativo() -> bool:
+    return os.environ.get("AUTODEV_FAKE_AGENT", "") == "1"
+
+
+def invocar(inv: Invocacao, cfg) -> Resultado:
+    """Executa o agente no worktree indicado e devolve resultado classificado."""
+    t0 = time.time()
+    log_path = Path(inv.log_path) if inv.log_path else None
+    if log_path:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if driver_fake_ativo():
+        res = _fake(inv)
+        res.prompt = inv.prompt
+        res.duracao = time.time() - t0
+        _gravar_log(log_path, res)
+        return res
+
+    if inv.agente not in WRAPPERS:
+        return Resultado(exit_code=127, stderr=f"agente sem adaptador: {inv.agente}",
+                         failure_class=errors.FailureClass.ENVIRONMENT_ERROR.value,
+                         duracao=time.time() - t0)
+
+    w = WRAPPERS[inv.agente]
+    modelo = inv.modelo
+    effort = inv.effort
+    res_effort = "(default)"
+    if w.get("prompt_arg"):
+        # Revisor Hermes: prompt no argumento, sem -d/--timeout/-f (não existem)
+        # e sem -e (effort do Hermes não é flag de CLI). O teto de tempo é o do
+        # próprio subprocess.
+        cmd = [w["cmd"]]
+        if modelo:
+            cmd += [w["flags"]["modelo"], modelo]
+            res_modelo = modelo
+        else:
+            res_modelo = "(default do agente)"
+        cmd += [w["flags"]["oneshot"], inv.prompt]
+    else:
+        cmd = [w["cmd"]]
+        if modelo:
+            cmd += [w["flags"]["modelo"], modelo]
+            res_modelo = modelo
+        else:
+            res_modelo = "(default do agente)"
+        if effort:
+            cmd += [w["flags"]["effort"], effort]
+            res_effort = effort
+        cmd += [w["flags"]["dir"], inv.worktree]
+        cmd += [w["flags"]["timeout"], w["timeout_fmt"].format(n=inv.timeout)]
+        if inv.agente == "codex":
+            cmd += [w["flags"]["sandbox"],
+                    SANDBOX_FLAG["codex"]["editar" if inv.edita else "ler"]]
+        else:
+            cmd += [w["flags"]["modo"],
+                    SANDBOX_FLAG["agy"]["editar" if inv.edita else "ler"]]
+            if inv.edita:
+                # O AGY só edita de fato em modo headless com -D. É seguro AQUI
+                # porque toda execução de agente roda dentro do worktree + bwrap
+                # (HOME real fora de alcance). Sem isto, a edição simplesmente não
+                # acontece e a task falha sem motivo aparente.
+                cmd += [w["flags"]["permissao"]]
+            else:
+                # Mesmo em modo plano/revisão o AGY headless precisa de -D: qualquer
+                # ferramenta exige a permissão "command", que o modo headless não
+                # consegue pedir e AUTO-NEGA em silêncio (stdout vazio, exit 0).
+                # Achado real da aceitação. A mitigação é o sandbox, que é
+                # exatamente o uso que a própria documentação do AGY recomenda.
+                cmd += [w["flags"]["permissao"]]
+        # prompt via stdin — evita estourar o limite de argumento e não vaza no ps.
+        # prompt via stdin — evita estourar o limite de argumento e não vaza no ps.
+        # O wrapper lê stdin com `-f -`, NÃO com um `-` solto (que ele rejeita como
+        # opção desconhecida). Bug real encontrado no teste com o Codex de verdade.
+        cmd += [w["flags"]["arquivo"], "-"]
+
+    try:
+        # ASK_CODEX_USO: o wrapper grava o consumo ao lado do nosso log ANTES de
+        # apagar o mktemp onde o rodapé "tokens used" vive. Opt-in: quem não define
+        # a variável não muda de comportamento (ver ~/.local/bin/ask-codex).
+        env = os.environ.copy()
+        if log_path:
+            env.setdefault("ASK_CODEX_USO", str(log_path) + ".uso")
+        p = subprocess.run(cmd, input=inv.prompt, capture_output=True, text=True,
+                           timeout=inv.timeout + 30, cwd=inv.worktree, env=env)
+        res = Resultado(exit_code=p.returncode, stdout=p.stdout or "",
+                        stderr=p.stderr or "", modelo_usado=res_modelo,
+                        effort_usado=res_effort)
+    except subprocess.TimeoutExpired:
+        res = Resultado(exit_code=124, stderr=f"timeout de {inv.timeout}s",
+                        failure_class=errors.FailureClass.ENVIRONMENT_ERROR.value,
+                        modelo_usado=res_modelo, effort_usado=res_effort)
+    except FileNotFoundError as e:
+        res = Resultado(exit_code=127, stderr=str(e),
+                        failure_class=errors.FailureClass.DEPENDENCY_ERROR.value,
+                        modelo_usado=res_modelo, effort_usado=res_effort)
+
+    res.duracao = time.time() - t0
+    res.prompt = inv.prompt
+    if not res.ok or res.exit_code != 0:
+        cls = errors.classificar(res.stdout, res.exit_code, res.stderr)
+        res.failure_class = cls.value
+    elif not (res.stdout or "").strip() and (res.stderr or "").strip():
+        # SUCESSO SILENCIOSO NÃO É SUCESSO. O AGY headless devolve exit 0 com
+        # stdout vazio quando auto-nega uma ferramenta — o agente "passa" sem
+        # ter feito nada e o Sprint não percebe. Exigimos saída útil.
+        cls = errors.classificar(res.stderr, 1)
+        res.failure_class = (cls.value if cls != errors.FailureClass.UNKNOWN
+                             else errors.FailureClass.ENVIRONMENT_ERROR.value)
+        res.stdout = res.stdout or ""
+    _medir_tokens(res, log_path)
+    _gravar_log(log_path, res)
+    return res
+
+
+def _fake(inv: Invocacao) -> Resultado:
+    """Driver determinístico para testes — não gasta cota.
+
+    Lê `fake_script` (JSON) descrevendo o comportamento esperado:
+      {"acao":"editar","arquivo":"src/stats.py","conteudo":"..."}
+      {"acao":"quota"}                     -> simula exaustão de cota do Codex
+      {"acao":"quebrar"}                   -> deixa os testes falhando
+      {"sequencia":[{...},{...}]}          -> comportamentos em ordem, por chamada
+
+    A `sequencia` mantém um contador ao lado do arquivo de spec, para que a
+    primeira chamada possa devolver cota e a segunda efetivamente implementar —
+    é assim que o teste de retomada pós-cota prova "CONTINUAR, não reiniciar".
+    """
+    spec = {}
+    if inv.fake_script and Path(inv.fake_script).exists():
+        spec = json.loads(Path(inv.fake_script).read_text())
+
+    def _conta() -> int:
+        """Contador de invocações, persistido ao lado da spec."""
+        if not inv.fake_script:
+            return 0
+        c = Path(inv.fake_script).with_suffix(".count")
+        n = int(c.read_text().strip() or "0") if c.exists() else 0
+        c.write_text(str(n + 1))
+        return n
+
+    if "sequencia" in spec:
+        seq = spec["sequencia"]
+        i = _conta()
+        spec = seq[min(i, len(seq) - 1)]
+
+    acao = spec.get("acao", "nada")
+    resultado = _fake_acao(acao, spec, inv)
+    # registra qual passo da sequência foi executado — a aceitação lê isso
+    if inv.log_path:
+        try:
+            Path(inv.log_path).with_suffix(".acao").write_text(
+                json.dumps({"acao": acao, "spec": spec}, ensure_ascii=False))
+        except OSError:
+            pass
+    return resultado
+
+
+def _fake_acao(acao: str, spec: dict, inv: Invocacao) -> Resultado:
+    if acao == "quota":
+        return Resultado(exit_code=1,
+                         stdout="Error: quota exceeded for this billing period. "
+
+exec
+/usr/bin/bash -lc "sed -n '1,220p' /home/saurus/.codex/skills/writing-good-tests.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ exited 2 in 0ms:
+sed: can't read /home/saurus/.codex/skills/writing-good-tests.md: No such file or directory
+
+exec
+/usr/bin/bash -lc "sed -n '1,220p' /home/saurus/.codex/skills/test-driven-development/writing-good-tests.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 0ms:
+# Writing Good Tests
+
+**Load this reference when:** writing or changing tests, adding mocks, or
+adding cleanup/helper methods for tests.
+
+## Overview
+
+A test exists to catch a specific break. Two principles govern everything
+here:
+
+```
+1. Every test names the break it catches
+2. Every test exercises the real thing
+```
+
+Strict TDD produces both naturally: a test written first and watched
+failing against real code has already proven it can fail, and only earns
+a mock when the real dependency proves slow or external.
+
+## Principle 1: Name the Break
+
+Before writing the test body, answer: **what production change should
+make this test fail — and is that change a bug or a decision?** A test
+earns its place by catching a wrong branch, missing side effect, wrong
+argument, boundary case, or broken contract.
+
+**Derive expectations independently.** Use literals and hand-checked
+fixtures; table-driven tests with literal `want` values are the preferred
+shape. An expectation computed by the code under test — or its helpers —
+passes no matter what that code does:
+
+```typescript
+// ❌ Mirror assertion: the same builder computes both sides — always true
+const expected = buildSearchQuery({ tag: 'urgent' });
+expect(buildSearchQuery({ tag: 'urgent' })).toBe(expected);
+
+// ✅ Hand-derived literal
+expect(buildSearchQuery({ tag: 'urgent' })).toBe('tag:"urgent"');
+```
+
+**No change detectors.** If only intentional decisions can fail a test —
+a constant's value, exact message wording, private structure — it fires
+on redesign and sleeps through bugs. Test the behavior that depends on
+the decision: not `expect(MAX_RETRIES).toBe(5)` but "a failing call is
+retried 5 times and the 6th attempt never happens."
+
+**Behavior, not text.** Asserting that a script, skill, or config
+contains an exact line proves only that the source is the source. Run
+scripts against controlled inputs and assert outputs, side effects, or
+exit codes. Documents that instruct agents are tested by the consuming
+agent's behavior (superpowers:writing-skills); prose for humans earns no
+test at all.
+
+**Your code, not the framework.** Test the contract your code makes at
+its boundaries — the route you register, the query you emit, the payload
+you produce. Upstream mechanics are their maintainers' tests to write
+(the classic: asserting your router invokes a registered handler — that
+is the framework's test, not yours). When upstream behavior genuinely
+surprised you, write one narrow characterization test naming the
+assumption. The same boundary applies inside your code: constructors,
+getters, constants, and trivial forwarding earn tests only when they
+validate, normalize, default, derive, enforce, or cause side effects —
+otherwise assert the first consumer-visible result that depends on them.
+
+### Gate Function
+
+```
+BEFORE writing the test body:
+  Name the production change that would make this test fail.
+
+  Cannot name one            → redesign around an observable behavior
+  "The source text changed"  → run the artifact and assert its effects
+  Only intentional decisions → change detector; test the behavior
+                               that depends on the decision
+
+  Confirm the expected value is derived without the code under test.
+  IF it reuses the code's logic or helpers:
+    Replace it with a literal or hand-checked fixture
+```
+
+## Principle 2: Exercise the Real Thing
+
+**The mock earns no assertions.** A mock assertion passes when the mock
+is present and fails when it is absent — it says nothing about the
+component. Assert the real component's behavior; if the mock is what you
+are checking, unmock it or delete the assertion.
+
+```typescript
+// ✅ Real behavior
+expect(screen.getByRole('navigation')).toBeInTheDocument();
+
+// ❌ Mock existence
+expect(screen.getByTestId('sidebar-mock')).toBeInTheDocument();
+```
+
+**your human partner's correction:** "Are we testing the behavior of a
+mock?"
+
+**Mock at the right level.** Learn every side effect of the real method
+before replacing it; mock the slow or external operation and keep what
+the test depends on real. When unsure, run the test against the real
+implementation first and observe what actually needs to happen.
+
+```typescript
+// ❌ The mock swallows the config write that duplicate detection reads
+vi.mock('ToolCatalog', () => ({
+  discoverAndCacheTools: vi.fn().mockResolvedValue(undefined)
+}));
+
+// ✅ Mock only the slow server startup; the config write stays real
+vi.mock('MCPServerManager');
+```
+
+**Make doubles specific.** When arguments, call counts, or ordering are
+part of the contract, assert them — a fake that accepts anything verifies
+nothing. Give each branch (success, error, malformed) its own fixture or
+spy, so the wrong branch cannot satisfy the expectation.
+
+**Mirror real data completely.** Mock the complete structure as it exists
+in reality — all documented fields — not just the ones your test reads.
+Partial mocks fail silently when downstream code reads an omitted field:
+the test passes while integration breaks.
+
+**Production classes carry production methods only.** Cleanup that only
+tests need lives in test utilities, never as a `destroy()` on the
+production class. Ask: is this method called only from tests? Does this
+class own this resource's lifecycle? Wrong answers → test utility.
+
+**Prefer real components over complex mocks.** When mock setup outgrows
+the test logic, mocks miss methods the real components have, or tests
+break when the mock changes, switch to an integration test with real
+components. **your human partner's question:** "Do we need to be using a
+mock here?"
+
+### Gate Function
+
+```
+BEFORE adding a mock or test helper:
+  List the real method's side effects; keep the ones the test
+  depends on real — mock the slow/external level below them.
+
+  Mock responses mirror the complete real structure.
+
+  A method only tests call lives in test utilities, not production.
+
+  About to assert on the mock itself?
+    Unmock it or delete the assertion.
+```
+
+## Tests Ship With the Implementation
+
+The TDD cycle — failing test, minimal implementation, refactor — is what
+"complete" means. Ship the tests the behavior needs and only those:
+trivial code and human prose earn none, and a test written to satisfy
+process costs maintenance forever.
+
+## The Mutation Check
+
+Before finishing, mentally mutate the production code; at least one test
+should fail for each realistic mutation:
+
+- Wrong constant or argument
+- Wrong branch handler
+- Missing state change or side effect
+- Empty or default return
+- Missing validation for zero, empty, nil, unauthorized, or malformed input
+
+A mutation nothing catches marks the behavior as unprotected — or the
+test as tautological.
+
+## Quick Reference
+
+| When you... | Do |
+|-------------|-----|
+| Write any test | Name the break it catches — a bug, not a decision |
+| Build an expected value | Derive it by hand; never with the code under test |
+| Test a script or document | Run it / pressure-test its consumer; never grep its text |
+| Reach for a dependency test | Test your boundary contract, not their documented mechanics |
+| Want to assert on a mocked element | Test the real component, or unmock it |
+| Are about to mock a method | Learn its side effects; mock the slow/external level |
+| Build a mock response | Mirror the real structure completely |
+| Need cleanup only tests use | Put it in test utilities |
+| Watch mock setup balloon | Switch to an integration test with real components |
+| Finish a test file | Run the mutation check |
+
+## Warning Signs
+
+- Setup and assertion share the same object, guaranteeing equality
+- The test can fail only through a panic, crash, or missing selector
+- The test fails on every intentional change, never on accidental breakage
+- Expected values are hidden behind loops, builders, or helpers
+- The test greps source text, or asserts a removed symbol stays removed
+- The test would still matter if only the framework remained
+- The test exists for coverage, checking no side effect or outcome
+- An assertion checks a `*-mock` test ID, or fails if you remove the mock
+- A method is called only from test files
+- Mock setup is more than half the test, or you can't explain why the mock is needed
+- Mocking "just to be safe"
+
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex/.autodev/tests/test_plan_portao_aceitacao.py
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c40a200746f6187da68771eb26176015e6c9bb7a
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c40a200746f6187da68771eb26176015e6c9bb7a
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+codex
+O teste de aceitação foi adicionado contra o motor real; agora vou executá-lo para validar a montagem do cenário e observar o primeiro resultado.
+exec
+/usr/bin/bash -lc 'python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ exited 1 in 62ms:
+/usr/bin/python3: No module named pytest
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c40a200746f6187da68771eb26176015e6c9bb7a
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+exec
+/usr/bin/bash -lc "rg --files -g 'pyvenv.cfg' -g 'pytest' -g 'requirements*.txt' -g 'pyproject.toml' -g 'tox.ini' -g 'setup.cfg' | head -80 && ls -la" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 90ms:
+total 68
+drwxr-xr-x 1 saurus saurus   326 Sep 29 08:00 .
+drwxr-xr-x 1 saurus saurus  1288 Sep 29 01:50 ..
+dr-xr-xr-x 2 saurus saurus    40 Sep 29 08:00 .agents
+drwxr-xr-x 1 saurus saurus    84 Sep 29 01:50 .autodev
+drwxr-xr-x 1 saurus saurus    52 Sep 29 01:50 .autodev_logs
+dr-xr-xr-x 2 saurus saurus    40 Sep 29 08:00 .codex
+-rw-r--r-- 1 saurus saurus    81 Sep 29 01:50 .git
+drwxr-xr-x 1 saurus saurus    20 Sep 29 01:50 .githooks
+-rw-r--r-- 1 saurus saurus  2025 Sep 29 01:50 .gitignore
+drwxr-xr-x 1 saurus saurus    64 Sep 29 07:59 .pytest_cache
+-rw-r--r-- 1 saurus saurus 16968 Sep 29 01:50 Pendencias.md
+-rw-r--r-- 1 saurus saurus  9898 Sep 29 01:50 README.md
+-rw-r--r-- 1 saurus saurus 15523 Sep 29 01:50 REPORT-TENTATIVAS-CODEX.md
+-rw-r--r-- 1 saurus saurus  6556 Sep 29 01:50 TesteAB-eficiencia-LLM.md
+drwxr-xr-x 1 saurus saurus   420 Sep 29 01:50 autodev
+drwxr-xr-x 1 saurus saurus   464 Sep 29 01:50 report
+-rwxr-xr-x 1 saurus saurus  1084 Sep 29 01:50 tela.sh
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c40a200746f6187da68771eb26176015e6c9bb7a
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+exec
+/usr/bin/bash -lc "command -v python python3 pytest || true; find /tmp /home/saurus/Code -path '*/bin/python*' -type f -maxdepth 8 2>/dev/null | head -30" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 153ms:
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c40a200746f6187da68771eb26176015e6c9bb7a
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+codex
+A execução está bloqueada pelo ambiente: este Python não tem `pytest` instalado. Corrigi uma pequena idempotência do próprio cenário e vou fazer verificações estáticas/por compilação enquanto preservo o comando exigido para quando o ambiente tiver a dependência.
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex/.autodev/tests/test_plan_portao_aceitacao.py
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..105a27c8be6fef909f9d9d31eb33005f0661d286
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..105a27c8be6fef909f9d9d31eb33005f0661d286
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+exec
+/usr/bin/bash -lc 'python3 -m py_compile .autodev/tests/test_plan_portao_aceitacao.py && git diff --check && git diff -- .autodev/tests/test_plan_portao_aceitacao.py && git status --short' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 206ms:
+?? .autodev/tests/test_plan_portao_aceitacao.py
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..105a27c8be6fef909f9d9d31eb33005f0661d286
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+exec
+/usr/bin/bash -lc "python3 - <<'PY'
+import yaml
+print('PyYAML disponível')
+PY
+sed -n '1,240p' .autodev/tests/test_plan_portao_aceitacao.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 81ms:
+PyYAML disponível
+"""Aceitação integrada do portão que protege a execução de um plano."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from autodev import cli
+from autodev.agents import AgenteInfo
+from autodev.orchestrator import Orquestrador
+
+from conftest import escreve_fake_spec
+
+
+SPRINT = "PORTAO"
+
+
+def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
+    sprint = raiz / ".autodev" / "sprints" / SPRINT
+    sprint.mkdir(parents=True, exist_ok=True)
+    (sprint / "dag.json").write_text(
+        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
+    )
+    (sprint / "sprint.yaml").write_text(
+        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
+        encoding="utf-8",
+    )
+    return sprint
+
+
+def _task(task_id: str, criterio: str) -> dict:
+    return {
+        "id": task_id,
+        "titulo": f"entrega {task_id}",
+        "criterios": [criterio],
+        "deps": [],
+        "agente": "codex",
+        "teste": "python3 -m pytest -q",
+    }
+
+
+def _orquestrador(raiz: Path) -> Orquestrador:
+    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
+    orquestrador.disponiveis["agy"] = AgenteInfo(
+        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
+    )
+    return orquestrador
+
+
+def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
+    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
+    # A regressão que este teste captura é criar tasks ou invocar o agente antes
+    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
+    fake_spec = escreve_fake_spec(
+        tmp_path / "driver-falso.json",
+        {"acao": "editar", "arquivo": "src/calc.py",
+         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
+    )
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
+
+    # O validador do motor recusa colisão na mesma onda antes de materializar
+    # task, portanto antes de qualquer invocação do driver.
+    _escrever_sprint(
+        projeto_pytest,
+        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
+    )
+    with pytest.raises(ValueError, match="colisão de arquivo"):
+        _orquestrador(projeto_pytest).rodar()
+    assert not fake_spec.with_suffix(".count").exists()
+
+    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
+    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
+    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
+    parado = _orquestrador(projeto_pytest).rodar()
+    assert "sem aprovacao" in (parado.parado_por or "")
+    assert not fake_spec.with_suffix(".count").exists()
+
+    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
+    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
+    executado = _orquestrador(projeto_pytest).rodar()
+    assert executado.parado_por is None
+    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
+    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
+    # reabre a execução nem consome outra ação falsa.
+    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
+    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
+    invalido = _orquestrador(projeto_pytest).rodar()
+    assert "divergencia" in (invalido.parado_por or "")
+    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..105a27c8be6fef909f9d9d31eb33005f0661d286
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+exec
+/usr/bin/bash -lc "rg -n \"class Task|def validar\" autodev/config.py && sed -n '180,250p' autodev/config.py && rg -n \"def _revisar|modo_teste\" autodev/orchestrator.py autodev/review.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 0ms:
+187:class Task:
+197:    def validar(d: dict) -> None:
+    def caminhos_proibidos(self) -> list[str]:
+        return self.policies["seguranca"]["caminhos_proibidos"]
+
+
+# --- schema do sprint --------------------------------------------------------
+
+@dataclass
+class Task:
+    id: str
+    titulo: str
+    criterios: list[str]
+    deps: list[str] = field(default_factory=list)
+    agente: str = "codex"
+    paralelizavel: bool = False
+    estimativa: str = ""
+
+    @staticmethod
+    def validar(d: dict) -> None:
+        faltando = {"id", "titulo", "criterios"} - set(d)
+        if faltando:
+            raise ValueError(f"task sem campos obrigatórios {faltando}: {d}")
+        if not isinstance(d["criterios"], list) or not d["criterios"]:
+            raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+
+
+def normalizar_caminho(caminho: str) -> str:
+    """Normaliza um caminho textual, sem acessar o filesystem."""
+    caminho = caminho.replace("\\", "/")
+    while caminho.startswith("./"):
+        caminho = caminho[2:]
+    partes: list[str] = []
+    for parte in PurePosixPath(caminho).parts:
+        if parte in ("/", "."):
+            continue
+        if parte == ".." and partes and partes[-1] != "..":
+            partes.pop()
+        else:
+            partes.append(parte)
+    return "/".join(partes)
+
+
+def registro_compartilhado(caminho: str) -> bool:
+    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
+    partes = PurePosixPath(normalizar_caminho(caminho)).parts
+    minusculas = tuple(parte.casefold() for parte in partes)
+    if len(minusculas) < 4 or minusculas[:2] != (".autodev", "sprints"):
+        return False
+    nome = minusculas[-1]
+    return bool(
+        nome == "decisions.md"
+        or (set(minusculas[3:-1]) & {"logs", "evidence"}
+            and PurePosixPath(nome).suffix in {".log", ".md", ".txt"})
+    )
+
+
+def arquivos_citados(textos: list[str]) -> set[str]:
+    """Extrai caminhos citados em textos usando a regra comum do plano."""
+    return {
+        normalizar_caminho(encontrado.group(0))
+        for texto in textos
+        if isinstance(texto, str)
+        for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+    }
+
+
+def valida_dag(dag: dict) -> list[str]:
+    """Valida o DAG e devolve os erros encontrados (lista vazia = ok).
+
+    Checa: ids únicos, deps existem, sem ciclos, e que nenhuma task
+    paralelizável dependa de outra do mesmo grupo paralelo sem ser marcada.
+    """
+autodev/review.py:171:def _revisar_por_llm(agente: str, modelo: str | None, prompt: str, worktree: str,
+autodev/orchestrator.py:95:                 modo_teste: bool = False, deadline_s: float | None = None):
+autodev/orchestrator.py:98:        self.modo_teste = modo_teste
+autodev/orchestrator.py:396:                    agente_atual=agente, cfg=self.cfg, modo_teste=self.modo_teste,
+autodev/orchestrator.py:511:                espera = self.cfg.espera_cota(self.modo_teste)
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..105a27c8be6fef909f9d9d31eb33005f0661d286
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+exec
+/usr/bin/bash -lc "python3 -m pip --version || true; find /home/saurus/.cache -type f -iname '*pytest*.whl' 2>/dev/null | head -10; git diff --no-index --check /dev/null .autodev/tests/test_plan_portao_aceitacao.py; git diff --no-index /dev/null .autodev/tests/test_plan_portao_aceitacao.py | sed -n '1,260p'" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ succeeded in 1099ms:
+/usr/bin/python3: No module named pip
+diff --git 1/.autodev/tests/test_plan_portao_aceitacao.py 2/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000..105a27c
+--- /dev/null
++++ 2/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..105a27c8be6fef909f9d9d31eb33005f0661d286
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,94 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    assert _orquestrador(projeto_pytest).store.task(SPRINT, "P01")["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(json.dumps({"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]}, indent=2), encoding="utf-8")
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex/.autodev/tests/test_plan_portao_aceitacao.py
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b44c9f2175d6e98002dd29738699cca1abb83860
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,101 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    integrada = _orquestrador(projeto_pytest).store.task(SPRINT, "P01")
++    assert integrada["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(
++        json.dumps(
++            {"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]},
++            indent=2,
++        ),
++        encoding="utf-8",
++    )
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b44c9f2175d6e98002dd29738699cca1abb83860
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,101 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    integrada = _orquestrador(projeto_pytest).store.task(SPRINT, "P01")
++    assert integrada["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(
++        json.dumps(
++            {"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]},
++            indent=2,
++        ),
++        encoding="utf-8",
++    )
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+codex
+A cobertura está pronta: ela verifica a rejeição antes da primeira chamada, o bloqueio sem aprovação, a execução/integracão após `aprovar` e a invalidação do hash. Vou registrar a verificação final disponível neste ambiente.
+exec
+/usr/bin/bash -lc 'python3 -m py_compile .autodev/tests/test_plan_portao_aceitacao.py && python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P06-codex
+ exited 1 in 262ms:
+/usr/bin/python3: No module named pytest
+
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b44c9f2175d6e98002dd29738699cca1abb83860
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,101 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    integrada = _orquestrador(projeto_pytest).store.task(SPRINT, "P01")
++    assert integrada["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(
++        json.dumps(
++            {"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]},
++            indent=2,
++        ),
++        encoding="utf-8",
++    )
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+codex
+RESULTADO: criado `.autodev/tests/test_plan_portao_aceitacao.py` com aceitação do validador, aprovação e invalidação por hash usando driver falso | TESTES: `python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q` bloqueado — ambiente sem módulo `pytest`; `py_compile` passou
+diff --git a/.autodev/tests/test_plan_portao_aceitacao.py b/.autodev/tests/test_plan_portao_aceitacao.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b44c9f2175d6e98002dd29738699cca1abb83860
+--- /dev/null
++++ b/.autodev/tests/test_plan_portao_aceitacao.py
+@@ -0,0 +1,101 @@
++"""Aceitação integrada do portão que protege a execução de um plano."""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from autodev import cli
++from autodev.agents import AgenteInfo
++from autodev.orchestrator import Orquestrador
++
++from conftest import escreve_fake_spec
++
++
++SPRINT = "PORTAO"
++
++
++def _escrever_sprint(raiz: Path, tasks: list[dict]) -> Path:
++    sprint = raiz / ".autodev" / "sprints" / SPRINT
++    sprint.mkdir(parents=True, exist_ok=True)
++    (sprint / "dag.json").write_text(
++        json.dumps({"sprint_id": SPRINT, "tasks": tasks}), encoding="utf-8"
++    )
++    (sprint / "sprint.yaml").write_text(
++        f"sprint_id: {SPRINT}\nobjetivo: provar o portao\nstatus: PLANEJADO\n",
++        encoding="utf-8",
++    )
++    return sprint
++
++
++def _task(task_id: str, criterio: str) -> dict:
++    return {
++        "id": task_id,
++        "titulo": f"entrega {task_id}",
++        "criterios": [criterio],
++        "deps": [],
++        "agente": "codex",
++        "teste": "python3 -m pytest -q",
++    }
++
++
++def _orquestrador(raiz: Path) -> Orquestrador:
++    orquestrador = Orquestrador(raiz, SPRINT, modo_teste=True)
++    orquestrador.disponiveis["agy"] = AgenteInfo(
++        nome="agy", disponivel=False, erro="revisor externo desligado no teste"
++    )
++    return orquestrador
++
++
++def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
++    """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
++    # A regressão que este teste captura é criar tasks ou invocar o agente antes
++    # de validar o DAG/portão. O driver abaixo é o falso determinístico.
++    fake_spec = escreve_fake_spec(
++        tmp_path / "driver-falso.json",
++        {"acao": "editar", "arquivo": "src/calc.py",
++         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
++    )
++    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
++    monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
++
++    # O validador do motor recusa colisão na mesma onda antes de materializar
++    # task, portanto antes de qualquer invocação do driver.
++    _escrever_sprint(
++        projeto_pytest,
++        [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
++    )
++    with pytest.raises(ValueError, match="colisão de arquivo"):
++        _orquestrador(projeto_pytest).rodar()
++    assert not fake_spec.with_suffix(".count").exists()
++
++    # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
++    # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
++    _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
++    parado = _orquestrador(projeto_pytest).rodar()
++    assert "sem aprovacao" in (parado.parado_por or "")
++    assert not fake_spec.with_suffix(".count").exists()
++
++    monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
++    assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
++    executado = _orquestrador(projeto_pytest).rodar()
++    assert executado.parado_por is None
++    integrada = _orquestrador(projeto_pytest).store.task(SPRINT, "P01")
++    assert integrada["estado"] == "INTEGRATED"
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
++
++    # Qualquer edição posterior do DAG torna o hash aprovado obsoleto e não
++    # reabre a execução nem consome outra ação falsa.
++    dag = projeto_pytest / ".autodev" / "sprints" / SPRINT / "dag.json"
++    dag.write_text(
++        json.dumps(
++            {"sprint_id": SPRINT, "tasks": [_task("P01", "altera src/calc.py")]},
++            indent=2,
++        ),
++        encoding="utf-8",
++    )
++    invalido = _orquestrador(projeto_pytest).rodar()
++    assert "divergencia" in (invalido.parado_por or "")
++    assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+
+tokens used
+81,753
+RESULTADO: criado `.autodev/tests/test_plan_portao_aceitacao.py` com aceitação do validador, aprovação e invalidação por hash usando driver falso | TESTES: `python3 -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q` bloqueado — ambiente sem módulo `pytest`; `py_compile` passou

@@ -1,0 +1,90 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/test_plan_portao_aceitacao.py -q
+exit=1 (2.5s)
+
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________________________ test_portao_do_plano _____________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-saurus/pytest-0/test_portao_do_plano0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcb3caf90d0>
+projeto_pytest = PosixPath('/tmp/pytest-of-saurus/pytest-0/test_portao_do_plano0/proj')
+
+    def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
+        """Colisão, aprovação e hash impedem chamadas indevidas ao agente real."""
+        # A regressão que este teste captura é criar tasks ou invocar o agente antes
+        # de validar o DAG/portão. O driver abaixo é o falso determinístico.
+        fake_spec = escreve_fake_spec(
+            tmp_path / "driver-falso.json",
+            {"acao": "editar", "arquivo": "src/calc.py",
+             "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
+        )
+        monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+        monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
+    
+        # O validador do motor recusa colisão na mesma onda antes de materializar
+        # task, portanto antes de qualquer invocação do driver.
+        _escrever_sprint(
+            projeto_pytest,
+            [_task("P01", "altera src/calc.py"), _task("P02", "altera src/calc.py")],
+        )
+        with pytest.raises(ValueError, match="colisão de arquivo"):
+            _orquestrador(projeto_pytest).rodar()
+        assert not fake_spec.with_suffix(".count").exists()
+    
+        # Um DAG válido permanece parado enquanto o sprint PLANEJADO não for
+        # aprovado; após a aprovação o mesmo driver falso executa e integra a task.
+        _escrever_sprint(projeto_pytest, [_task("P01", "altera src/calc.py")])
+        parado = _orquestrador(projeto_pytest).rodar()
+        assert "sem aprovacao" in (parado.parado_por or "")
+        assert not fake_spec.with_suffix(".count").exists()
+    
+        monkeypatch.setattr(cli, "RAIZ", projeto_pytest)
+        assert cli.main(["aprovar", SPRINT, "--por", "Aceitacao"]) == 0
+        executado = _orquestrador(projeto_pytest).rodar()
+        assert executado.parado_por is None
+        integrada = _orquestrador(projeto_pytest).store.task(SPRINT, "P01")
+        assert integrada["estado"] == "INTEGRATED"
+>       assert fake_spec.with_suffix(".count").read_text(encoding="utf-8") == "1"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.autodev/tests/test_plan_portao_aceitacao.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/saurus/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1058: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/tmp/pytest-of-saurus/pytest-0/test_portao_do_plano0/driver-falso.count')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pytest-of-saurus/pytest-0/test_portao_do_plano0/driver-falso.count'
+
+/home/saurus/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1044: FileNotFoundError
+----------------------------- Captured stdout call -----------------------------
+[11:01:46] RODADA NAO INICIADA: sprint PLANEJADO sem aprovacao registrada; use autodev aprovar PORTAO --por <nome>
+sprint PORTAO aprovado por Aceitacao
+[11:01:46] sprint PORTAO: 1 tasks (1 novas) — ondas [['P01']]
+[11:01:46] rodada dona: pid 2 — rodada única garantida pelo motor
+[11:01:46] P01 tentativa 1: codex gpt-5.6-luna/low
+[11:01:47] P01: testes exit=0 passed=1 failed=0 (configurado)
+[11:01:47] P01: revisao por hermes-deterministico [reserva (revisor da escada 'agy' indisponivel)] -> APPROVE (0 findings)
+[11:01:47] P01: DONE em 1 tentativa(s) — commit 2d3b8be7
+[11:01:47] integrando 1 task(s) da onda 0
+[11:01:47]   portao build: OK
+[11:01:47]   portao testes: OK
+[11:01:47]   portao lint: OK
+[11:01:47]   portao seguranca: OK
+[11:01:47] branch atual do repo: 2d7d1db0 (main intacta — merge automatico proibido)
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_plan_portao_aceitacao.py::test_portao_do_plano - F...
+1 failed in 1.73s

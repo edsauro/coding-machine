@@ -1,0 +1,1939 @@
+Reading additional input from stdin...
+OpenAI Codex v0.154.0
+--------
+workdir: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a0eb76-7983-7032-ac55-c2aed8139929
+--------
+user
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P05: Portao de aprovacao humana do plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- sprint.yaml aceita o bloco aprovacao com as chaves por, quando e hash_dag (sha256 do dag.json)
+- autodev run recusa rodar sprint PLANEJADO sem aprovacao registrada, dizendo qual comando registra a aprovacao
+- existe o comando autodev aprovar <sprint_id> --por <nome> que grava a aprovacao com o hash atual do dag.json
+- depois de aprovar, autodev run aceita o sprint e registra um evento de aprovacao no historico
+- dag.json alterado depois da aprovacao invalida a aprovacao (hash nao confere) e o run recusa de novo, citando a divergencia
+- os testes ficam em .autodev/tests/test_plan_aprovacao.py e rodam com python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q
+- estende autodev/cli.py e autodev/orchestrator.py preservando os subcomandos e o laco de execucao atuais, sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 2: REVIEW_FAILURE (exit 0) — 
+  - tentativa 3: REVIEW_FAILURE (exit 0) — 
+  - tentativa 4: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+[{"severidade": "media", "arquivo": "autodev/orchestrator.py", "linha": 238, "descricao": "Portao desligado em estados terminais: `if estado in SPRINT_TERMINAIS: return None` (SPRINT_TERMINAIS = {ENCERRADO, ABORTADO}, config.py:58) sai ANTES da comparacao de hash. Demonstrado em execucao real: sprint aprovado, transicionado para ENCERRADO (fluxo do autor via `autodev encerrar`, que sempre fecha em ENCERRADO, inclusive com --resultado ABORTADO --forcar), dag.json trocado por um plano nunca aprovado -> rodar() nao recusa, materializa a task injetada e tenta executa-la. O spec da sprint nao preve essa excecao (spec.md:27-28) e o criterio 5 e incondicional; nenhum teste cobre o caso, e a exclusao nao e necessaria: removendo essas 2 linhas numa copia, a suite continua 420 passed. Ou seja, e um buraco silencioso e nao carregado por nada.", "correcao_sugerida": "Ou remover o early-return dos estados terminais (comparar o hash sempre que 'aprovacao' for dict, como ja e feito em EM_EXECUCAO/FIM), ou, se a excecao for intencional, documenta-la com comentario explicando o porque e fixa-la com dois testes (estado ENCERRADO e ABORTADO + dag.json divergente) para que o comportamento deixe de ser acidental."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 190, "descricao": "O campo `quando` e gravado com time.strftime('%Y-%m-%dT%H:%M:%S%z') -> '2026-09-29T01:38:59-0300', enquanto o formato documentado no proprio sprint.yaml (o contrato da interface, .autodev/sprints/DEVFACTORY-003/sprint.yaml:41-42 e DEVFACTORY-004:44-45) e '2026-09-28T12:00:00-03:00'. Nada valida o formato, entao a divergencia passa em silencio e o campo documentado nunca e o campo gravado.", "correcao_sugerida": "Gravar no formato do contrato (offset com dois-pontos, por exemplo time.strftime('%Y-%m-%dT%H:%M:%S') + offset formatado) ou corrigir o exemplo comentado no sprint.yaml; em qualquer caso, um teste que compare o `quando` gravado com o padrao declarado."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_aprovacao.py", "linha": 233, "descricao": "O evento de aprovacao e provado por tipo, nunca por conteudo: test_run_apos_aprovacao_registra_evento (linha 233) faz `any(e['tipo'] == 'aprovacao_plano')` e os outros dois testes so contam/verificam tipo — um payload vazio ou com 'por' errado passaria igual. test_aprovacao_nao_duplica_evento_fora_da_janela_de_500 ainda chama o metodo privado o._registrar_aprovacao() (linha 266) em vez do caminho publico, entao o 'registra um evento por hash' do run fica coberto so indiretamente.", "correcao_sugerida": "Afirmar o payload (por/quando/hash_dag do evento iguais aos do sprint.yaml) e exercitar a deduplicacao pelo proprio rodar(), sem chamar o metodo privado."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 3, "descricao": "A docstring de uso ('Uso:' linhas 3-17) enumera os comandos e nao menciona 'aprovar' — o comando que o criterio 2 exige que a mensagem de recusa ensine. Nao quebra nada e a lista ja era incompleta antes (faltam metrics e desbloquear), mas o portao fica invisivel para quem le o modulo.", "correcao_sugerida": "Acrescentar 'python3 -m autodev aprovar <sprint_id> --por <nome>  # registra a aprovacao do plano' na lista (e, de passagem, metrics/desbloquear). A documentacao de usuario e escopo da P07."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/conftest.py
+  - .autodev/tests/test_plan_aceitacao.py
+  - .autodev/tests/test_plan_aprovacao.py
+  - autodev/cli.py
+  - autodev/config.py
+  - autodev/orchestrator.py
+
+## INSTRUCAO
+Esta e a tentativa #5.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 5a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+codex
+A tentativa anterior deixou estados terminais escaparem da validação do hash. Vou corrigir essa brecha e testar pelo caminho público de execução, usando as skills de diagnóstico, revisão de feedback e verificação.
+
+exec
+/usr/bin/bash -lc 'cat /home/saurus/.codex/skills/using-superpowers/SKILL.md /home/saurus/.codex/skills/receiving-code-review/SKILL.md /home/saurus/.codex/skills/systematic-debugging/SKILL.md /home/saurus/.codex/skills/test-driven-development/SKILL.md /home/saurus/.codex/skills/verification-before-completion/SKILL.md' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 16ms:
+exec
+/usr/bin/bash -lc "pwd; rg --files -g AGENTS.md -g '*aprovacao*'; git status --short" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 22ms:
+exec
+/usr/bin/bash -lc "cat /home/saurus/.codex/skills/ask-agy/SKILL.md; find .. -name AGENTS.md -print; sed -n '1,330p' .autodev/tests/test_plan_aprovacao.py; sed -n '1,320p' autodev/orchestrator.py; sed -n '1,220p' autodev/cli.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 29ms:
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import yaml
+import pytest
+
+from autodev.cli import main
+from autodev.config import carrega_sprint
+from autodev.orchestrator import Orquestrador
+
+
+def _sprint(tmp_path: Path, sprint: str = "S1") -> Path:
+    d = tmp_path / ".autodev" / "sprints" / sprint
+    d.mkdir(parents=True)
+    (d / "dag.json").write_text(json.dumps({"sprint_id": sprint, "tasks": []}), encoding="utf-8")
+    (d / "sprint.yaml").write_text(
+        f"sprint_id: {sprint}\nobjetivo: teste\nstatus: PLANEJADO\n", encoding="utf-8"
+    )
+    return d
+
+
+def test_sprint_yaml_accepts_approval_keys(tmp_path, monkeypatch):
+    d = _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+    approval = yaml.safe_load((d / "sprint.yaml").read_text())["aprovacao"]
+    assert set(approval) == {"por", "quando", "hash_dag"}
+    assert approval["por"] == "Ana"
+    assert approval["hash_dag"] == hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
+
+
+def test_aprovar_preserva_conteudo_existente_do_yaml(tmp_path, monkeypatch):
+    d = _sprint(tmp_path)
+    (d / "sprint.yaml").write_text(
+        "# comentario importante\nsprint_id: S1\nobjetivo: teste\n# manter\nstatus: PLANEJADO\n",
+        encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
+    assert "# comentario importante" in texto
+    assert "# manter" in texto
+
+
+def test_aprovar_substitui_aprovacao_null(tmp_path, monkeypatch):
+    d = _sprint(tmp_path)
+    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
+        arquivo.write("aprovacao: null\n")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+
+    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
+    assert texto.count("aprovacao:") == 1
+    dados = yaml.safe_load(texto)
+    assert dados["aprovacao"]["por"] == "Ana"
+
+
+@pytest.mark.parametrize("aprovacao_existente", [
+    'aprovacao: {por: Bia, quando: ontem, hash_dag: antigo}\n',
+    'aprovacao:\n  por: Bia\n  quando: ontem\n  hash_dag: antigo\n',
+])
+def test_aprovar_substitui_aprovacao_existente_sem_duplicar(
+        tmp_path, monkeypatch, aprovacao_existente):
+    d = _sprint(tmp_path)
+    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
+        arquivo.write(aprovacao_existente)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+
+    texto = (d / "sprint.yaml").read_text(encoding="utf-8")
+    assert texto.count("aprovacao:") == 1
+    assert yaml.safe_load(texto)["aprovacao"]["por"] == "Ana"
+
+
+@pytest.mark.parametrize("sprint_id", ["", ".", "..", "../fora", r"..\fora"])
+def test_aprovar_recusa_sprint_id_invalido(tmp_path, monkeypatch, capsys, sprint_id):
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", sprint_id, "--por", "Ana"]) == 1
+    assert "sprint inválido" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("aprovacao", [
+    {"por": "Ana", "hash_dag": "abc"},
+    {"por": "Ana", "quando": "agora", "hash_dag": "abc", "extra": "nao"},
+    {"por": "", "quando": "agora", "hash_dag": "abc"},
+])
+def test_carrega_sprint_recusa_aprovacao_malformada(tmp_path, aprovacao):
+    d = _sprint(tmp_path)
+    dados = yaml.safe_load((d / "sprint.yaml").read_text())
+    dados["aprovacao"] = aprovacao
+    (d / "sprint.yaml").write_text(yaml.safe_dump(dados), encoding="utf-8")
+    with pytest.raises(ValueError, match="aprovacao"):
+        carrega_sprint(d / "sprint.yaml")
+
+
+def test_aprovar_recusa_nome_vazio(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S1", "--por", ""]) == 2
+    assert "--por" in capsys.readouterr().out
+
+
+def test_aprovar_recusa_sprints_divergentes(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path, "S1")
+    _sprint(tmp_path, "S2")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S2", "--por", "Ana"]) == 2
+    assert "diverge" in capsys.readouterr().out
+
+
+def test_aprovar_recusa_id_declarado_por_outro_sprint(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path, "S1")
+    (d / "sprint.yaml").write_text(
+        "sprint_id: OUTRA\nobjetivo: teste\nstatus: PLANEJADO\n", encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+    assert "OUTRA" in capsys.readouterr().out
+    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
+
+
+def test_aprovar_recusa_dag_invalido(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    (d / "dag.json").write_text("{nao-json", encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+    assert "DAG invalido" in capsys.readouterr().out
+    assert "aprovacao:" not in (d / "sprint.yaml").read_text(encoding="utf-8")
+
+
+def test_aprovar_informa_sprint_yaml_invalido(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    (d / "sprint.yaml").write_text("sprint_id: S1\n", encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
+
+
+def test_run_informa_yaml_de_aprovacao_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    dados = yaml.safe_load((d / "sprint.yaml").read_text())
+    dados["aprovacao"] = {"por": "Ana", "hash_dag": "abc"}
+    (d / "sprint.yaml").write_text(yaml.safe_dump(dados), encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "run", "--modo-teste"]) == 2
+    saida = capsys.readouterr().out
+    assert "sprint invalido" in saida
+
+
+def test_resume_planejado_recusa_sem_aprovacao(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
+    assert "autodev aprovar S1 --por <nome>" in capsys.readouterr().out
+
+
+def test_resume_aceita_aprovacao_valida(tmp_path, monkeypatch, capsys):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 0
+    assert "parado por: -" in capsys.readouterr().out
+
+
+def test_resume_informa_yaml_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
+        arquivo.write("aprovacao:\n  por: Ana\n")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("conteudo", ["sprint_id: [\n", "- sprint_id: S1\n"])
+def test_resume_informa_yaml_ilegivel_sem_traceback(
+        tmp_path, monkeypatch, capsys, conteudo):
+    d = _sprint(tmp_path)
+    (d / "sprint.yaml").write_text(conteudo, encoding="utf-8")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "resume", "--modo-teste"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
+
+
+def test_report_informa_yaml_invalido_sem_traceback(tmp_path, monkeypatch, capsys):
+    d = _sprint(tmp_path)
+    with (d / "sprint.yaml").open("a", encoding="utf-8") as arquivo:
+        arquivo.write("aprovacao:\n  por: Ana\n")
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+
+    assert main(["--sprint", "S1", "report"]) == 2
+    assert "sprint invalido" in capsys.readouterr().out
+
+
+def test_run_nao_mascara_value_error_do_laco(tmp_path, monkeypatch):
+    d = _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+
+    def falha_no_laco(orquestrador, args):
+        raise ValueError("falha interna")
+
+    monkeypatch.setattr("autodev.cli._rodar_com_rodadas", falha_no_laco)
+    with pytest.raises(ValueError, match="falha interna"):
+        main(["--sprint", "S1", "run", "--modo-teste"])
+
+
+def test_run_planejado_recusa_sem_aprovacao(tmp_path):
+    d = _sprint(tmp_path)
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    resultado = o.rodar()
+    assert resultado.parado_por and "autodev aprovar S1 --por <nome>" in resultado.parado_por
+    assert o.store.tasks("S1") == []
+
+
+def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
+    d = _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    resultado = o.rodar()
+    assert resultado.parado_por is None
+    assert any(e["tipo"] == "aprovacao_plano" for e in o.store.eventos("S1"))
+
+
+def test_run_nao_exige_aprovacao_legada_de_sprint_ja_em_execucao(tmp_path):
+    _sprint(tmp_path)
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    o.store.transicionar_sprint("S1", "EM_EXECUCAO", "sprint preexistente")
+
+    resultado = o.rodar()
+
+    assert resultado.parado_por is None
+
+
+def test_aprovacao_gera_um_evento_por_hash(tmp_path, monkeypatch):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    o.rodar()
+    o.rodar()
+    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
+    assert len(eventos) == 1
+
+
+def test_aprovacao_nao_duplica_evento_fora_da_janela_de_500(tmp_path, monkeypatch):
+    _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    assert o.rodar().parado_por is None
+    for numero in range(501):
+        o.store.evento("S1", None, "ruido", {"numero": numero})
+
+    o._registrar_aprovacao()
+
+    quantidade = o.store.conn.execute(
+        "SELECT COUNT(*) FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
+        ("S1",),
+    ).fetchone()[0]
+    assert quantidade == 1
+
+
+def test_dag_alterado_invalida_aprovacao(tmp_path, monkeypatch):
+    d = _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+    (d / "dag.json").write_text(
+        '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
+        '"criterios":["x"]}]}'
+    )
+    resultado = Orquestrador(tmp_path, "S1", modo_teste=True).rodar()
+    assert resultado.parado_por and "diverg" in resultado.parado_por
+
+
+@pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM"])
+def test_dag_alterado_invalida_aprovacao_em_reexecucao(
+        tmp_path, monkeypatch, estado):
+    d = _sprint(tmp_path)
+    monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+    assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+    o = Orquestrador(tmp_path, "S1", modo_teste=True)
+    if estado == "EM_EXECUCAO":
+        o.store.transicionar_sprint("S1", estado, "rodada em curso")
+    else:
+        o.store.checkpoint("S1", estado, {"motivo": "fim da rodada"})
+    (d / "dag.json").write_text(
+        '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
+        '"criterios":["alterar modulo.py"]}]}', encoding="utf-8")
+
+    resultado = o.rodar()
+
+    assert resultado.parado_por and "divergencia" in resultado.parado_por
+    assert o.store.task("S1", "P1") is None
+"""DEVFACTORY — orquestrador de longo horizonte (spec §5/§7/§21/§30).
+
+Padrão de operação:
+    RESTORE STATE -> SELECT NEXT BOUNDED TASK -> EXECUTE -> VERIFY -> CHECKPOINT
+    -> SELECT NEXT TASK
+
+O estado autoritativo é Git + SQLite + arquivos do sprint + evidência de teste.
+Nunca a memória conversacional.
+"""
+from __future__ import annotations
+
+import json
+import hashlib
+import os
+import signal
+import threading
+import time
+import traceback
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from . import agents, errors, haq, integration, killswitch, report, retry, review
+from . import sandbox as sbx
+from . import testrunner
+from .config import (SPRINT_TERMINAIS, Config, carrega_dag, carrega_sprint,
+                     ordem_topologica)
+from .state import StateStore, TransicaoInvalida, WorktreeOcupado
+from .worktree import (WorktreeManager, arquivos_alterados, branch_existe,
+                       commit_atual, git)
+
+PROMPT_TASK = """Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task {task_id}: {titulo}
+
+## Criterios de aceitacao (todos obrigatorios)
+{criterios}
+
+## Contexto do projeto
+{contexto}
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: {worktree}
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+"""
+
+
+@dataclass
+class ResumoTask:
+    task_id: str
+    estado_final: str
+    tentativas: int
+    esperas_cota: int = 0
+    review: dict | None = None
+    teste: dict | None = None
+    motivo: str = ""
+
+
+@dataclass
+class ResultadoSprint:
+    sprint: str
+    tasks: list[ResumoTask] = field(default_factory=list)
+    parado_por: str | None = None
+    duracao_s: float = 0.0
+    # True quando o único motivo de não haver progresso é espera de cota: é
+    # "volte depois", não travamento — o vigia usa isso para decidir se retoma.
+    aguardando_recurso: bool = False
+
+    @property
+    def concluidas(self) -> int:
+        return sum(1 for t in self.tasks if t.estado_final in ("DONE", "INTEGRATED"))
+
+
+class PlanoInvalido(ValueError):
+    """Arquivos do plano não puderam ser carregados ou validados."""
+
+
+class Orquestrador:
+    def __init__(self, raiz: str | Path, sprint: str, *,
+                 modo_teste: bool = False, deadline_s: float | None = None):
+        self.raiz = Path(raiz).resolve()
+        self.sprint = sprint
+        self.modo_teste = modo_teste
+        self.deadline = time.time() + deadline_s if deadline_s else None
+        self.cfg = Config.carregar()
+        self.dir_sprint = self.raiz / ".autodev" / "sprints" / sprint
+        self.dir_sprint.mkdir(parents=True, exist_ok=True)
+        for sub in ("evidence", "logs"):
+            (self.dir_sprint / sub).mkdir(exist_ok=True)
+        self.store = StateStore(self.raiz / ".autodev" / "state.db")
+        self.wm = WorktreeManager(self.raiz, self.raiz / ".autodev" / "worktrees")
+        self.disponiveis = agents.detectar(self.cfg)
+        # Agentes que estouraram cota NESTA rodada. Regra do autor (2026-09-27):
+        # não parar por agente que tem substituto — cota do agente secundário não
+        # estaciona a task por 5h10m.
+        self._sem_cota: set[str] = set()
+        self.dag: dict = {}
+        self._parar = False
+        signal.signal(signal.SIGINT, self._sinal)
+        signal.signal(signal.SIGTERM, self._sinal)
+
+    def _sinal(self, *_):
+        self._parar = True
+        self.log("sinal de parada recebido — finalizando com checkpoint")
+
+    # ------------------------------------------------------------ utilidades
+    def log(self, msg: str) -> None:
+        linha = f"[{time.strftime('%H:%M:%S')}] {msg}"
+        print(linha, flush=True)
+        with (self.dir_sprint / "logs" / "orquestrador.log").open("a",
+                                                                 encoding="utf-8") as fh:
+            fh.write(linha + "\n")
+
+    def _checa_parada(self, acao: str, task: str | None = None) -> None:
+        killswitch.verificar(self.store, self.raiz, sprint=self.sprint,
+                             task=task, acao=acao)
+        if self._parar:
+            raise killswitch.ParadoPorKillSwitch("SIGTERM", "parada solicitada por sinal")
+        if self.deadline and time.time() > self.deadline:
+            raise killswitch.ParadoPorKillSwitch("DEADLINE", "deadline do sprint atingido")
+
+    def _modelo_da_tentativa(self, d, n_tent: int) -> dict:
+        """Degrau de modelo da PRÓXIMA tentativa.
+
+        Sem decisão (1ª tentativa), vale o contador da task (`n_tent + 1`) — chumbar 1
+        fazia uma sprint retomada voltar ao degrau barato, ignorando o desbloqueio.
+        Com decisão, quem manda é o `tier` DELA: quando a classe de falha não recebe
+        escalonamento (P-09 — cota, rede, ambiente, permissão, segredo), a decisão
+        carrega o degrau ATUAL e a infra deixa de pagar a chamada cara.
+        """
+        if d is None:
+            return self.cfg.modelo_para_tentativa(n_tent + 1)
+        if d.tier:
+            atual = self.cfg.degrau_por_tier(d.tier)
+            if atual is not None:
+                return atual
+        return self.cfg.modelo_para_tentativa(d.tentativa_proxima)
+
+    def _ctx(self) -> str:
+        p = self.dir_sprint / "spec.md"
+        return p.read_text(encoding="utf-8")[:2500] if p.exists() else "(sem spec.md)"
+
+    def _row(self, task_id: str):
+        """Row da task, garantidamente existente (falha alto se não existir)."""
+        r = self.store.task(self.sprint, task_id)
+        if r is None:
+            raise KeyError(f"task {task_id} nao existe no sprint {self.sprint}")
+        return r
+
+    def _prompt_continuacao(self, task_id: str, spec: dict, criterios: list[str],
+                            wt, base: str, prompt_base: str) -> str:
+        """Monta o prompt de CONTINUAÇÃO para retomada após espera de cota (§12).
+
+        Inspeciona o worktree de verdade: quais testes passam, quais falham, o que
+        já está commitado. O agente recebe o estado atual e a ordem explícita de
+        continuar — nunca o prompt original, que o faria recomeçar do zero.
+        """
+        anterior = self.store.ultima_tentativa(self.sprint, task_id)
+        try:
+            rt = testrunner.rodar(wt.caminho, comando=spec.get("teste"))
+            passando, falhando = testrunner.resumo_testes(rt.saida)
+        except Exception as e:  # noqa: BLE001
+            passando, falhando = [], [f"(nao foi possivel rodar os testes: {e})"]
+        alterados = []
+        try:
+            alterados = arquivos_alterados(wt.caminho, base)
+        except Exception:  # noqa: BLE001
+            pass
+        ck = self.store.ler_checkpoint(self.sprint) or {}
+        det = ck.get("checkpoint") or {}
+        findings = []
+        if anterior and anterior["review_result"]:
+            try:
+                import json as _json
+                findings = (_json.loads(anterior["review_result"]) or {}).get(
+                    "findings", []) or []
+            except Exception:  # noqa: BLE001
+                findings = []
+        tentativas = [{"attempt": t["attempt"], "failure_class": t["failure_class"],
+                       "agent": t["agent"], "model": t["model"]}
+                      for t in self.store.tentativas(self.sprint, task_id)]
+        proxima = ("Retomar de onde parou: os arquivos ja modificados estao no "
+                   "worktree. Corrija o que falta para os testes passarem e "
+                   "NAO reescreva o que ja funciona.")
+        prompt = retry.montar_prompt_continuacao(
+            prompt_base, task_id=task_id, criterios=criterios,
+            estado_impl=f"{len(alterados)} arquivo(s) ja modificado(s) por tentativa "
+                        f"anterior; ultimo commit {det.get('commit', '(nao registrado)')}",
+            arquivos=alterados,
+            ultimo_commit=det.get("commit") or commit_atual(wt.caminho),
+            testes_passando=passando, testes_falhando=falhando,
+            tentativas=tentativas, findings=findings, proxima_acao=proxima)
+        return prompt
+
+    def _onda(self, task_id: str) -> int:
+        for i, onda in enumerate(ordem_topologica(self.dag)):
+            if task_id in onda:
+                return i
+        return 0
+
+    # ------------------------------------------------------------ carregar sprint
+    def _ler_plano(self) -> None:
+        """Lê e valida os arquivos do plano sem materializá-los no estado."""
+        self.sprint_yaml = carrega_sprint(self.dir_sprint / "sprint.yaml")
+        self.dag = carrega_dag(self.dir_sprint / "dag.json")
+
+    def carregar(self) -> None:
+        self._ler_plano()
+        novas = self.store.criar_tasks_do_dag(self.sprint, self.dag)
+        self.log(f"sprint {self.sprint}: {len(self.dag['tasks'])} tasks "
+                 f"({novas} novas) — ondas {ordem_topologica(self.dag)}")
+
+    def _validar_aprovacao(self) -> str | None:
+        """Impede executar plano ainda não aprovado ou cujo DAG mudou."""
+        estado = self.store.estado_sprint(self.sprint)
+        aprovacao = self.sprint_yaml.get("aprovacao")
+        comando = f"autodev aprovar {self.sprint} --por <nome>"
+        if not isinstance(aprovacao, dict):
+            if estado in (None, "PLANEJADO"):
+                return f"sprint PLANEJADO sem aprovacao registrada; use {comando}"
+            # Sprints iniciados antes da existência do portão continuam retomáveis.
+            return None
+        if estado in SPRINT_TERMINAIS:
+            return None
+        atual = hashlib.sha256((self.dir_sprint / "dag.json").read_bytes()).hexdigest()
+        registrado = aprovacao.get("hash_dag")
+        if registrado != atual:
+            return (f"aprovacao invalida: divergencia no hash do dag.json "
+                    f"(aprovado {registrado}, atual {atual}); use {comando}")
+        return None
+
+    def checar_aprovacao(self) -> str | None:
+        """Checa o portão sem criar tasks ou alterar o estado persistido."""
+        try:
+            self._ler_plano()
+        except ValueError as exc:
+            raise PlanoInvalido(str(exc)) from exc
+        return self._validar_aprovacao()
+
+    def _registrar_aprovacao(self) -> None:
+        aprovacao = self.sprint_yaml["aprovacao"]
+        hash_dag = aprovacao["hash_dag"]
+        eventos = self.store.conn.execute(
+            "SELECT payload FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
+            (self.sprint,),
+        ).fetchall()
+        for evento in eventos:
+            try:
+                if json.loads(evento["payload"]).get("hash_dag") == hash_dag:
+                    return
+            except (TypeError, ValueError):
+                continue
+        self.store.evento(self.sprint, None, "aprovacao_plano", dict(aprovacao))
+
+    # ------------------------------------------------------------ recuperação
+    def recuperar(self) -> dict:
+        """Recuperação de crash (spec §21): retoma o que ficou pela metade."""
+        rel: dict = {"stale": [], "requeued": [], "resource": []}
+        stale = self.store.stale_workers(
+            self.cfg.policies["heartbeat"]["stale_apos_segundos"])
+        for t in stale:
+            rel["stale"].append(f"{t['task_id']}#{t['attempt']}")
+            self.store.finalizar_tentativa(
+                t["sprint_id"], t["task_id"], t["attempt"], status="STALE",
+                failure_class="AGENT_CRASH",
+                test_result={"nota": "worker sem heartbeat — recuperado no restart"})
+            row = self.store.task(t["sprint_id"], t["task_id"])
+            if row and row["estado"] == "RUNNING":
+                self.store.forcar_estado(t["sprint_id"], t["task_id"], "RETRY",
+                                         "recuperado de worker stale")
+                rel["requeued"].append(t["task_id"])
+            if t["worktree"]:
+                self.store.liberar_worktree(t["worktree"])
+        # esperas de cota vencidas
+        for w in self.store.esperas_vencidas():
+            rel["resource"].append(w["task_id"])
+        if any(rel.values()):
+            self.log(f"recuperacao: {rel}")
+        return rel
+
+    # --------------------------------------------------------------- base
+    def _base_do_worktree(self) -> str:
+        """Commit base do worktree de uma task.
+
+        O DAG era respeitado para ORDEM e nunca para CONTEUDO. `WorktreeManager`
+        criava todo worktree a partir da `main`, entao uma task que declarava
+        `deps` esperava pela dependencia e mesmo assim comecava SEM o codigo dela:
+        reimplementava o que ja existia e escrevia a sua propria versao dos mesmos
+        arquivos — e no merge as versoes colidiam. Numa noite real isso deu 1 task
+        integrada de 10, com as outras 9 em CONFLITO em cinco rodadas seguidas.
+
+        A integracao acontece a cada onda, entao o tip do branch de integracao ja
+        contem o trabalho integrado das dependencias. Base e o que o DAG prometia.
+        """
+        branch = f"sprint/{self.sprint}/integration"
+        if branch_existe(self.raiz, branch):
+            return git("rev-parse", branch, cwd=self.raiz).strip()
+        return commit_atual(self.raiz)
+
+    # ------------------------------------------------------------ uma task
+    def _quarentena_cota(self, agente: str, task_id: str = "") -> None:
+        """Tira um agente secundário da rodada quando a cota dele estoura.
+
+        Marca a indisponibilidade em `self.disponiveis`, que é o que a escada de
+        revisão e a troca de agente consultam. Sem isto, cada task tentaria o agy
+"""DEVFACTORY — interface de linha de comando.
+
+Uso:
+  python3 -m autodev detect                 # T01
+  python3 -m autodev plan "pedido"          # cria um sprint planejado
+  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
+  python3 -m autodev init                   # valida DAG e cria as tasks
+  python3 -m autodev status                 # estado atual do Sprint
+  python3 -m autodev run [--parar-em T07]   # executa o Sprint
+  python3 -m autodev resume                 # recupera de crash e continua
+  python3 -m autodev report                 # gera o relatorio
+  python3 -m autodev stop <NIVEL> [alvo]    # kill switch
+  python3 -m autodev start                  # limpa os kill switches
+  python3 -m autodev haq                    # mostra a fila humana
+  python3 -m autodev quota                  # esperas de cota registradas
+  python3 -m autodev evidenciar T03 -e "..."  # conclui task por evidencia
+  python3 -m autodev encerrar               # fecha o sprint (estado terminal)
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+import time
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parent.parent
+SPRINT_PADRAO = "DEVFACTORY-001"
+
+
+def _store(raiz: Path):
+    from .state import StateStore
+    return StateStore(raiz / ".autodev" / "state.db")
+
+
+def _dt(ts) -> str:
+    return time.strftime("%d/%m %H:%M", time.localtime(ts)) if ts else "-"
+
+
+def cmd_detect(args) -> int:
+    from .agents import detectar
+    from . import sandbox
+    print("=== agentes detectados ===")
+    for n, i in detectar().items():
+        marca = "OK " if i.disponivel else "AUSENTE"
+        print(f"  [{marca}] {n:8s} {i.versao or i.erro}  wrapper={i.wrapper or '-'}")
+    print(f"\n=== sandbox ===")
+    print(f"  bwrap: {'disponivel' if sandbox.disponivel() else 'AUSENTE'}")
+    return 0
+
+
+def cmd_init(args) -> int:
+    from .config import Config, carrega_dag, ordem_topologica, valida_dag
+    d = RAIZ / ".autodev" / "sprints" / args.sprint
+    dag = json.loads((d / "dag.json").read_text())
+    erros = valida_dag(dag)
+    if erros:
+        print("DAG INVALIDO:")
+        for e in erros:
+            print("  -", e)
+        return 1
+    ondas = ordem_topologica(dag)
+    print(f"DAG valido: {len(dag['tasks'])} tasks em {len(ondas)} ondas")
+    for i, o in enumerate(ondas):
+        print(f"  onda {i}: {', '.join(o)}")
+    with _store(RAIZ) as st:
+        novas = st.criar_tasks_do_dag(args.sprint, dag)
+        print(f"tasks criadas: {novas} (de {len(dag['tasks'])})")
+    return 0
+
+
+def cmd_status(args) -> int:
+    from .config import carrega_dag, ordem_topologica
+    with _store(RAIZ) as st:
+        m = st.metricas(args.sprint)
+        tasks = st.tasks(args.sprint)
+        print(f"=== {args.sprint} ===")
+        print(f"  tasks {m['tasks_total']}  done {m['done']}  blocked {m['blocked']}  "
+              f"failed {m['failed']}  aguardando recurso {m['waiting_resource']}")
+        print(f"  tentativas {m['tentativas_implementacao']}  esperas de cota "
+              f"{m['esperas_cota']}  HAQ {m['haq']} (abertos {m['haq_abertos']})")
+        ks = st.killswitch_ativo(args.sprint)
+        if ks:
+            print(f"  ⚠ KILL SWITCH ATIVO: {ks}")
+        print()
+        if args.verbose:
+            for t in tasks:
+                print(f"  {t['task_id']:5s} {t['estado']:17s} tent={t['tentativas']} "
+                      f"cota={t['esperas_cota']} tier={t['tier_atual']} "
+                      f"{t['agente'] or '-'}")
+        st_ = st.ler_checkpoint(args.sprint)
+        if st_:
+            print(f"\n  ultimo checkpoint: {st_['estado']} "
+                  f"em {_dt(st_['atualizado_em'])}")
+    return 0
+
+
+def _rodar_com_rodadas(o, args):
+    """Roda o sprint em passadas: uma passada percorre as ondas UMA vez.
+
+    Sem isto, a rodada acaba na primeira falha de integração (as dependentes ficam
+    BLOCKED) e o autor precisa rodar de novo na mão a cada susto — foi assim que a
+    primeira noite parou com 9 tasks bloqueadas. Cada passada extra rearma apenas
+    as tasks bloqueadas por dependência JÁ integrada; se nada for rearmável, para
+    na hora (nenhum custo por passada vazia). Não é laço infinito: o teto é o
+    número de passadas pedido, e cada passada continua respeitando o limite de 5
+    tentativas por task.
+    """
+    rodadas = max(1, getattr(args, "rodadas", 1) or 1)
+    r = None
+    for k in range(rodadas):
+        # Um `run` terminado grava 'FIM' no sprint_state: é o fim de UMA rodada, não
+        # do sprint — mas qualquer transição a partir de FIM é recusada pela máquina
+        # de estados. Enquanto isso era comando manual, a passada seguinte nascia
+        # morta; aqui ela simplesmente reabre (ENCERRADO/ABORTADO, que são decisão do
+        # autor, não são tocados).
+        store = getattr(o, "store", None)
+        if store is not None and store.estado_sprint(o.sprint) == "FIM":
+            store.reabrir_sprint(o.sprint, motivo=f"passada {k + 1} do run")
+        if k:
+            rearmadas = o.rearmar_dependentes()
+            if not rearmadas:
+                break
+            print(f"rodada {k + 1}: {len(rearmadas)} task(s) rearmada(s) por "
+                  f"dependencia integrada: {', '.join(rearmadas)}")
+        r = o.rodar(parar_em=getattr(args, "parar_em", None))
+        if r.parado_por:
+            break
+    return r
+
+
+def cmd_run(args) -> int:
+    from .orchestrator import Orquestrador, PlanoInvalido
+    import os
+    os.environ.setdefault("AUTODEV_AGENT_TIMEOUT", "900")
+    o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste,
+                     deadline_s=args.deadline)
+    try:
+        r = _rodar_com_rodadas(o, args)
+    except PlanoInvalido as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    assert r is not None  # rodadas >= 1 sempre executa ao menos uma passada
+    print(f"\n=== resumo ===\n  concluidas: {r.concluidas}/{len(r.tasks)}"
+          f"\n  parado por: {r.parado_por or '-'}"
+          f"\n  duracao: {r.duracao_s / 60:.1f} min")
+    return 0 if not r.parado_por else 2
+
+
+def cmd_aprovar(args) -> int:
+    if (not args.sprint_id or args.sprint_id in (".", "..")
+            or "/" in args.sprint_id or "\\" in args.sprint_id):
+        print(f"sprint inválido: {args.sprint_id}")
+        return 1
+    if args.sprint is not None and args.sprint != args.sprint_id:
+        print(f"--sprint {args.sprint} diverge de sprint_id {args.sprint_id}")
+        return 2
+    if not args.por.strip():
+        print("--por precisa conter um nome nao vazio")
+        return 2
+    d = RAIZ / ".autodev" / "sprints" / args.sprint_id
+    yaml_path = d / "sprint.yaml"
+    dag_path = d / "dag.json"
+    if not yaml_path.exists() or not dag_path.exists():
+        print(f"sprint inexistente ou incompleto: {args.sprint_id}")
+        return 1
+    from .config import carrega_dag, carrega_sprint
+    try:
+        sprint = carrega_sprint(yaml_path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    if sprint["sprint_id"] != args.sprint_id:
+        print(f"sprint_id declarado {sprint['sprint_id']} diverge de {args.sprint_id}")
+        return 2
+    try:
+        carrega_dag(dag_path)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"DAG invalido: {exc}")
+        return 2
+    try:
+        texto = yaml_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    aprovacao = {
+        "por": args.por.strip(),
+        "quando": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "hash_dag": hashlib.sha256(dag_path.read_bytes()).hexdigest(),
+    }
+    bloco = "aprovacao:\n" + "".join(
+        f"  {chave}: {json.dumps(valor, ensure_ascii=False)}\n"
+        for chave, valor in aprovacao.items())
+    texto = re.sub(
+        r"(?m)^aprovacao:[^\n]*(?:\n^[ \t]+[^\n]*)*",
+        "",
+        texto,
+    )
+    yaml_path.write_text(texto.rstrip() + "\n" + bloco, encoding="utf-8")
+    print(f"sprint {args.sprint_id} aprovado por {args.por}")
+    return 0
+
+
+def cmd_resume(args) -> int:
+    from .orchestrator import Orquestrador, PlanoInvalido
+    o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste)
+    try:
+        bloqueio = o.checar_aprovacao()
+    except PlanoInvalido as exc:
+        print(f"sprint invalido: {exc}")
+        return 2
+    if bloqueio:
+        print(f"concluidas: 0/0 | parado por: {bloqueio}")
+        return 2
+    rec = o.recuperar()
+    print(f"recuperacao: {json.dumps(rec, ensure_ascii=False)}")
+    r = o.rodar()
+    print(f"concluidas: {r.concluidas}/{len(r.tasks)} | parado por: {r.parado_por or '-'}")
+
+exec
+/usr/bin/bash -lc "command -v ask-agy; cat /home/saurus/.local/share/agent-bridge/PROTOCOL.md; rg -n 'def eventos|def rodar|SPRINT_TERMINAIS|def transicionar_sprint' autodev/{state,orchestrator}.py; cat .autodev/tests/conftest.py; cat /home/saurus/.codex/skills/test-driven-development/writing-good-tests.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 72ms:
+autodev/state.py:21:from .config import (ESTADOS, ORDEM_SPRINT, SPRINT_TERMINAIS, TERMINAIS_TASK,
+autodev/state.py:533:    def eventos(self, sprint_id: str, limite: int = 500) -> list[sqlite3.Row]:
+autodev/state.py:810:    def transicionar_sprint(self, sprint_id: str, novo: str, motivo: str = "",
+autodev/state.py:842:        if atual in SPRINT_TERMINAIS and not forcar:
+autodev/orchestrator.py:25:from .config import (SPRINT_TERMINAIS, Config, carrega_dag, carrega_sprint,
+autodev/orchestrator.py:238:        if estado in SPRINT_TERMINAIS:
+autodev/orchestrator.py:701:    def rodar(self, *, parar_em: str | None = None) -> ResultadoSprint:
+"""Fixtures compartilhadas dos testes do DEVFACTORY."""
+from __future__ import annotations
+
+import json
+import hashlib
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+RAIZ = Path(__file__).resolve().parent.parent.parent   # raiz do repositório
+AUTODEV = RAIZ / ".autodev"
+sys.path.insert(0, str(RAIZ))
+
+from autodev.config import Config  # noqa: E402
+from autodev.state import StateStore  # noqa: E402
+
+
+@pytest.fixture
+def cfg() -> Config:
+    return Config.carregar()
+
+
+@pytest.fixture
+def store(tmp_path):
+    s = StateStore(tmp_path / "state.db")
+    yield s
+    s.close()
+
+
+def _git(cwd: Path, *args: str) -> str:
+    p = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)}: {p.stderr}")
+    return p.stdout.strip()
+
+
+@pytest.fixture
+def repo(tmp_path) -> Path:
+    """Repositório git limpo com um arquivo inicial."""
+    r = tmp_path / "repo"
+    r.mkdir()
+    _git(r, "init", "-q")
+    _git(r, "config", "user.email", "t@t")
+    _git(r, "config", "user.name", "t")
+    (r / "README.md").write_text("# repo de teste\n")
+    _git(r, "add", "-A")
+    _git(r, "commit", "-q", "-m", "inicial")
+    return r
+
+
+@pytest.fixture
+def projeto_pytest(tmp_path) -> Path:
+    """Projeto com pytest, um teste passando e um módulo correto."""
+    r = tmp_path / "proj"
+    (r / "src").mkdir(parents=True)
+    (r / "tests").mkdir(parents=True)
+    (r / "src" / "calc.py").write_text("def soma(a, b):\n    return a + b\n")
+    (r / "tests" / "test_calc.py").write_text(
+        "import sys\nfrom pathlib import Path\n"
+        "sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))\n"
+        "from calc import soma\n\n\n"
+        "def test_soma():\n    assert soma(2, 3) == 5\n")
+    (r / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\ntestpaths = ['tests']\naddopts = '-q'\n")
+    _git(r, "init", "-q")
+    _git(r, "config", "user.email", "t@t")
+    _git(r, "config", "user.name", "t")
+    _git(r, "add", "-A")
+    _git(r, "commit", "-q", "-m", "inicial")
+    return r
+
+
+def scaffold_sprint(raiz: Path, sprint: str, tarefas: list[dict],
+                    objetivo: str = "sprint de teste") -> Path:
+    """Cria os arquivos mínimos de um sprint dentro de `raiz`."""
+    d = raiz / ".autodev" / "sprints" / sprint
+    (d / "evidence").mkdir(parents=True, exist_ok=True)
+    (d / "logs").mkdir(parents=True, exist_ok=True)
+    (d / "dag.json").write_text(
+        json.dumps({"sprint_id": sprint, "tasks": tarefas}, ensure_ascii=False),
+        encoding="utf-8")
+    hash_dag = hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
+    (d / "sprint.yaml").write_text(
+        f"sprint_id: {sprint}\ntitulo: teste\nobjetivo: {objetivo}\n"
+        f"aprovacao:\n  por: teste\n  quando: fixture\n  hash_dag: {hash_dag}\n",
+        encoding="utf-8")
+    (d / "spec.md").write_text(f"# {sprint}\n\n{objetivo}\n", encoding="utf-8")
+    return d
+
+
+@pytest.fixture
+def fake_agent(monkeypatch):
+    """Ativa o driver determinístico de agente."""
+    monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
+    yield
+    monkeypatch.delenv("AUTODEV_FAKE_AGENT", raising=False)
+
+
+def escreve_fake_spec(p: Path, spec: dict) -> Path:
+    p.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+    Path(str(p).replace(".json", ".count")).unlink(missing_ok=True)
+    return p
+
+
+def criar_fixture(destino: Path) -> Path:
+    """Recria o projeto-fixture de aceitação (T14) no destino dado."""
+    import importlib.util
+    p = AUTODEV / "fixtures" / "criar_fixture.py"
+    spec = importlib.util.spec_from_file_location("criar_fixture_t", p)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m.criar(Path(destino))
+
+
+TASK_FIXTURE = {
+    "id": "T01",
+    "titulo": "corrigir mediana e desvio padrao do modulo stats",
+    "criterios": [
+        "mediana() devolve a mediana real (nao a media)",
+        "mediana() nao muta a lista de entrada",
+        "desvio_padrao() usa o denominador amostral N-1",
+        "amplitude() continua funcionando",
+        "todos os testes de tests/test_stats.py passam",
+    ],
+    "deps": [],
+    "agente": "codex",
+    "estimativa": "S",
+}
+# Writing Good Tests
+
+**Load this reference when:** writing or changing tests, adding mocks, or
+adding cleanup/helper methods for tests.
+
+## Overview
+
+A test exists to catch a specific break. Two principles govern everything
+here:
+
+```
+1. Every test names the break it catches
+2. Every test exercises the real thing
+```
+
+Strict TDD produces both naturally: a test written first and watched
+failing against real code has already proven it can fail, and only earns
+a mock when the real dependency proves slow or external.
+
+## Principle 1: Name the Break
+
+Before writing the test body, answer: **what production change should
+make this test fail — and is that change a bug or a decision?** A test
+earns its place by catching a wrong branch, missing side effect, wrong
+argument, boundary case, or broken contract.
+
+**Derive expectations independently.** Use literals and hand-checked
+fixtures; table-driven tests with literal `want` values are the preferred
+shape. An expectation computed by the code under test — or its helpers —
+passes no matter what that code does:
+
+```typescript
+// ❌ Mirror assertion: the same builder computes both sides — always true
+const expected = buildSearchQuery({ tag: 'urgent' });
+expect(buildSearchQuery({ tag: 'urgent' })).toBe(expected);
+
+// ✅ Hand-derived literal
+expect(buildSearchQuery({ tag: 'urgent' })).toBe('tag:"urgent"');
+```
+
+**No change detectors.** If only intentional decisions can fail a test —
+a constant's value, exact message wording, private structure — it fires
+on redesign and sleeps through bugs. Test the behavior that depends on
+the decision: not `expect(MAX_RETRIES).toBe(5)` but "a failing call is
+retried 5 times and the 6th attempt never happens."
+
+**Behavior, not text.** Asserting that a script, skill, or config
+contains an exact line proves only that the source is the source. Run
+scripts against controlled inputs and assert outputs, side effects, or
+exit codes. Documents that instruct agents are tested by the consuming
+agent's behavior (superpowers:writing-skills); prose for humans earns no
+test at all.
+
+**Your code, not the framework.** Test the contract your code makes at
+its boundaries — the route you register, the query you emit, the payload
+you produce. Upstream mechanics are their maintainers' tests to write
+(the classic: asserting your router invokes a registered handler — that
+is the framework's test, not yours). When upstream behavior genuinely
+surprised you, write one narrow characterization test naming the
+assumption. The same boundary applies inside your code: constructors,
+getters, constants, and trivial forwarding earn tests only when they
+validate, normalize, default, derive, enforce, or cause side effects —
+otherwise assert the first consumer-visible result that depends on them.
+
+### Gate Function
+
+```
+BEFORE writing the test body:
+  Name the production change that would make this test fail.
+
+  Cannot name one            → redesign around an observable behavior
+  "The source text changed"  → run the artifact and assert its effects
+  Only intentional decisions → change detector; test the behavior
+                               that depends on the decision
+
+  Confirm the expected value is derived without the code under test.
+  IF it reuses the code's logic or helpers:
+    Replace it with a literal or hand-checked fixture
+```
+
+## Principle 2: Exercise the Real Thing
+
+**The mock earns no assertions.** A mock assertion passes when the mock
+is present and fails when it is absent — it says nothing about the
+component. Assert the real component's behavior; if the mock is what you
+are checking, unmock it or delete the assertion.
+
+```typescript
+// ✅ Real behavior
+expect(screen.getByRole('navigation')).toBeInTheDocument();
+
+// ❌ Mock existence
+expect(screen.getByTestId('sidebar-mock')).toBeInTheDocument();
+```
+
+**your human partner's correction:** "Are we testing the behavior of a
+mock?"
+
+**Mock at the right level.** Learn every side effect of the real method
+before replacing it; mock the slow or external operation and keep what
+the test depends on real. When unsure, run the test against the real
+implementation first and observe what actually needs to happen.
+
+```typescript
+// ❌ The mock swallows the config write that duplicate detection reads
+vi.mock('ToolCatalog', () => ({
+  discoverAndCacheTools: vi.fn().mockResolvedValue(undefined)
+}));
+
+// ✅ Mock only the slow server startup; the config write stays real
+vi.mock('MCPServerManager');
+```
+
+**Make doubles specific.** When arguments, call counts, or ordering are
+part of the contract, assert them — a fake that accepts anything verifies
+nothing. Give each branch (success, error, malformed) its own fixture or
+spy, so the wrong branch cannot satisfy the expectation.
+
+**Mirror real data completely.** Mock the complete structure as it exists
+in reality — all documented fields — not just the ones your test reads.
+Partial mocks fail silently when downstream code reads an omitted field:
+the test passes while integration breaks.
+
+**Production classes carry production methods only.** Cleanup that only
+tests need lives in test utilities, never as a `destroy()` on the
+production class. Ask: is this method called only from tests? Does this
+class own this resource's lifecycle? Wrong answers → test utility.
+
+**Prefer real components over complex mocks.** When mock setup outgrows
+the test logic, mocks miss methods the real components have, or tests
+break when the mock changes, switch to an integration test with real
+components. **your human partner's question:** "Do we need to be using a
+mock here?"
+
+### Gate Function
+
+```
+BEFORE adding a mock or test helper:
+  List the real method's side effects; keep the ones the test
+  depends on real — mock the slow/external level below them.
+
+  Mock responses mirror the complete real structure.
+
+  A method only tests call lives in test utilities, not production.
+
+  About to assert on the mock itself?
+    Unmock it or delete the assertion.
+```
+
+## Tests Ship With the Implementation
+
+The TDD cycle — failing test, minimal implementation, refactor — is what
+"complete" means. Ship the tests the behavior needs and only those:
+trivial code and human prose earn none, and a test written to satisfy
+process costs maintenance forever.
+
+## The Mutation Check
+
+Before finishing, mentally mutate the production code; at least one test
+should fail for each realistic mutation:
+
+- Wrong constant or argument
+- Wrong branch handler
+- Missing state change or side effect
+- Empty or default return
+- Missing validation for zero, empty, nil, unauthorized, or malformed input
+
+A mutation nothing catches marks the behavior as unprotected — or the
+test as tautological.
+
+## Quick Reference
+
+| When you... | Do |
+|-------------|-----|
+| Write any test | Name the break it catches — a bug, not a decision |
+| Build an expected value | Derive it by hand; never with the code under test |
+| Test a script or document | Run it / pressure-test its consumer; never grep its text |
+| Reach for a dependency test | Test your boundary contract, not their documented mechanics |
+| Want to assert on a mocked element | Test the real component, or unmock it |
+| Are about to mock a method | Learn its side effects; mock the slow/external level |
+| Build a mock response | Mirror the real structure completely |
+| Need cleanup only tests use | Put it in test utilities |
+| Watch mock setup balloon | Switch to an integration test with real components |
+| Finish a test file | Run the mutation check |
+
+## Warning Signs
+
+- Setup and assertion share the same object, guaranteeing equality
+- The test can fail only through a panic, crash, or missing selector
+- The test fails on every intentional change, never on accidental breakage
+- Expected values are hidden behind loops, builders, or helpers
+- The test greps source text, or asserts a removed symbol stays removed
+- The test would still matter if only the framework remained
+- The test exists for coverage, checking no side effect or outcome
+- An assertion checks a `*-mock` test ID, or fails if you remove the mock
+- A method is called only from test files
+- Mock setup is more than half the test, or you can't explain why the mock is needed
+- Mocking "just to be safe"
+
+exec
+/usr/bin/bash -lc "cat /home/saurus/.local/bin/ask-agy; sed -n '701,752p' autodev/orchestrator.py; sed -n '810,855p' autodev/state.py; sed -n '523,541p' autodev/state.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 0ms:
+#!/usr/bin/env bash
+# ask-agy — consulta o Antigravity (agy) em modo headless, para ser chamado por
+# outro agente (Codex/Hermes) ou por scripts.
+#
+# Uso:
+#   ask-agy [-m "Modelo"] [-e low|medium|high] [-t plan|accept-edits] [-d DIR]
+#           [--timeout 10m] [-D] [-f arquivo] <prompt|-> 
+#
+#   -e   effort de raciocínio         (default: o que estiver salvo no agy)
+#   -t   modo: plan (não edita) ou accept-edits (edita)
+#   -D   --dangerously-skip-permissions (só use em git worktree/sandbox)
+#   -d   diretório extra no workspace (repetível)
+#   -f   lê o prompt de um arquivo; "-" lê do stdin
+#
+# Saída: a resposta final no stdout; erros no stderr.
+set -uo pipefail
+
+MODEL=""; EFFORT=""; MODE=""; DIRS=(); TIMEOUT=""; DANGEROUS=0; PROMPT=""; FILE=""
+
+uso() {
+  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  exit "${1:-2}"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -m|--model)   MODEL="$2"; shift 2 ;;
+    -e|--effort)  EFFORT="$2"; shift 2 ;;
+    -t|--mode)    MODE="$2"; shift 2 ;;
+    -d|--dir)     DIRS+=("$2"); shift 2 ;;
+    --timeout)    TIMEOUT="$2"; shift 2 ;;
+    -D|--dangerous) DANGEROUS=1; shift ;;
+    -f|--file)    FILE="$2"; shift 2 ;;
+    -h|--help)    uso 0 ;;
+    -*)           echo "ask-agy: opção desconhecida: $1" >&2; uso 2 ;;
+    *)            PROMPT="$1"; shift ;;
+  esac
+done
+
+if [ -n "$FILE" ]; then
+  PROMPT="$(cat "$FILE")"
+elif [ "$PROMPT" = "-" ]; then
+  PROMPT="$(cat)"
+fi
+
+if [ -z "$PROMPT" ]; then
+  echo "ask-agy: prompt vazio" >&2
+  uso 2
+fi
+
+command -v agy >/dev/null || { echo "ask-agy: agy não encontrado no PATH" >&2; exit 127; }
+
+# Trava anti ping-pong: um agente chamando outro que chama outro...
+DEPTH="${AGENT_BRIDGE_DEPTH:-0}"
+if [ "$DEPTH" -ge 2 ]; then
+  echo "ask-agy: profundidade de ponte $DEPTH atingida (máx 2) — recusando a chamada" >&2
+  exit 3
+fi
+
+# O agy exige o prompt COLADO na flag --print ("--print=<prompt>"); a flag vai por
+# último e o prompt nunca como argumento solto (ele é consumido por outra flag).
+args=()
+[ -n "$MODEL" ]   && args+=(--model "$MODEL")
+[ -n "$EFFORT" ]  && args+=(--effort "$EFFORT")
+[ -n "$MODE" ]    && args+=(--mode "$MODE")
+[ -n "$TIMEOUT" ] && args+=(--print-timeout "$TIMEOUT")
+[ "$DANGEROUS" = 1 ] && args+=(--dangerously-skip-permissions)
+for d in "${DIRS[@]:-}"; do [ -n "$d" ] && args+=(--add-dir "$d"); done
+args+=("--print=$PROMPT")
+
+AGENT_BRIDGE_DEPTH=$((DEPTH + 1)) exec agy "${args[@]}"
+    def rodar(self, *, parar_em: str | None = None) -> ResultadoSprint:
+        t0 = time.time()
+        res = ResultadoSprint(sprint=self.sprint)
+        bloqueio_aprovacao = self.checar_aprovacao()
+        if bloqueio_aprovacao:
+            self.log(f"RODADA NAO INICIADA: {bloqueio_aprovacao}")
+            res.parado_por = bloqueio_aprovacao
+            res.duracao_s = time.time() - t0
+            return res
+        self.carregar()
+        self.recuperar()
+
+        # ---- rodada única por sprint -------------------------------------------
+        # Quem impede rodada dupla é o MOTOR. A versão anterior deixava isso para
+        # fora (guarda por pgrep/heartbeat) e pagou caro: em 28/09 um vigia de cron
+        # disparou outra rodada enquanto a primeira revisava uma task por 5 min;
+        # ela integrou a P01 no meio da revisão da P04, o portão de segurança deu
+        # falso positivo e a P04 foi bloqueada por limite — o run morreu com
+        # TransicaoInvalida: BLOCKED -> DONE.
+        ok_lock, motivo_lock = self.store.adquirir_run_lock(self.sprint)
+        if not ok_lock:
+            self.log(f"RODADA NAO INICIADA: {motivo_lock}")
+            res.parado_por = motivo_lock
+            res.duracao_s = 0.0
+            return res
+        if isinstance(self.sprint_yaml.get("aprovacao"), dict):
+            self._registrar_aprovacao()
+        self.log(f"rodada dona: pid {os.getpid()} — rodada única garantida pelo motor")
+        parar_batimento = threading.Event()
+        fio = threading.Thread(target=self._batimento, args=(parar_batimento,),
+                               daemon=True)
+        fio.start()
+
+        try:
+            for onda_i, onda in enumerate(ordem_topologica(self.dag)):
+                for task_id in onda:
+                    if parar_em and task_id == parar_em:
+                        self.log(f"parada solicitada antes de {task_id}")
+                        res.parado_por = f"antes de {task_id}"
+                        res.duracao_s = time.time() - t0
+                        return res
+                    self._checa_parada("selecionar_task", task_id)
+                    row = self._row(task_id)
+                    if row["estado"] in ("DONE", "INTEGRATED", "BLOCKED"):
+                        continue
+                    deps = [t for t in self.dag["tasks"] if t["id"] == task_id][0].get("deps", [])
+                    faltando = [d for d in deps
+                                if self._row(d)["estado"]
+                                not in ("DONE", "INTEGRATED")]
+                    if faltando:
+                        self.store.bloqueia(self.sprint, task_id,
+                                            f"depende de {faltando}")
+    def transicionar_sprint(self, sprint_id: str, novo: str, motivo: str = "",
+                            dados: dict | None = None) -> None:
+        atual = self.estado_sprint(sprint_id) or "PLANEJADO"
+        if novo not in TRANSICOES_SPRINT.get(atual, set()):
+            raise TransicaoInvalida(
+                f"sprint {sprint_id}: {atual} -> {novo} não permitido")
+        anterior = self.ler_checkpoint(sprint_id) or {}
+        self.checkpoint(sprint_id, novo, {**(anterior.get("checkpoint") or {}),
+                                          **(dados or {}), "motivo": motivo})
+        self.evento(sprint_id, None, "sprint_transicao",
+                    {"de": atual, "para": novo, "motivo": motivo})
+
+    def pendentes(self, sprint_id: str) -> list[str]:
+        """Tasks fora de estado terminal, como 'T03(REVIEW)'."""
+        rows = self.conn.execute(
+            "SELECT task_id, estado FROM tasks WHERE sprint_id=?"
+            " AND estado NOT IN ('DONE','INTEGRATED') ORDER BY task_id",
+            (sprint_id,)).fetchall()
+        return [f"{r['task_id']}({r['estado']})" for r in rows]
+
+    def encerrar_sprint(self, sprint_id: str, *, resultado: str = "CONCLUIDO",
+                        resumo: str = "", forcar: bool = False) -> None:
+        """Fecha o sprint em ENCERRADO.
+
+        Recusa se houver task fora de estado terminal — encerrar com trabalho em
+        aberto é exatamente o que o HAQ existe para evitar.
+
+        Avança pelas transições VÁLIDAS em vez de gravar ENCERRADO direto: o
+        histórico do sprint precisa mostrar por onde ele passou, e a máquina de
+        estados vale também para quem está fechando.
+        """
+        atual = self.estado_sprint(sprint_id)
+        if atual in SPRINT_TERMINAIS and not forcar:
+            raise SprintNaoEncerravel(f"sprint {sprint_id} já está {atual}")
+        pend = self.pendentes(sprint_id)
+        if pend and not forcar:
+            raise SprintNaoEncerravel(
+                f"{len(pend)} task(s) fora de estado terminal: {', '.join(pend)}")
+
+        partida = atual or "PLANEJADO"
+        metadados = {"resultado": resultado, "resumo": resumo,
+                     "estado_anterior": atual,
+                     "tasks_pendentes_no_encerramento": pend,
+                     "forcado": bool(forcar)}
+        if partida in ORDEM_SPRINT:
+            caminho = ORDEM_SPRINT[ORDEM_SPRINT.index(partida) + 1:]
+            (sprint_id, task_id)).fetchone()
+
+    # ---------------------------------------------------------------- eventos
+    def evento(self, sprint_id: str | None, task_id: str | None, tipo: str,
+               payload: dict | None = None) -> None:
+        self.conn.execute(
+            "INSERT INTO events (ts, sprint_id, task_id, tipo, payload) VALUES (?,?,?,?,?)",
+            (time.time(), sprint_id, task_id, tipo,
+             json.dumps(payload or {}, ensure_ascii=False, default=str)))
+
+    def eventos(self, sprint_id: str, limite: int = 500) -> list[sqlite3.Row]:
+        return list(self.conn.execute(
+            "SELECT * FROM events WHERE sprint_id=? ORDER BY ts DESC LIMIT ?",
+            (sprint_id, limite)).fetchall())
+
+    # ---------------------------------------------------------------- HAQ
+    def haq_adicionar(self, haq_id: str, *, sprint_id: str, task_id: str | None,
+                      reason: str, risk: str, dependencia: str,
+                      acao_humana: str, resultado: str, verificacao: str,
+
+codex
+Confirmei a exceção em `ENCERRADO` e `ABORTADO`. Vou acrescentar regressões para esses estados, conferir o conteúdo do evento e o formato da data. Também vou tentar a consulta ao agy indicada pela estratégia, conforme a skill `ask-agy`.
+
+exec
+/usr/bin/bash -lc 'ask-agy -t plan -e high --timeout 1m -d "$PWD" '"'Revise somente autodev/orchestrator.py _validar_aprovacao e .autodev/tests/test_plan_aprovacao.py. Verifique a brecha de hash em ENCERRADO e ABORTADO. Nao edite arquivos nem leia credenciais. Responda com uma correcao minima e testes necessarios.'" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ exited 1 in 356ms:
+ERROR: logging before google.Init: E0929 01:40:58.708148       1 main.go:703] Failed to redirect output for CLI: creating log file: opening log file: open /home/saurus/.gemini/antigravity-cli/log/cli-20260929_014058.log: read-only file system
+I0929 01:40:58.708991      23 server.go:1584] Starting language server process with pid 2
+E0929 01:40:58.709232      23 server.go:1560] Failed to initialize crash reporter: failed to setup crash output: open /home/saurus/.gemini/antigravity-cli/crashes/crash_2_1f413b2c-804e-4163-95f4-21b7dcbd5f2f.log: read-only file system
+I0929 01:40:58.713940      23 server.go:1635] Language server version: 1.2.12
+I0929 01:40:58.713980      23 server.go:616] Language server will attempt to listen on host localhost
+E0929 01:40:58.723442      23 main.go:877] CLI failed to start - listen tcp 127.0.0.1:0: socket: operation not permitted
+(1) attached stack trace
+  -- stack trace:
+  | google3/third_party/jetski/language_server/language_server.setUpServerPortListeners
+  | 	third_party/jetski/language_server/server.go:628
+  | google3/third_party/jetski/language_server/language_server.CreateLanguageServerAndServe
+  | 	third_party/jetski/language_server/server.go:1647
+  | main.main.func4
+  | 	third_party/jetski/cmd/cli/main.go:875
+  | runtime.goexit
+  | 	third_party/go/gc/src/runtime/asm_amd64.s:1264
+Wraps: (2) listen tcp 127.0.0.1:0
+Wraps: (3) socket
+Wraps: (4) operation not permitted
+Error types: (1) *withstack.withStack (2) *net.OpError (3) *os.SyscallError (4) syscall.Errno
+Failed to start: listen tcp 127.0.0.1:0: socket: operation not permitted
+
+exec
+/usr/bin/bash -lc "python3 - <<'PY'
+from pathlib import Path
+p=Path('.autodev/tests/test_plan_aprovacao.py')
+s=p.read_text().replace('import json\\n','import json\\nimport re\\n')
+s=s.replace('    assert approval[\"por\"] == \"Ana\"','    assert approval[\"por\"] == \"Ana\"\\n    assert re.fullmatch(r\"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}\", approval[\"quando\"])',1)
+s=s.replace('    assert any(e[\"tipo\"] == \"aprovacao_plano\" for e in o.store.eventos(\"S1\"))','    eventos = [e for e in o.store.eventos(\"S1\") if e[\"tipo\"] == \"aprovacao_plano\"]\\n    assert len(eventos) == 1\\n    assert json.loads(eventos[0][\"payload\"]) == yaml.safe_load(\\n        (d / \"sprint.yaml\").read_text())[\"aprovacao\"]')
+s=s.replace('    o._registrar_aprovacao()','    assert o.rodar().parado_por is None')
+s=s.replace('@pytest.mark.parametrize(\"estado\", [\"EM_EXECUCAO\", \"FIM\"])','@pytest.mark.parametrize(\"estado\", [\"EM_EXECUCAO\", \"FIM\", \"ENCERRADO\", \"ABORTADO\"])')
+s=s.replace('    else:\\n        o.store.checkpoint(\"S1\", estado, {\"motivo\": \"fim da rodada\"})','    elif estado == \"ENCERRADO\":\\n        o.store.encerrar_sprint(\"S1\")\\n    elif estado == \"ABORTADO\":\\n        o.store.transicionar_sprint(\"S1\", estado, \"cancelado pelo autor\")\\n    else:\\n        o.store.checkpoint(\"S1\", estado, {\"motivo\": \"fim da rodada\"})')
+s=s.replace('    resultado = o.rodar()\\n\\n    assert resultado.parado_por and \"divergencia\"','    resultado = o.rodar(parar_em=\"P1\")\\n\\n    assert resultado.parado_por and \"divergencia\"')
+p.write_text(s)
+PY
+python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q --basetemp=.autodev/tmp-p05-tests" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ exited 1 in 110ms:
+<stdin>:4: SyntaxWarning: "\d" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\d"? A raw string is also an option.
+/usr/bin/python3: No module named pytest
+
+exec
+/usr/bin/bash -lc "ls -a; command -v -a python3; rg --files --hidden -g '*pytest*' -g pyvenv.cfg -g '*requirements*' -g pyproject.toml /home/saurus/Code/Coding_Machine /home/saurus/.hermes 2>/dev/null | head -40; git diff --stat" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 149ms:
+/home/saurus/.hermes/profiles/github-fisherbot/cache/scratch/scr/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep3/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-integration-int/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep3/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P03-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep3/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P02-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep3/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P01-codex/pyproject.toml
+/home/saurus/.hermes/hermes-agent/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep3/test_aceitacao_do_planejador0/projeto/pyproject.toml
+/home/saurus/.hermes/profiles/budha/lsp/node_modules/pyright/dist/typeshed-fallback/stubs/pytest-lazy-fixture/pytest_lazyfixture.pyi
+/home/saurus/.hermes/cache/scratch/rev_p09_mut/.autodev/tests/__pycache__/test_plan_rastreabilidade.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev_p09_mut/.autodev/tests/__pycache__/test_plan_escrita.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev_p09_mut/.autodev/tests/__pycache__/conftest.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/pt_rep2/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-integration-int/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep2/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P03-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep2/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P02-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep2/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P01-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep2/test_aceitacao_do_planejador0/projeto/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep1/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-integration-int/pyproject.toml
+/home/saurus/.hermes/cache/scratch/venv_report/pyvenv.cfg
+/home/saurus/.hermes/cache/scratch/pt_rep1/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P03-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep1/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P02-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep1/test_aceitacao_do_planejador0/projeto/.autodev/worktrees/DEVFACTORY-002-P01-codex/pyproject.toml
+/home/saurus/.hermes/cache/scratch/pt_rep1/test_aceitacao_do_planejador0/projeto/pyproject.toml
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_tokens.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_tela.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_rodada_unica_e_portao.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_reset_de_cota.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_readme_estrutura.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_readme_afirmacoes.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plano_comando.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_planner.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_validacao.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_rastreabilidade.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_prompt.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_parser.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_escrita.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_docs.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_colisoes.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_cli.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_agente.cpython-311-pytest-9.1.1.pyc
+/home/saurus/.hermes/cache/scratch/rev034/M2/.autodev/tests/__pycache__/test_plan_aceitacao.cpython-311-pytest-9.1.1.pyc
+ .autodev/tests/test_plan_aprovacao.py | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
+
+exec
+/usr/bin/bash -lc "ls /home/saurus/.hermes/cache/scratch/venv_report/bin/python*; /home/saurus/.hermes/cache/scratch/venv_report/bin/python3 -c 'import pytest, yaml; print(pytest.__version__)'" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ exited 1 in 91ms:
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import pytest, yaml; print(pytest.__version__)
+    ^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'pytest'
+
+exec
+/usr/bin/bash -lc "find /home/saurus/.hermes /home/saurus/Code/Coding_Machine /tmp -name pyvenv.cfg -o -path '*/pytest/__init__.py' 2>/dev/null | head -45" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 1266ms:
+/home/saurus/.hermes/hermes-agent/venv/pyvenv.cfg
+/home/saurus/.hermes/cache/scratch/venv_report/pyvenv.cfg
+/home/saurus/Code/Coding_Machine/.venv/lib/python3.11/site-packages/pytest/__init__.py
+/home/saurus/Code/Coding_Machine/.venv/pyvenv.cfg
+/tmp/autodev-p06-venv/pyvenv.cfg
+/tmp/p02-pytest-env.bJEA0t/pyvenv.cfg
+
+codex
+O agy não iniciou: o sandbox bloqueou seus arquivos de log e o socket local. Essa limitação é de ambiente; a brecha está no código. O Python padrão também não tem pytest, então usarei o ambiente virtual já existente do projeto.
+
+exec
+/usr/bin/bash -lc 'PATH=/home/saurus/Code/Coding_Machine/.venv/bin:$PATH python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q --basetemp=.autodev/tmp-p05-tests' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ exited 1 in 13430ms:
+F.................................FF                                     [100%]
+=================================== FAILURES ===================================
+____________________ test_sprint_yaml_accepts_approval_keys ____________________
+
+tmp_path = PosixPath('/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex/.autodev/tmp-p05-tests/test_sprint_yaml_accepts_appro0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7efe2b127190>
+
+    def test_sprint_yaml_accepts_approval_keys(tmp_path, monkeypatch):
+        d = _sprint(tmp_path)
+        monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+        assert main(["--sprint", "S1", "aprovar", "S1", "--por", "Ana"]) == 0
+        approval = yaml.safe_load((d / "sprint.yaml").read_text())["aprovacao"]
+        assert set(approval) == {"por", "quando", "hash_dag"}
+        assert approval["por"] == "Ana"
+>       assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}", approval["quando"])
+E       AssertionError: assert None
+E        +  where None = <function fullmatch at 0x7efe2bc1bc40>('\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}', '2026-09-29T01:41:22-0300')
+E        +    where <function fullmatch at 0x7efe2bc1bc40> = re.fullmatch
+
+.autodev/tests/test_plan_aprovacao.py:33: AssertionError
+----------------------------- Captured stdout call -----------------------------
+sprint S1 aprovado por Ana
+________ test_dag_alterado_invalida_aprovacao_em_reexecucao[ENCERRADO] _________
+
+tmp_path = PosixPath('/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex/.autodev/tmp-p05-tests/test_dag_alterado_invalida_apr3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7efe2adf1650>
+estado = 'ENCERRADO'
+
+    @pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM", "ENCERRADO", "ABORTADO"])
+    def test_dag_alterado_invalida_aprovacao_em_reexecucao(
+            tmp_path, monkeypatch, estado):
+        d = _sprint(tmp_path)
+        monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+        assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+        o = Orquestrador(tmp_path, "S1", modo_teste=True)
+        if estado == "EM_EXECUCAO":
+            o.store.transicionar_sprint("S1", estado, "rodada em curso")
+        elif estado == "ENCERRADO":
+            o.store.encerrar_sprint("S1")
+        elif estado == "ABORTADO":
+            o.store.transicionar_sprint("S1", estado, "cancelado pelo autor")
+        else:
+            o.store.checkpoint("S1", estado, {"motivo": "fim da rodada"})
+        (d / "dag.json").write_text(
+            '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
+            '"criterios":["alterar modulo.py"]}]}', encoding="utf-8")
+    
+        resultado = o.rodar(parar_em="P1")
+    
+>       assert resultado.parado_por and "divergencia" in resultado.parado_por
+E       AssertionError: assert ('antes de P1' and 'divergencia' in 'antes de P1')
+E        +  where 'antes de P1' = ResultadoSprint(sprint='S1', tasks=[], parado_por='antes de P1', duracao_s=0.01035761833190918, aguardando_recurso=False).parado_por
+E        +  and   'antes de P1' = ResultadoSprint(sprint='S1', tasks=[], parado_por='antes de P1', duracao_s=0.01035761833190918, aguardando_recurso=False).parado_por
+
+.autodev/tests/test_plan_aprovacao.py:313: AssertionError
+----------------------------- Captured stdout call -----------------------------
+sprint S1 aprovado por Ana
+[01:41:34] sprint S1: 1 tasks (1 novas) — ondas [['P1']]
+[01:41:34] rodada dona: pid 2 — rodada única garantida pelo motor
+[01:41:34] parada solicitada antes de P1
+_________ test_dag_alterado_invalida_aprovacao_em_reexecucao[ABORTADO] _________
+
+tmp_path = PosixPath('/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex/.autodev/tmp-p05-tests/test_dag_alterado_invalida_apr4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7efe2b042a50>
+estado = 'ABORTADO'
+
+    @pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM", "ENCERRADO", "ABORTADO"])
+    def test_dag_alterado_invalida_aprovacao_em_reexecucao(
+            tmp_path, monkeypatch, estado):
+        d = _sprint(tmp_path)
+        monkeypatch.setattr("autodev.cli.RAIZ", tmp_path)
+        assert main(["aprovar", "S1", "--por", "Ana"]) == 0
+        o = Orquestrador(tmp_path, "S1", modo_teste=True)
+        if estado == "EM_EXECUCAO":
+            o.store.transicionar_sprint("S1", estado, "rodada em curso")
+        elif estado == "ENCERRADO":
+            o.store.encerrar_sprint("S1")
+        elif estado == "ABORTADO":
+            o.store.transicionar_sprint("S1", estado, "cancelado pelo autor")
+        else:
+            o.store.checkpoint("S1", estado, {"motivo": "fim da rodada"})
+        (d / "dag.json").write_text(
+            '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
+            '"criterios":["alterar modulo.py"]}]}', encoding="utf-8")
+    
+        resultado = o.rodar(parar_em="P1")
+    
+>       assert resultado.parado_por and "divergencia" in resultado.parado_por
+E       AssertionError: assert ('antes de P1' and 'divergencia' in 'antes de P1')
+E        +  where 'antes de P1' = ResultadoSprint(sprint='S1', tasks=[], parado_por='antes de P1', duracao_s=0.009700775146484375, aguardando_recurso=False).parado_por
+E        +  and   'antes de P1' = ResultadoSprint(sprint='S1', tasks=[], parado_por='antes de P1', duracao_s=0.009700775146484375, aguardando_recurso=False).parado_por
+
+.autodev/tests/test_plan_aprovacao.py:313: AssertionError
+----------------------------- Captured stdout call -----------------------------
+sprint S1 aprovado por Ana
+[01:41:35] sprint S1: 1 tasks (1 novas) — ondas [['P1']]
+[01:41:35] rodada dona: pid 2 — rodada única garantida pelo motor
+[01:41:35] parada solicitada antes de P1
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_plan_aprovacao.py::test_sprint_yaml_accepts_approval_keys
+FAILED .autodev/tests/test_plan_aprovacao.py::test_dag_alterado_invalida_aprovacao_em_reexecucao[ENCERRADO]
+FAILED .autodev/tests/test_plan_aprovacao.py::test_dag_alterado_invalida_aprovacao_em_reexecucao[ABORTADO]
+3 failed, 33 passed in 12.75s
+
+exec
+/usr/bin/bash -lc "python3 - <<'PY'
+from pathlib import Path
+p=Path('autodev/orchestrator.py')
+s=p.read_text().replace('from .config import (SPRINT_TERMINAIS, Config, carrega_dag, carrega_sprint,','from .config import (Config, carrega_dag, carrega_sprint,').replace('        if estado in SPRINT_TERMINAIS:\\n            return None\\n','')
+p.write_text(s)
+p=Path('autodev/cli.py')
+s=p.read_text().replace('  python3 -m autodev init ', '  python3 -m autodev aprovar <sprint_id> --por <nome>  # registra a aprovacao do plano\\n  python3 -m autodev init ',1).replace('from pathlib import Path','from datetime import datetime\\nfrom pathlib import Path',1).replace('\"quando\": time.strftime(\"%Y-%m-%dT%H:%M:%S%z\"),','\"quando\": datetime.now().astimezone().isoformat(timespec=\"seconds\"),')
+p.write_text(s)
+PY
+PATH=/home/saurus/Code/Coding_Machine/.venv/bin:"'$PATH TMPDIR="$PWD/.autodev/tmp-p05-tests" python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+exec
+/usr/bin/bash -lc 'PATH=/home/saurus/Code/Coding_Machine/.venv/bin:$PATH TMPDIR="$PWD/.autodev/tmp-p05-tests" python3 -m pytest .autodev/tests -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+exec
+/usr/bin/bash -lc 'git diff --check; git diff --stat; git status --short' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 0ms:
+ .autodev/tests/test_plan_aprovacao.py | 17 +++++++++++++----
+ autodev/cli.py                        |  4 +++-
+ autodev/orchestrator.py               |  4 +---
+ 3 files changed, 17 insertions(+), 8 deletions(-)
+ M .autodev/tests/test_plan_aprovacao.py
+ M autodev/cli.py
+ M autodev/orchestrator.py
+?? .autodev/tmp-p05-tests/
+
+ succeeded in 14513ms:
+....................................                                     [100%]
+36 passed in 13.74s
+
+codex
+Os testes reproduziram as três falhas esperadas: hash divergente aceito nos dois estados terminais e data sem dois-pontos no fuso. Após a correção, os 36 testes de aprovação passaram. A suíte completa está em execução.
+
+exec
+/usr/bin/bash -lc "git diff -- autodev/cli.py autodev/orchestrator.py .autodev/tests/test_plan_aprovacao.py; rg -n 'aprovacao|hash_dag' autodev/config.py; rg -n 'pytest|timeout' .autodev/tests/test_plan_aceitacao.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 0ms:
+diff --git i/.autodev/tests/test_plan_aprovacao.py w/.autodev/tests/test_plan_aprovacao.py
+index 2ad9626..1360349 100644
+--- i/.autodev/tests/test_plan_aprovacao.py
++++ w/.autodev/tests/test_plan_aprovacao.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import hashlib
+ import json
++import re
+ from pathlib import Path
+ 
+ import yaml
+@@ -29,6 +30,7 @@ def test_sprint_yaml_accepts_approval_keys(tmp_path, monkeypatch):
+     approval = yaml.safe_load((d / "sprint.yaml").read_text())["aprovacao"]
+     assert set(approval) == {"por", "quando", "hash_dag"}
+     assert approval["por"] == "Ana"
++    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}", approval["quando"])
+     assert approval["hash_dag"] == hashlib.sha256((d / "dag.json").read_bytes()).hexdigest()
+ 
+ 
+@@ -230,7 +232,10 @@ def test_run_apos_aprovacao_registra_evento(tmp_path, monkeypatch):
+     o = Orquestrador(tmp_path, "S1", modo_teste=True)
+     resultado = o.rodar()
+     assert resultado.parado_por is None
+-    assert any(e["tipo"] == "aprovacao_plano" for e in o.store.eventos("S1"))
++    eventos = [e for e in o.store.eventos("S1") if e["tipo"] == "aprovacao_plano"]
++    assert len(eventos) == 1
++    assert json.loads(eventos[0]["payload"]) == yaml.safe_load(
++        (d / "sprint.yaml").read_text())["aprovacao"]
+ 
+ 
+ def test_run_nao_exige_aprovacao_legada_de_sprint_ja_em_execucao(tmp_path):
+@@ -263,7 +268,7 @@ def test_aprovacao_nao_duplica_evento_fora_da_janela_de_500(tmp_path, monkeypatc
+     for numero in range(501):
+         o.store.evento("S1", None, "ruido", {"numero": numero})
+ 
+-    o._registrar_aprovacao()
++    assert o.rodar().parado_por is None
+ 
+     quantidade = o.store.conn.execute(
+         "SELECT COUNT(*) FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
+@@ -284,7 +289,7 @@ def test_dag_alterado_invalida_aprovacao(tmp_path, monkeypatch):
+     assert resultado.parado_por and "diverg" in resultado.parado_por
+ 
+ 
+-@pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM"])
++@pytest.mark.parametrize("estado", ["EM_EXECUCAO", "FIM", "ENCERRADO", "ABORTADO"])
+ def test_dag_alterado_invalida_aprovacao_em_reexecucao(
+         tmp_path, monkeypatch, estado):
+     d = _sprint(tmp_path)
+@@ -293,13 +298,17 @@ def test_dag_alterado_invalida_aprovacao_em_reexecucao(
+     o = Orquestrador(tmp_path, "S1", modo_teste=True)
+     if estado == "EM_EXECUCAO":
+         o.store.transicionar_sprint("S1", estado, "rodada em curso")
++    elif estado == "ENCERRADO":
++        o.store.encerrar_sprint("S1")
++    elif estado == "ABORTADO":
++        o.store.transicionar_sprint("S1", estado, "cancelado pelo autor")
+     else:
+         o.store.checkpoint("S1", estado, {"motivo": "fim da rodada"})
+     (d / "dag.json").write_text(
+         '{"sprint_id":"S1","tasks":[{"id":"P1","titulo":"x",'
+         '"criterios":["alterar modulo.py"]}]}', encoding="utf-8")
+ 
+-    resultado = o.rodar()
++    resultado = o.rodar(parar_em="P1")
+ 
+     assert resultado.parado_por and "divergencia" in resultado.parado_por
+     assert o.store.task("S1", "P1") is None
+diff --git i/autodev/cli.py w/autodev/cli.py
+index 7dd3896..0052d2b 100644
+--- i/autodev/cli.py
++++ w/autodev/cli.py
+@@ -4,6 +4,7 @@ Uso:
+   python3 -m autodev detect                 # T01
+   python3 -m autodev plan "pedido"          # cria um sprint planejado
+   python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
++  python3 -m autodev aprovar <sprint_id> --por <nome>  # registra a aprovacao do plano
+   python3 -m autodev init                   # valida DAG e cria as tasks
+   python3 -m autodev status                 # estado atual do Sprint
+   python3 -m autodev run [--parar-em T07]   # executa o Sprint
+@@ -24,6 +25,7 @@ import json
+ import re
+ import sys
+ import time
++from datetime import datetime
+ from pathlib import Path
+ 
+ RAIZ = Path(__file__).resolve().parent.parent
+@@ -187,7 +189,7 @@ def cmd_aprovar(args) -> int:
+         return 2
+     aprovacao = {
+         "por": args.por.strip(),
+-        "quando": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
++        "quando": datetime.now().astimezone().isoformat(timespec="seconds"),
+         "hash_dag": hashlib.sha256(dag_path.read_bytes()).hexdigest(),
+     }
+     bloco = "aprovacao:\n" + "".join(
+diff --git i/autodev/orchestrator.py w/autodev/orchestrator.py
+index a9406d5..3b0fc6c 100644
+--- i/autodev/orchestrator.py
++++ w/autodev/orchestrator.py
+@@ -22,7 +22,7 @@ from pathlib import Path
+ from . import agents, errors, haq, integration, killswitch, report, retry, review
+ from . import sandbox as sbx
+ from . import testrunner
+-from .config import (SPRINT_TERMINAIS, Config, carrega_dag, carrega_sprint,
++from .config import (Config, carrega_dag, carrega_sprint,
+                      ordem_topologica)
+ from .state import StateStore, TransicaoInvalida, WorktreeOcupado
+ from .worktree import (WorktreeManager, arquivos_alterados, branch_existe,
+@@ -235,8 +235,6 @@ class Orquestrador:
+                 return f"sprint PLANEJADO sem aprovacao registrada; use {comando}"
+             # Sprints iniciados antes da existência do portão continuam retomáveis.
+             return None
+-        if estado in SPRINT_TERMINAIS:
+-            return None
+         atual = hashlib.sha256((self.dir_sprint / "dag.json").read_bytes()).hexdigest()
+         registrado = aprovacao.get("hash_dag")
+         if registrado != atual:
+331:    aprovacao = s.get("aprovacao")
+332:    if aprovacao is not None:
+333:        if not isinstance(aprovacao, dict) or set(aprovacao) != {"por", "quando", "hash_dag"}:
+334:            raise ValueError("aprovacao precisa conter exatamente por, quando e hash_dag")
+335:        if not all(isinstance(aprovacao.get(k), str) and aprovacao[k] for k in ("por", "quando", "hash_dag")):
+336:            raise ValueError("aprovacao precisa conter por, quando e hash_dag preenchidos")
+9:import pytest
+39:                        "python3 -m pytest tests/test_stats.py -q passa"
+43:                    "teste": "python3 -m pytest tests/test_stats.py -q",
+51:                    "teste": "python3 -m pytest tests/test_notas.py -q",
+59:                    "teste": "python3 -m pytest tests/test_resultado.py -q",
+122:    with pytest.raises(PlanoInvalido, match=r"task P02: critério 1 vago"):
+
+ succeeded in 65848ms:
+........................................................................ [ 17%]
+........................................................................ [ 34%]
+........................................................................ [ 51%]
+........................................................................ [ 68%]
+........................................................................ [ 85%]
+..............................................................           [100%]
+422 passed in 65.21s (0:01:05)
+
+exec
+/usr/bin/bash -lc "python3 - <<'PY'
+from pathlib import Path
+import shutil
+p = Path('.autodev/tmp-p05-tests')
+if p.exists():
+    shutil.rmtree(p)
+PY
+ git diff --check; git status --short" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+ succeeded in 997ms:
+ M .autodev/tests/test_plan_aprovacao.py
+ M autodev/cli.py
+ M autodev/orchestrator.py
+
+codex
+RESULTADO: corrigida validação do hash em ENCERRADO/ABORTADO, data ISO 8601, documentação e testes de histórico/deduplicação | TESTES: `python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q`: 36 passaram; suíte completa: 422 passaram, no venv existente. Ag y bloqueado pelo sandbox.
+tokens used
+52,386
+RESULTADO: corrigida validação do hash em ENCERRADO/ABORTADO, data ISO 8601, documentação e testes de histórico/deduplicação | TESTES: `python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q`: 36 passaram; suíte completa: 422 passaram, no venv existente. Ag y bloqueado pelo sandbox.

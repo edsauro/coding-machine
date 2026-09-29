@@ -1,0 +1,5 @@
+$ /home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/test_plan_aprovacao.py -q
+exit=0 (1.8s)
+
+..................................                                       [100%]
+34 passed in 1.13s

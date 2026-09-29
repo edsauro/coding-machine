@@ -17,17 +17,23 @@ AUTODEV = RAIZ / ".autodev"
 CONFIG = AUTODEV / "config"
 
 ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
-           "REVIEW", "RETRY", "DONE", "FAILED", "INTEGRATED", "WAITING_RESOURCE"]
+           "REVIEW", "RETRY", "DONE", "FAILED", "INTEGRATED", "WAITING_RESOURCE",
+           "WAITING_HUMAN"]
 
 TRANSICOES = {
     "NEW": {"PLANNED", "BLOCKED"},
     "PLANNED": {"QUEUED", "BLOCKED"},
-    "QUEUED": {"RUNNING", "BLOCKED", "WAITING_RESOURCE"},
+    "QUEUED": {"RUNNING", "BLOCKED", "WAITING_RESOURCE", "WAITING_HUMAN"},
     "RUNNING": {"VERIFYING", "RETRY", "FAILED", "BLOCKED", "WAITING_RESOURCE"},
     "VERIFYING": {"REVIEW", "RETRY", "DONE", "FAILED", "BLOCKED"},
     "REVIEW": {"DONE", "RETRY", "FAILED", "BLOCKED"},
-    "RETRY": {"QUEUED", "BLOCKED", "FAILED", "WAITING_RESOURCE"},
+    "RETRY": {"QUEUED", "BLOCKED", "FAILED", "WAITING_RESOURCE", "WAITING_HUMAN"},
     "WAITING_RESOURCE": {"QUEUED", "RUNNING", "BLOCKED"},
+    # WAITING_HUMAN: a estratégia pediu confirmação do autor (29/09 — "3 degraus").
+    # Não é BLOCKED por dois motivos: o trabalho não morreu por limite de capacidade,
+    # parou esperando DECISÃO; e é daqui que sai a repetição do ciclo
+    # (`desbloquear --repetir`, que devolve a task a QUEUED com o contador em zero).
+    "WAITING_HUMAN": {"QUEUED", "BLOCKED"},
     "DONE": {"INTEGRATED"},
     "INTEGRATED": set(),
     "FAILED": {"QUEUED"},
@@ -125,11 +131,53 @@ class Config:
         tn = self.tier_do_modelo(slug_novo, effort_novo)
         return ta is not None and tn is not None and tn > ta
 
-    def modelo_para_tentativa(self, tentativa: int) -> dict:
-        """Tentativa N -> degrau da escada (spec §10). 1-indexado."""
-        mapa = self.policies["retry"]["escalonamento"]
-        tier = mapa.get(min(tentativa, max(mapa)), max(mapa.values()))
+    def modelo_para_tentativa(self, tentativa: int, estrategia: str | None = None) -> dict:
+        """Tentativa N -> degrau da escada (spec §10). 1-indexado.
+
+        Com estratégia (P-15), quem manda é o mapa DELA: a task "3 degraus" tem degraus
+        `luna/low -> astra/low -> luna/low`, que não é uma escada crescente — é alocação
+        deliberada. Sem estratégia, cai na `escalonamento` legada.
+        """
+        mapa = self.estrategia(estrategia)["degraus"]
+        tier = mapa.get(min(tentativa, max(mapa)), mapa[max(mapa)])
         return self.degrau_por_tier(tier) or self.models["codex"]["default"]
+
+    # ------------------------------------------------------------- estratégias
+    def estrategias(self) -> dict:
+        return self.policies["retry"].get("estrategias") or {}
+
+    def estrategia_padrao(self) -> str:
+        """Estratégia das tasks que COMEÇAM agora (as antigas têm a delas gravada)."""
+        return self.policies["retry"].get("estrategia_padrao", "escada_5")
+
+    def estrategia(self, nome: str | None = None) -> dict:
+        """`{nome, degraus, max_tentativas, pede_confirmacao}` da estratégia pedida.
+
+        `None` significa **sem estratégia**: cai na `escalonamento` legada (escada de 5
+        degraus). É o que mantém relatório, CLI e testes antigos com a escada de sempre —
+        quem tem estratégia passa o nome explicitamente (o orquestrador passa a da task).
+        Nome desconhecido também cai no legado: banco ou sprint velho continua rodando em
+        vez de quebrar.
+        """
+        e = self.estrategias().get(nome) if nome else None
+        if e:
+            return {"nome": nome,
+                    "degraus": {int(k): int(v) for k, v in (e.get("degraus") or {}).items()},
+                    "max_tentativas": int(e.get("max_tentativas", 5)),
+                    "pede_confirmacao": bool(e.get("pede_confirmacao", False))}
+        legado = self.policies["retry"]["escalonamento"]
+        return {"nome": f"{nome} (legado)" if nome else "escalonamento (legado)",
+                "degraus": {int(k): int(v) for k, v in legado.items()},
+                "max_tentativas": int(
+                    self.policies["retry"]["max_tentativas_implementacao"]),
+                "pede_confirmacao": False}
+
+    def max_tentativas(self, estrategia: str | None = None) -> int:
+        return self.estrategia(estrategia)["max_tentativas"]
+
+    def pede_confirmacao(self, estrategia: str | None = None) -> bool:
+        """A estratégia para depois do último degrau e espera o autor? (3 degraus = sim.)"""
+        return self.estrategia(estrategia)["pede_confirmacao"]
 
     def tier_atual(self, tentativas_implementacao: int) -> int:
         """Tier do degrau EM USO depois de N tentativas — nunca o próximo da escada."""

@@ -1,0 +1,125 @@
+# exit_code=0 duracao=360.7s modelo=gpt-5.6-terra effort=low failure_class=None tokens=87349(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P05: Portao de aprovacao humana do plano
+
+## Criterios de aceitacao (todos obrigatorios)
+- sprint.yaml aceita o bloco aprovacao com as chaves por, quando e hash_dag (sha256 do dag.json)
+- autodev run recusa rodar sprint PLANEJADO sem aprovacao registrada, dizendo qual comando registra a aprovacao
+- existe o comando autodev aprovar <sprint_id> --por <nome> que grava a aprovacao com o hash atual do dag.json
+- depois de aprovar, autodev run aceita o sprint e registra um evento de aprovacao no historico
+- dag.json alterado depois da aprovacao invalida a aprovacao (hash nao confere) e o run recusa de novo, citando a divergencia
+- os testes ficam em .autodev/tests/test_plan_aprovacao.py e rodam com python3 -m pytest .autodev/tests/test_plan_aprovacao.py -q
+- estende autodev/cli.py e autodev/orchestrator.py preservando os subcomandos e o laco de execucao atuais, sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P05-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+ual/anexa ao texto existente (ou usar ruamel.yaml em modo round-trip para preservar comentarios), em vez de serializar o dict inteiro."}, {"severidade": "media", "arquivo": "autodev/cli.py", "linha": 158, "descricao": "aprovar nao valida o que grava: 'autodev aprovar S1 --por \"\"' retorna 0 e imprime 'sprint S1 aprovado por ' (valor vazio), mas o run seguinte morre com excecao crua nao tratada — 'ValueError: aprovacao precisa conter por, quando e hash_dag preenchidos' propagada por main() sem try/except (traceback para o usuario), em vez da mensagem que diz qual comando registra a aprovacao. O portao tem uma porta de entrada que grava estado invalido e reporta sucesso.", "correcao_sugerida": "cmd_aprovar deve rejeitar --por vazio (e validar o sprint carregando carrega_sprint antes de escrever), retornando codigo != 0 com mensagem clara; e a carga do sprint no run deve falhar com mensagem acionavel, nao com traceback."}, {"severidade": "media", "arquivo": "autodev/config.py", "linha": 328, "descricao": "As duas ramificacoes novas de validacao (chaves exatas e campos preenchidos, config.py:328-331) nao sao exercitadas por nenhum teste: o arquivo novo so verifica o que o CLI escreve, nunca carrega um sprint.yaml com aprovacao malformada (grep em .autodev/tests mostra 'aprovacao' apenas em test_plan_aprovacao.py). O nome test_sprint_yaml_accepts_approval_keys promete testar a aceitacao pelo carregador, mas nao chama carrega_sprint. Retirar essas linhas do diff nao deixaria nenhum teste vermelho.", "correcao_sugerida": "Adicionar casos em test_plan_aprovacao.py chamando carrega_sprint com aprovacao sem 'quando', com chave extra e com valor vazio, esperando ValueError."}, {"severidade": "media", "arquivo": "autodev/orchestrator.py", "linha": 676, "descricao": "O evento 'aprovacao_plano' e gravado no inicio de toda rodada enquanto o status for PLANEJADO, e antes de adquirir_run_lock (linha 689). Medido: 3 rodadas do mesmo sprint => 3 eventos 'aprovacao_plano' no historico, inclusive quando a rodada termina bloqueada ou perde o lock. O historico de auditoria infla e qualquer contagem por tipo de evento (relatorios/metricas) passa a superestimar aprovacoes; o criterio pede 'um evento de aprovacao', nao um por passada.", "correcao_sugerida": "Gravar o evento uma unica vez por (sprint, hash_dag) — consultar eventos antes de inserir — e depois de obter o run lock."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 489, "descricao": "Duas fontes para o mesmo sprint no CLI: o global --sprint e o posicional sprint_id de aprovar, e cmd_aprovar ignora args.sprint. Medido: 'autodev --sprint S1 aprovar S2 --por Ana' aprova S2 silenciosamente (S2 ganhou aprovacao, S1 nao), sem aviso de divergencia.", "correcao_sugerida": "Usar args.sprint como sprint alvo (ou exigir que o posicional, quando informado, seja igual ao --sprint) e falhar com mensagem clara em caso de divergencia."}, {"severidade": "baixa", "arquivo": "autodev/orchestrator.py", "linha": 668, "descricao": "O portao e avaliado depois de self.carregar(), que ja escreve no banco: rodada bloqueada por falta de aprovacao ainda assim cria as tasks do DAG no state.db (medido: 'tasks no db = 1' com a rodada recusada) e grava no orquestrador.log. O plano nao aprovado ja produz efeito de escrita antes de ser recusado.", "correcao_sugerida": "Validar aprovacao/hash antes de carregar o DAG para o banco (ou separar leitura do yaml/dag de criar_tasks_do_dag)."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 173, "descricao": "cmd_resume chama recuperar() (que altera estado, finaliza tentativas e libera worktrees) antes de rodar(), e retorna 0 mesmo quando o run para no portao: medido 'autodev resume' com sprint sem aprovacao -> rc=0 e 'parado por: sprint PLANEJADO sem aprovacao registrada'. Falha silenciosa em automacao que confia no exit code.", "correcao_sugerida": "Retornar 2 quando r.parado_por (mesma convencao do cmd_run) e checar o portao antes da recuperacao."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_aprovacao.py
+  - autodev/cli.py
+  - autodev/config.py
+  - autodev/orchestrator.py
+
+## INSTRUCAO
+Esta e a tentativa #2.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-terra/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+RESULTADO: portão corrigido (validação, YAML preservado, sem efeitos antes do gate, evento idempotente e resume seguro) | TESTES: `uv run --with pytest ...test_plan_aprovacao.py -q` — 12 passed; comando literal bloqueado: `No module named pytest`
+
+===== STDERR =====
+

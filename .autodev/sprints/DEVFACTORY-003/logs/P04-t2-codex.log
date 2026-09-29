@@ -1,0 +1,125 @@
+# exit_code=0 duracao=166.9s modelo=gpt-5.6-terra effort=low failure_class=None tokens=50770(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P04: Comando autodev prever: impacto do plano antes de rodar
+
+## Criterios de aceitacao (todos obrigatorios)
+- a CLI aceita autodev prever <sprint_id> e imprime, por onda, os arquivos prometidos por cada task e as colisoes encontradas
+- autodev prever aceita --json e imprime o mesmo conteudo em JSON valido
+- sprint inexistente devolve exit code 1 com mensagem clara, sem traceback
+- os testes ficam em .autodev/tests/test_plan_cli_prever.py e rodam com python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q
+- estende autodev/cli.py preservando os subcomandos existentes (detect, init, status, run, resume, report, haq, quota, metrics, encerrar, evidenciar, desbloquear, stop, start) sem remover nenhum
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P04-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+ X` imprime traceback completo ('AttributeError: 'list' object has no attribute 'get'') em vez da mensagem clara — exatamente o tipo de surpresa que o comando (somente-leitura, para uso antes de aprovar o DAG) existe para eliminar. O criterio literal fala de 'sprint inexistente', mas o bloco try/except foi escrito justamente para nunca vazar traceback em dag.json malformado e esta incompleto.", "correcao_sugerida": "Validar o tipo antes de usar: `if not isinstance(dag, dict) or \"tasks\" not in dag: raise ValueError(\"dag.json sem objeto com a chave 'tasks'\")` (mensagem que ja cai no except existente), ou simplesmente somar AttributeError a tupla do except."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_cli_prever.py", "linha": 44, "descricao": "O teste de falha so olha capsys.readouterr().out: um traceback sai em stderr e passaria despercebido por esse assert. O ramo de erro por dag.json invalido/incompativel (todo o except da linha 390 do cli.py), o `--json` no caminho de falha, o ramo 'nenhuma' de colisoes e os ramos `sem_arquivo`/'(sem arquivo nomeado)' da saida em texto nao tem nenhum teste. O teste tambem assume a regra 'arquivo de teste colide em qualquer onda' ao exigir colisoes[0]['arquivo'] == 'tests/test_a.py' (src/a.py em ondas diferentes nao conta), o que codifica justamente o ponto cego do finding seguinte.", "correcao_sugerida": "Capturar out, err = capsys.readouterr() e afirmar err == '' / 'Traceback' not in out + err; adicionar casos: dag.json invalido ('{oops'), dag.json sem 'tasks', e um caso sem arquivos nomeados e sem colisoes."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_cli_prever.py", "linha": 6, "descricao": "A fixture _dag() nao reproduz o schema real do dag.json do motor: faltam sprint_id/versao/criterio_paralelizacao e, nas tasks, estimativa e paralelizavel (formato real conferido em DEVFACTORY-001..004). Um teste assim continuaria verde mesmo se o comando quebrasse sobre os arquivos reais; so confirmei que funciona porque rodei `autodev prever DEVFACTORY-003` a mao (exit 0, JSON valido).", "correcao_sugerida": "Gerar a fixture a partir de um dag.json real (ou incluir os campos do schema) para cobrir o caminho de producao."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 407, "descricao": "No sprint real DEVFACTORY-003 o comando imprime 'colisões: nenhuma', embora existam tres sobreposicoes de arquivo entre ondas (P01 x P03 em autodev/planner.py, P04 x P05 em autodev/cli.py, P05 x P06 em dag.json) que o comando irmao `plan` reporta como 'aviso: colisão de arquivo entre ...'. Nao e violacao: a spec da sprint (spec.md linhas 45-46) define a saida de `autodev prever` como 'arquivos por onda, colisoes, tasks sem arquivo nomeado' e plan_impacto (P03) usa colisoes_de_arquivo, que de proposito so acusa mesma onda + arquivos de teste. Fica como nota de UX, porque a palavra 'colisoes' pode ser lida como cobertura total.", "correcao_sugerida": "Opcional: imprimir tambem planner.avisos_de_colisao_de_arquivo(plano) (rotulo 'avisos (entre ondas)'), ou trocar o texto para 'colisões na mesma onda / arquivos de teste:'."}, {"severidade": "baixa", "arquivo": "autodev/cli.py", "linha": 499, "descricao": "`if args.cmd == \"prever\": args.sprint = args.sprint_id` reescreve o namespace global --sprint depois do parse, combinado com set_defaults(fn=cmd_prever, sprint=\"\"). Funciona (confirmado), mas o valor de --sprint passado antes do subcomando e silenciosamente descartado e o cmd_prever depende de um campo que so existe para este subcomando. Codigo morto/TODO: nenhum no diff; nenhuma dependencia nova (so stdlib json e imports internos ja existentes) e nenhum segredo, caminho absoluto fragil ou escrita em disco (git status limpo depois de rodar o comando em sprint real).", "correcao_sugerida": "Usar `args.sprint_id` diretamente dentro de cmd_prever (sprint_dir = RAIZ/'.autodev'/'sprints'/args.sprint_id) e remover o set_defaults(sprint=\"\") + a reescrita no main."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_cli_prever.py
+  - autodev/cli.py
+
+## INSTRUCAO
+Esta e a tentativa #2.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-terra/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+Corrigido o tratamento de `dag.json` malformado, evitando traceback; simplificado `prever` para usar `sprint_id` diretamente e ampliados testes de erro/sem arquivo.
+
+Validação manual e compilação passaram. O comando obrigatório de pytest não executa neste ambiente: `python3` não possui o módulo `pytest`.
+
+RESULTADO: CLI `prever` robusta contra DAG inválido e testes ampliados | TESTES: `python3 -m compileall -q autodev` e cenários manuais passaram; `python3 -m pytest .autodev/tests/test_plan_cli_prever.py -q` bloqueado por `No module named pytest`
+
+===== STDERR =====
+

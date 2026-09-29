@@ -32,10 +32,16 @@ h2 + ol > li { margin-bottom: .5em; }
 
 table {
   border-collapse: collapse; width: 100%; margin: .9em 0;
-  font-size: 9.8pt; page-break-inside: avoid;
+  /* 8.2pt (era 9.8): com as colunas de auditoria a Tabela 1 chegou a 14 colunas e, no
+     A4 retrato, as últimas saíam cortadas na borda direita. O texto corrido fica em
+     10.5pt; só as tabelas encolhem. */
+  font-size: 8.2pt; page-break-inside: avoid;
 }
 th { background: #eef3f9; color: #14395e; text-align: left; }
-th, td { border: 1px solid #c9d6e4; padding: .38em .6em; }
+th, td { border: 1px solid #c9d6e4; padding: .3em .42em; }
+/* `word-break: break-word` só nas CÉLULAS: no cabeçalho ele partia as palavras no meio
+   ("sprin/t", "chamad/as") e as linhas ficavam com o dobro da altura. */
+td { word-break: break-word; }
 tbody tr:nth-child(even) { background: #f8fafc; }
 /* tabela longa (a Tabela 1 já passa de uma página): o cabeçalho se repete e
    nenhuma LINHA se parte entre páginas — antes a última linha saía como
