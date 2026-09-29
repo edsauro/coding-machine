@@ -6,7 +6,7 @@ import json
 import os
 import re
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
@@ -257,33 +257,63 @@ def _arquivos_da_task(task: TaskPlano) -> set[str]:
     """Extrai todos os caminhos mencionados nos critérios e no teste."""
     textos = [*task.criterios, task.teste]
     return {
-        caminho.group(0).lstrip("./")
+        _normalizar_caminho(caminho.group(0))
         for texto in textos
         for caminho in _ARQUIVO.finditer(texto)
     }
 
 
-def _tem_intencao_de_edicao(texto: str) -> bool:
-    texto_normalizado = texto.casefold()
-    return (
-        not any(negacao in texto_normalizado for negacao in _NEGACOES_EDICAO)
-        and _PADRAO_EDICAO.search(texto) is not None
-    )
+def _normalizar_caminho(caminho: str) -> str:
+    """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+    caminho = caminho.replace("\\", "/")
+    while caminho.startswith("./"):
+        caminho = caminho[2:]
+    return PurePosixPath(caminho).as_posix().lstrip("/")
+
+
+def _trecho_da_mencao(texto: str, inicio: int) -> str:
+    """Obtém a oração imediatamente anterior a uma menção de caminho."""
+    prefixo = texto[:inicio]
+    separadores = [m.end() for m in re.finditer(r"[,;]|\.\s+|\s+e\s+", prefixo, re.I)]
+    return prefixo[separadores[-1] if separadores else 0:]
+
+
+def _mencoes_editadas(texto: str) -> set[str]:
+    """Classifica a intenção por menção, para uma negação não vazar de oração."""
+    editados: set[str] = set()
+    contexto_afirmativo = False
+    for mencao in _ARQUIVO.finditer(texto):
+        trecho = _trecho_da_mencao(texto, mencao.start())
+        trecho_normalizado = trecho.casefold()
+        negado = any(negacao in trecho_normalizado for negacao in _NEGACOES_EDICAO)
+        afirmativo = _PADRAO_EDICAO.search(trecho) is not None
+        if not negado and (afirmativo or contexto_afirmativo):
+            editados.add(_normalizar_caminho(mencao.group(0)))
+        if afirmativo:
+            contexto_afirmativo = not negado
+    return editados
 
 
 def _arquivos_editados_da_task(task: TaskPlano) -> set[str]:
     """Extrai arquivos que a task declara editar, não apenas mencionar."""
-    arquivos = {
-        caminho.group(0).lstrip("./")
-        for caminho in _ARQUIVO.finditer(task.teste)
-    }
+    arquivos = {_normalizar_caminho(caminho.group(0)) for caminho in _ARQUIVO.finditer(task.teste)}
     for criterio in task.criterios:
-        if _tem_intencao_de_edicao(criterio):
-            arquivos.update(
-                caminho.group(0).lstrip("./")
-                for caminho in _ARQUIVO.finditer(criterio)
-            )
+        arquivos.update(_mencoes_editadas(criterio))
     return arquivos
+
+
+def _arquivos_em_comum(arquivos_a: set[str], arquivos_b: set[str]) -> set[str]:
+    """Compara caminhos normalizados e aceita basename quando só um lado o usa."""
+    comuns: set[str] = set()
+    for arquivo_a in arquivos_a:
+        for arquivo_b in arquivos_b:
+            if arquivo_a == arquivo_b:
+                comuns.add(arquivo_a)
+            elif "/" not in arquivo_a and PurePosixPath(arquivo_b).name == arquivo_a:
+                comuns.add(arquivo_b)
+            elif "/" not in arquivo_b and PurePosixPath(arquivo_a).name == arquivo_b:
+                comuns.add(arquivo_a)
+    return comuns
 
 
 def _arquivo_de_teste(caminho: str) -> bool:
@@ -326,12 +356,16 @@ def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
             arquivos_de_teste = {
                 arquivo
-                for arquivo in arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+                for arquivo in _arquivos_em_comum(
+                    arquivos_mencionados[indice], arquivos_mencionados[indice_b]
+                )
                 if _arquivo_de_teste(arquivo)
             }
             arquivos_de_producao = {
                 arquivo
-                for arquivo in arquivos_editados[indice] & arquivos_editados[indice_b]
+                for arquivo in _arquivos_em_comum(
+                    arquivos_editados[indice], arquivos_editados[indice_b]
+                )
                 if not _arquivo_de_teste(arquivo)
             }
             for arquivo in sorted(arquivos_de_teste | arquivos_de_producao):
@@ -342,7 +376,7 @@ def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
                         "task_a": task_a.id,
                         "task_b": task_b.id,
                         "arquivo": arquivo,
-                        "onda": onda_a if onda_a is not None else onda_b,
+                        "onda": (onda_a if onda_a == onda_b else f"{onda_a} e {onda_b}"),
                     })
     return colisoes
 
@@ -360,13 +394,15 @@ def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
             onda_b = onda_por_task[task_b.id]
             if onda_a == onda_b:
                 continue
-            for arquivo in sorted(arquivos_editados[indice] & arquivos_editados[indice_b]):
+            for arquivo in sorted(_arquivos_em_comum(
+                arquivos_editados[indice], arquivos_editados[indice_b]
+            )):
                 if not _arquivo_de_teste(arquivo):
                     avisos.append({
                         "task_a": task_a.id,
                         "task_b": task_b.id,
                         "arquivo": arquivo,
-                        "onda": onda_a,
+                        "onda": f"{onda_a} e {onda_b}",
                     })
     return avisos
 
