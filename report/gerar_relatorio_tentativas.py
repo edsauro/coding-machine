@@ -352,8 +352,25 @@ def escreve_relatorio(dados: dict) -> Path:
             f"{acumulado:.1f}% | {x['ok']} | {mods} |")
     tabela_degraus = "\n".join(linhas_degrau)
 
+    def _mult(a: int, b: int) -> str:
+        """Reprovações por aprovação, em múltiplo: 2x = duas por aprovação.
+
+        Não é porcentagem de nada — por isso o valor pode passar de 1x (e de
+        '100%'), e por isso vai em x em vez de %.
+        """
+        if not b:
+            return "—"
+        r = a / b
+        if r == 0:
+            return "0x"
+        if r < 0.05:
+            return "<0,1x"
+        if abs(r - round(r)) < 0.05:          # 1,0 / 2,0 / 3,0 → 1x / 2x / 3x
+            return f"{round(r)}x"
+        return f"{r:.1f}".replace(".", ",") + "x"
+
     def _retrab(p, ajustado: bool) -> str:
-        """% de retrabalho = reprovações do aprovador ÷ aprovações do aprovador.
+        """Múltiplo de retrabalho do pacote = reprovações ÷ aprovações.
 
         `ajustado` desconta as reprovações causadas pelo NOSSO teste/plano (a mesma
         janela curada da coluna `culpa teste/plano`) — nunca as do codificador.
@@ -363,7 +380,7 @@ def escreve_relatorio(dados: dict) -> Path:
         if not aprov:
             return "—"
         reprov = p["reprovacoes"] - (p["reprov_em_janela"] if ajustado else 0)
-        return f"{100.0 * reprov / aprov:.0f}%"
+        return _mult(reprov, aprov)
 
     linhas_pacote = []
     for s in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-004"):
@@ -397,11 +414,11 @@ def escreve_relatorio(dados: dict) -> Path:
 
     retrab_global = (
         f"No total: **{tot_reprov} reprovações ÷ {tot_aprov} aprovações** = "
-        f"**{_pct(tot_reprov, tot_aprov)} bruto** e "
-        f"**{_pct(tot_reprov - tot_reprov_jan, tot_aprov)} ajustado** (a escada cobrou "
+        f"**{_mult(tot_reprov, tot_aprov)} bruto** e "
+        f"**{_mult(tot_reprov - tot_reprov_jan, tot_aprov)} ajustado** (a escada cobrou "
         f"{tot_reprov_jan} reprovações que eram defeito do NOSSO teste/plano). "
         f"Se o denominador for *chamadas avaliadas* em vez de aprovações — "
-        f"`reprov ÷ (aprov+reprov)` — os mesmos números ficam "
+        f"`reprov ÷ (aprov+reprov)`, aí sim uma fatia — os mesmos números ficam "
         f"{_pct(tot_reprov, tot_aprov + tot_reprov)} e "
         f"{_pct(tot_reprov - tot_reprov_jan, tot_aprov + tot_reprov - tot_reprov_jan)}."
     )
@@ -541,10 +558,11 @@ naquele pacote (aprovado / reprovado / chamadas que nem chegaram a ser avaliadas
 `culpa teste/plano` separam o que **não era do modelo** (cota/crash e defeito de
 teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
 
-`retrab. bruto` = **reprovações do aprovador ÷ aprovações do aprovador** (quanto a escada
-cobrou de volta por aprovação entregue); `retrab. ajust.` desconta as reprovações que foram
-culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem aprovação nenhuma fica
-`—`. {retrab_global}
+`retrab. bruto` = **reprovações do aprovador ÷ aprovações do aprovador**, em **múltiplo**:
+`2x` significa duas reprovações para cada aprovação entregue (não é porcentagem de nada —
+pode passar de 1x, e é por isso que vai em `x` e não em `%`); `retrab. ajust.` desconta as
+reprovações que foram culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem
+aprovação nenhuma fica `—`. {retrab_global}
 
 | sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados |
 |---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---|

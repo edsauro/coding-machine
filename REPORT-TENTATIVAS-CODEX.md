@@ -4,7 +4,7 @@
 que tentativa cada uma aconteceu e com que modelo.
 **Fonte:** `.autodev/state.db`, tabela `attempts` (o próprio motor grava uma linha por
 invocação).
-**Janela:** 27/09/2026 02:03 a 28/09/2026 21:56 —
+**Janela:** 27/09/2026 02:03 a 28/09/2026 22:02 —
 DEVFACTORY-001, 002 e 004 (a 003 foi planejada e nunca executada).
 **Data do relatório:** 28/09/2026.
 **Total no período:** **94 chamadas do Codex**, 48 delas aprovadas
@@ -90,28 +90,29 @@ naquele pacote (aprovado / reprovado / chamadas que nem chegaram a ser avaliadas
 `culpa teste/plano` separam o que **não era do modelo** (cota/crash e defeito de
 teste/plano, atribuição curada descrita abaixo); `do modelo` é o que sobra.
 
-`retrab. bruto` = **reprovações do aprovador ÷ aprovações do aprovador** (quanto a escada
-cobrou de volta por aprovação entregue); `retrab. ajust.` desconta as reprovações que foram
-culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem aprovação nenhuma fica
-`—`. No total: **24 reprovações ÷ 47 aprovações** = **51.1% bruto** e **44.7% ajustado** (a escada cobrou 3 reprovações que eram defeito do NOSSO teste/plano). Se o denominador for *chamadas avaliadas* em vez de aprovações — `reprov ÷ (aprov+reprov)` — os mesmos números ficam 33.8% e 30.9%.
+`retrab. bruto` = **reprovações do aprovador ÷ aprovações do aprovador**, em **múltiplo**:
+`2x` significa duas reprovações para cada aprovação entregue (não é porcentagem de nada —
+pode passar de 1x, e é por isso que vai em `x` e não em `%`); `retrab. ajust.` desconta as
+reprovações que foram culpa do **nosso teste/plano** — nunca as do codificador. Pacote sem
+aprovação nenhuma fica `—`. No total: **24 reprovações ÷ 47 aprovações** = **0,5x bruto** e **0,4x ajustado** (a escada cobrou 3 reprovações que eram defeito do NOSSO teste/plano). Se o denominador for *chamadas avaliadas* em vez de aprovações — `reprov ÷ (aprov+reprov)`, aí sim uma fatia — os mesmos números ficam 33.8% e 30.9%.
 
 | sprint | pacote | chamadas | aprov./reprov./s/aval. | chamadas (1ª–última) | aprovada na | infra | culpa teste/plano | do modelo | retrab. bruto | retrab. ajust. | modelos usados |
 |---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---|
 | 001 | T15 | 1 | 0/0/1 | 1ª–1ª | — | 0 | 0 | 1 | — | — | (nenhum)/(nenhum) |
-| 002 | P01 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0% | 0% | gpt-5.6-luna/low |
-| 002 | P02 | 14 | 5/5/4 | 1ª–15ª ⚠ | 14ª (gpt-5.6-sol/low) | 3 | 5 | 6 | 100% | 100% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P03 | 9 | 6/2/1 | 1ª–10ª ⚠ | 9ª (gpt-5.6-sol/medium) | 1 | 5 | 3 | 33% | 33% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium |
-| 002 | P04 | 9 | 6/2/1 | 1ª–9ª | 9ª (gpt-6-astra/low) | 1 | 0 | 8 | 33% | 33% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P05 | 6 | 4/2/0 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | 50% | 50% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
-| 002 | P06 | 7 | 5/1/1 | 1ª–7ª | 7ª (gpt-6-astra/low) | 1 | 0 | 6 | 20% | 20% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P07 | 6 | 4/1/1 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | 25% | 25% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
-| 002 | P08 | 4 | 4/0/0 | 1ª–4ª | 4ª (gpt-5.6-sol/low) | 0 | 0 | 4 | 0% | 0% | gpt-5.6-luna/low, gpt-5.6-sol/low |
-| 002 | P09 | 9 | 4/3/2 | 1ª–10ª ⚠ | 9ª (gpt-6-astra/low) | 1 | 7 | 1 | 75% | 0% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
-| 002 | P10 | 5 | 4/1/0 | 1ª–5ª | 5ª (gpt-5.6-sol/low) | 0 | 0 | 5 | 25% | 25% | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low |
-| 004 | P01 | 8 | 1/2/5 | 1ª–9ª ⚠ | 8ª (gpt-5.6-sol/low) | 0 | 5 | 3 | 200% | 200% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
-| 004 | P02 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0% | 0% | gpt-5.6-luna/low |
-| 004 | P03 | 4 | 1/2/1 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 1 | 0 | 3 | 200% | 200% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low |
-| 004 | P04 | 10 | 1/3/6 | 1ª–10ª | 10ª (gpt-6-astra/low) | 0 | 5 | 5 | 300% | 300% | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
+| 002 | P01 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0x | 0x | gpt-5.6-luna/low |
+| 002 | P02 | 14 | 5/5/4 | 1ª–15ª ⚠ | 14ª (gpt-5.6-sol/low) | 3 | 5 | 6 | 1x | 1x | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P03 | 9 | 6/2/1 | 1ª–10ª ⚠ | 9ª (gpt-5.6-sol/medium) | 1 | 5 | 3 | 0,3x | 0,3x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium |
+| 002 | P04 | 9 | 6/2/1 | 1ª–9ª | 9ª (gpt-6-astra/low) | 1 | 0 | 8 | 0,3x | 0,3x | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P05 | 6 | 4/2/0 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | 0,5x | 0,5x | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
+| 002 | P06 | 7 | 5/1/1 | 1ª–7ª | 7ª (gpt-6-astra/low) | 1 | 0 | 6 | 0,2x | 0,2x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P07 | 6 | 4/1/1 | 1ª–6ª | 6ª (gpt-5.6-sol/low) | 0 | 0 | 6 | 0,2x | 0,2x | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low, gpt-5.6-terra/medium |
+| 002 | P08 | 4 | 4/0/0 | 1ª–4ª | 4ª (gpt-5.6-sol/low) | 0 | 0 | 4 | 0x | 0x | gpt-5.6-luna/low, gpt-5.6-sol/low |
+| 002 | P09 | 9 | 4/3/2 | 1ª–10ª ⚠ | 9ª (gpt-6-astra/low) | 1 | 7 | 1 | 0,8x | 0x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-6-astra/low |
+| 002 | P10 | 5 | 4/1/0 | 1ª–5ª | 5ª (gpt-5.6-sol/low) | 0 | 0 | 5 | 0,2x | 0,2x | gpt-5.6-luna/low, gpt-5.6-luna/medium, gpt-5.6-sol/low |
+| 004 | P01 | 8 | 1/2/5 | 1ª–9ª ⚠ | 8ª (gpt-5.6-sol/low) | 0 | 5 | 3 | 2x | 2x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
+| 004 | P02 | 1 | 1/0/0 | 1ª–1ª | 1ª (gpt-5.6-luna/low) | 0 | 0 | 1 | 0x | 0x | gpt-5.6-luna/low |
+| 004 | P03 | 4 | 1/2/1 | 1ª–4ª | 4ª (gpt-5.6-sol/medium) | 1 | 0 | 3 | 2x | 2x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low |
+| 004 | P04 | 10 | 1/3/6 | 1ª–10ª | 10ª (gpt-6-astra/low) | 0 | 5 | 5 | 3x | 3x | gpt-5.6-luna/low, gpt-5.6-sol/low, gpt-5.6-sol/medium, gpt-5.6-terra/low, gpt-6-astra/low |
 
 ## Tabela 3 — em que chamada a aprovação veio
 
