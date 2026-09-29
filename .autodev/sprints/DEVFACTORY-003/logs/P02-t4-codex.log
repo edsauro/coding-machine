@@ -1,0 +1,124 @@
+# exit_code=0 duracao=308.5s modelo=gpt-5.6-sol effort=medium failure_class=None tokens=66386(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P02: Barrar colisao na mesma onda no validador do motor
+
+## Criterios de aceitacao (todos obrigatorios)
+- valida_dag em autodev/config.py recusa DAG com duas tasks na mesma onda citando o mesmo arquivo, citando os ids e o caminho
+- a recusa alcanca o comando autodev init, que ja chama valida_dag
+- plano com o mesmo arquivo em ondas diferentes continua valido (aviso, nao erro)
+- os testes ficam em .autodev/tests/test_plan_guarda.py e rodam com python3 -m pytest .autodev/tests/test_plan_guarda.py -q
+- estende autodev/config.py preservando valida_dag, ordem_topologica e carga_dag existentes, sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+  - tentativa 2: REVIEW_FAILURE (exit 0) — 
+  - tentativa 3: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+n_validacao.py). Repetindo a suíte com o alias reposto apenas em memória (planner._ARQUIVO = config._ARQUIVO, sem tocar em arquivo) o resultado é 370 passed — ou seja, a regressão é 100% do nome removido. O autor rodou só o arquivo de teste novo (12 passed), não a suíte.", "correcao_sugerida": "Em autodev/planner.py:382 usar 'config._ARQUIVO.search(criterio)' (ou reexpor 'from .config import _ARQUIVO' / '_ARQUIVO = config._ARQUIVO' no topo do planner) e rodar a suíte completa antes de fechar a task."}, {"severidade": "media", "arquivo": "autodev/config.py", "linha": 26, "descricao": "A regra de detecção mudou de 'qualquer extensão alfanumérica' (base) para uma whitelist de ~36 extensões. Arquivos reais com extensão fora dela passam a não ser vistos: verificado arquivos_citados(['altera .autodev/state.db']) == set() e valida_dag devolve [] para duas tasks na mesma onda citando '.autodev/state.db' ou 'report/x.png' (antes colidiriam). Varredura dos dags reais do repo: das 111 citações com extensão, 1 perde cobertura (state.db) e 1 falso positivo é eliminado (agents.invocar) — o ganho é legítimo, a perda é silenciosa e não está documentada nem testada.", "correcao_sugerida": "Manter a whitelist (ela mata o falso positivo 'item 3.a'/'agents.invocar'), mas incluir as extensões usadas pelo projeto (db, png, pdf, ipynb, svg, lock) e cobrir com teste o caso 'extensão fora da whitelist' para que a limitação seja deliberada e visível."}, {"severidade": "media", "arquivo": "autodev/config.py", "linha": 216, "descricao": "registro_compartilhado isenta colisão para QUALQUER caminho que tenha um componente de diretório 'logs' ou 'evidence' (casefold), em qualquer profundidade, não só sob .autodev/sprints/<sprint>/. Verificado: valida_dag devolve [] para P01/P02 na mesma onda citando 'src/evidence/coleta.py' e 'logs/rotacao.py' — dois arquivos de CÓDIGO, exatamente o caso que a guarda existe para barrar. É uma válvula de escape fora do escopo dos critérios de aceitação (o AC não pede carve-out) e não há teste que a limite a .autodev.", "correcao_sugerida": "Ancorar a isenção no prefixo do sprint ('.autodev/sprints/<sprint>/') e restringir a extensões append-only (.log/.md/.txt), ex.: exigir caminho com partes[:2] == ('.autodev','sprints'); cobrir com teste que 'src/evidence/x.py' NÃO é isento."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 213, "descricao": "O alias '_normalizar_caminho = normalizar_caminho', justificado como 'compatibilidade para consumidores antigos', não tem nenhum consumidor: grep em todo o repo só encontra a própria definição. Código morto.", "correcao_sugerida": "Remover o alias enquanto não houver consumidor (ou nomear o consumidor real no comentário)."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 289, "descricao": "A guarda nova do motor não espelha a regra de arquivo_de_teste que o portão do plano usa (D-16: arquivo de teste colide em QUALQUER onda). Verificado: DAG com P01/P02 citando '.autodev/tests/test_x.py' em ondas diferentes passa em valida_dag (init -> válido), enquanto planner.colisoes_de_arquivo no plano equivalente acusa colisão. O comentário no código afirma que 'o planejador e o validador do motor usam a mesma regra', o que só vale para caminho/registro compartilhado.", "correcao_sugerida": "Ou replicar a regra de teste no valida_dag, ou ajustar o comentário para deixar explícita a divergência entre `init` e o portão do plano."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 204, "descricao": "normalizar_caminho não colapsa '..': valida_dag devolve [] para P01 'altera src/../autodev/config.py' contra P02 'altera autodev/config.py' na mesma onda (verificado). Era limitação pré-existente do planner, mas agora virou a regra do motor e é trivialmente explorável por texto de critério gerado pelo planejador.", "correcao_sugerida": "Colapsar componentes '.'/'..' antes do as_posix() (sem tocar no filesystem) ou recusar caminhos que contenham '..'."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_guarda.py
+  - autodev/config.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #4.
+Estrategia decidida: SWITCH_AGENT.
+Motivo: mesma falha pela 4a vez — trocando para agy
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+RESULTADO: `valida_dag` barra colisões na mesma onda, normaliza caminhos e preserva avisos entre ondas; regressão do planner corrigida | TESTES: `python3 -m pytest .autodev/tests/test_plan_guarda.py -q` — 18 passed; suíte completa — 376 passed
+
+===== STDERR =====
+

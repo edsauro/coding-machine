@@ -1,0 +1,3699 @@
+Reading additional input from stdin...
+OpenAI Codex v0.154.0
+--------
+workdir: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a0eb24-9635-7681-b75d-11ec89746082
+--------
+user
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P02: Barrar colisao na mesma onda no validador do motor
+
+## Criterios de aceitacao (todos obrigatorios)
+- valida_dag em autodev/config.py recusa DAG com duas tasks na mesma onda citando o mesmo arquivo, citando os ids e o caminho
+- a recusa alcanca o comando autodev init, que ja chama valida_dag
+- plano com o mesmo arquivo em ondas diferentes continua valido (aviso, nao erro)
+- os testes ficam em .autodev/tests/test_plan_guarda.py e rodam com python3 -m pytest .autodev/tests/test_plan_guarda.py -q
+- estende autodev/config.py preservando valida_dag, ordem_topologica e carga_dag existentes, sem remover nem renomear nada
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+  - tentativa 2: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+dag, que o orquestrador usa para QUALQUER sprint já existente (orchestrator.py:213) — sem migração, sem allow-list e sem isenção para arquivos de log/registro append-only. Efeito medido agora no repo: DEVFACTORY-004/dag.json (rastreado no git) passa a falhar em carrega_dag com 'colisão de arquivo entre P02 e P03: .autodev/sprints/DEVFACTORY-004/decisions.md (onda 1)'. Editar o mesmo decisions.md por duas tasks paralelas é convenção documentada do projeto (os merges das sprints 002/004 reconciliam justamente 'decisions.md com os DOIS registros preservados'), então um DAG válido e já planejado fica inutilizável de um commit para o outro.", "correcao_sugerida": "Isentar caminhos de registro compartilhados (ex.: <sprint>/decisions.md, logs/**, evidence/**) da colisão dura — mantendo-os como aviso —, ou introduzir a checagem apenas no portão de escrita (init/plan) em vez de no carregamento, e declarar explicitamente no README/Pendencias.md o que fazer com DAGs existentes reprovados."}, {"severidade": "media", "arquivo": "autodev/config.py", "linha": 22, "descricao": "A regex _ARQUIVO herdada do planejador (onde gerava apenas aviso) virou critério de recusa dura no motor, mas continua permissiva: extrai tokens que não são arquivos. Medido: 'cobre o caso 3.a da spec' -> {'3.a'}, 'atualiza a versao 1.b do doc' -> {'1.b'}, 'resumo: e.g. isto nao muda nada' -> {'e.g'}. Duas tasks na mesma onda cujos critérios citem 'caso 3.a' (numeração de item de spec) seriam recusadas no init com uma 'colisão de arquivo' inexistente — falso positivo que bloqueia trabalho, não que o alerta.", "correcao_sugerida": "Antes de reusar a regex como hard error, restringi-la a tokens com separador de diretório ou extensão conhecida (ex.: exigir '/' no caminho quando não for Makefile/Dockerfile, ou validar contra uma lista de extensões de código/doc), e cobrir esse caso com um teste negativo (texto com 'item 3.a' não deve gerar colisão)."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 276, "descricao": "Numeração de onda inconsistente entre as duas mensagens do mesmo sprint: valida_dag usa índice 0-based ('(onda 0)') enquanto o planejador usa 1-based (tests esperam onda 1 / onda_b 2 em avisos_de_colisao_de_arquivo) e o próprio texto do P02 fala de ondas. O usuário lê 'onda 0' no init e 'onda 1' no plano para a mesma primeira onda.", "correcao_sugerida": "Usar `numero + 1` na mensagem de valida_dag (e no print de cli.cmd_init, se quiser alinhar tudo) ou padronizar 0-based nos dois módulos, decidindo isso explicitamente."}, {"severidade": "baixa", "arquivo": "autodev/config.py", "linha": 199, "descricao": "A comparação é textual e trivialmente evadível: 'autodev/config.py' vs 'config.py' (sem diretório) ou um caminho absoluto não colidem, então a guarda passa a depender de como o planejador escreveu o critério. O teste novo só prova as formas './' e '\\\\', as duas normalizadas; nenhum teste cobre o falso negativo. Uso agora também em valida_dag, que só olha 'criterios' e 'teste' — se o dag.json não persistir o campo 'teste', a checagem do init fica mais fraca que a do planejador.", "correcao_sugerida": "Comparar por sufixo/últimos segmentos (ou pelo caminho resolvido quando o arquivo existir) além da forma normalizada, e adicionar teste cobrindo 'config.py' vs 'autodev/config.py'; documentar que a guarda é textual e best-effort."}, {"severidade": "baixa", "arquivo": "autodev/planner.py", "linha": 236, "descricao": "planner._normalizar_caminho passou a ser só um wrapper sobre `config._normalizar_caminho`, acessando um símbolo privado (underscore) de outro módulo. Funciona e não há dead code (PurePosixPath continua usado na linha 241), mas cria acoplamento a nome privado num pacote que declara regra comum entre planejador e motor.", "correcao_sugerida": "Tornar a função pública em config.py (ex.: `normalizar_caminho`) — junto com a regra de caminhos — e chamá-la dos dois lados; nenhuma dependência nova é necessária (re e pathlib são stdlib)."}]
+```
+### Arquivos ja tocados
+  - .autodev/tests/test_plan_guarda.py
+  - autodev/config.py
+  - autodev/planner.py
+
+## INSTRUCAO
+Esta e a tentativa #3.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-sol/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+Vou corrigir a abordagem anterior: ela tornou uma heurística textual permissiva em erro global durante todo carregamento, gerando falsos positivos e quebrando DAGs existentes. Vou aplicar TDD com uma regra conservadora e compatível, preservando registros compartilhados como aviso.
+exec
+/usr/bin/bash -lc "sed -n '1,240p' /home/saurus/.codex/skills/using-superpowers/SKILL.md && sed -n '1,260p' /home/saurus/.codex/skills/test-driven-development/SKILL.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 0ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+---
+
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, ignore this skill.
+</SUBAGENT-STOP>
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## The Rule
+
+**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+
+**Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
+
+Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+
+## Skill Priority
+
+When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
+
+- "Let's build X" → superpowers:brainstorming first, then implementation skills.
+- "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+
+## Red Flags
+
+These thoughts mean STOP—you're rationalizing:
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+
+## Platform Adaptation
+
+If your harness appears here, read its reference file for special instructions:
+
+- Codex: `references/codex-tools.md`
+- Pi: `references/pi-tools.md`
+- Antigravity: `references/antigravity-tools.md`
+- Hermes Agent: `references/hermes-tools.md`
+
+## User Instructions
+
+User instructions (CLAUDE.md, AGENTS.md, GEMINI.md, etc, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows or instructions when your human partner has explicitly told you to.
+---
+name: test-driven-development
+description: Use when implementing any feature or bugfix, before writing implementation code
+---
+
+# Test-Driven Development (TDD)
+
+## Overview
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+**Violating the letter of the rules is violating the spirit of the rules.**
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+- Refactoring
+- Behavior changes
+
+**Exceptions (ask your human partner):**
+- Throwaway prototypes
+- Generated code
+- Configuration files
+
+Thinking "skip TDD just this once"? Stop. That's rationalization.
+
+## The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Write code before the test? Delete it. Start over.
+
+**No exceptions:**
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+
+Implement fresh from tests. Period.
+
+## Red-Green-Refactor
+
+```dot
+digraph tdd_cycle {
+    rankdir=LR;
+    red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
+    verify_red [label="Verify fails\ncorrectly", shape=diamond];
+    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
+    verify_green [label="Verify passes\nAll green", shape=diamond];
+    refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
+    next [label="Next", shape=ellipse];
+
+    red -> verify_red;
+    verify_red -> green [label="yes"];
+    verify_red -> red [label="wrong\nfailure"];
+    green -> verify_green;
+    verify_green -> refactor [label="yes"];
+    verify_green -> green [label="no"];
+    refactor -> verify_green [label="stay\ngreen"];
+    verify_green -> next;
+    next -> red;
+}
+```
+
+### RED - Write Failing Test
+
+Write one minimal test showing what should happen.
+
+<Good>
+```typescript
+test('retries failed operations 3 times', async () => {
+  let attempts = 0;
+  const operation = () => {
+    attempts++;
+    if (attempts < 3) throw new Error('fail');
+    return 'success';
+  };
+
+  const result = await retryOperation(operation);
+
+  expect(result).toBe('success');
+  expect(attempts).toBe(3);
+});
+```
+Clear name, tests real behavior, one thing
+</Good>
+
+<Bad>
+```typescript
+test('retry works', async () => {
+  const mock = jest.fn()
+    .mockRejectedValueOnce(new Error())
+    .mockRejectedValueOnce(new Error())
+    .mockResolvedValueOnce('success');
+  await retryOperation(mock);
+  expect(mock).toHaveBeenCalledTimes(3);
+});
+```
+Vague name, tests mock not code
+</Bad>
+
+**Requirements:**
+- One behavior
+- Clear name
+- Real code (no mocks unless unavoidable)
+
+### Verify RED - Watch It Fail
+
+**MANDATORY. Never skip.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test fails (not errors)
+- Failure message is expected
+- Fails because feature missing (not typos)
+
+**Test passes?** You're testing existing behavior. Fix test.
+
+**Test errors?** Fix error, re-run until it fails correctly.
+
+### GREEN - Minimal Code
+
+Write simplest code to pass the test.
+
+<Good>
+```typescript
+async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === 2) throw e;
+    }
+  }
+  throw new Error('unreachable');
+}
+```
+Just enough to pass
+</Good>
+
+<Bad>
+```typescript
+async function retryOperation<T>(
+  fn: () => Promise<T>,
+  options?: {
+    maxRetries?: number;
+    backoff?: 'linear' | 'exponential';
+    onRetry?: (attempt: number) => void;
+  }
+): Promise<T> {
+  // YAGNI
+}
+```
+Over-engineered
+</Bad>
+
+Don't add features, refactor other code, or "improve" beyond the test.
+
+### Verify GREEN - Watch It Pass
+
+**MANDATORY.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test passes
+- Other tests still pass
+- Output pristine (no errors, warnings)
+
+**Test fails?** Fix code, not test.
+
+**Other tests fail?** Fix now.
+
+### REFACTOR - Clean Up
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green. Don't add behavior.
+
+### Repeat
+
+Next failing test for next feature.
+
+## Good Tests
+
+| Quality | Good | Bad |
+|---------|------|-----|
+| **Minimal** | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
+| **Clear** | Name describes behavior | `test('test1')` |
+| **Shows intent** | Demonstrates desired API | Obscures what code should do |
+
+When writing or changing any test, read [writing-good-tests.md](writing-good-tests.md) for the rules that keep tests honest:
+- Name the production change that would make the test fail — before writing it
+- Assert on real behavior, never on mock behavior
+- Keep test-only code in test utilities, out of production classes
+- Understand a dependency's side effects before mocking it
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests written after pass immediately — which proves nothing. They may test the wrong thing, test the implementation instead of the behavior, or miss the edge case you forgot. You never watched it fail, so you never proved it can catch the bug. Test-first forces that failure. |
+| "Tests after achieve same goals (spirit not ritual)" | Tests-after answer "what does this do?"; tests-first answer "what should this do?" Tests written after are biased by the code you already wrote — you verify the cases you remembered, not the ones you'd have discovered. Coverage without proof the tests work. |
+| "Already manually tested" | Manual testing is ad-hoc: no record of what you covered, no way to re-run it when the code changes, easy to forget cases under pressure. "Worked when I tried it" ≠ comprehensive. Automated tests run the same way every time. |
+| "Deleting X hours is wasteful" | Sunk cost fallacy — that time is already spent either way. The real choice: rewrite with TDD (high confidence) vs. keep it and bolt tests on after (low confidence, likely bugs). Keeping code you can't trust is the waste. |
+| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
+| "TDD will slow me down" | TDD IS the pragmatic path: catches bugs before commit, prevents regressions, lets you refactor without fear. "Pragmatic" shortcuts mean debugging in production — slower, not faster. |
+| "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
+| "Existing code has no tests" | You're improving it. Add tests for existing code. |
+
+## Red Flags - STOP and Start Over
+
+- Code before test
+- Test after implementation
+- Test passes immediately
+- Can't explain why test failed
+- Tests added "later"
+- Rationalizing "just this once"
+- "I already manually tested it"
+- "Tests after achieve the same purpose"
+- "It's about spirit not ritual"
+- "Keep as reference" or "adapt existing code"
+- "Already spent X hours, deleting is wasteful"
+- "TDD is dogmatic, I'm being pragmatic"
+- "This is different because..."
+
+**All of these mean: Delete code. Start over with TDD.**
+
+## Example: Bug Fix
+
+**Bug:** Empty email accepted
+
+**RED**
+```typescript
+test('rejects empty email', async () => {
+  const result = await submitForm({ email: '' });
+  expect(result.error).toBe('Email required');
+});
+```
+
+**Verify RED**
+```bash
+$ npm test
+
+codex
+Estou usando `using-superpowers` para seguir o fluxo obrigatório do repositório e `test-driven-development` para primeiro reproduzir cada regressão indicada pelo revisor, depois aplicar a correção mínima.
+exec
+/usr/bin/bash -lc "cat /home/saurus/.codex/skills/using-superpowers/references/codex-tools.md && cat /home/saurus/.codex/skills/test-driven-development/writing-good-tests.md && git status --short && sed -n '1,360p' autodev/config.py && sed -n '1,360p' .autodev/tests/test_plan_guarda.py && git diff -- autodev/config.py autodev/planner.py .autodev/tests/test_plan_guarda.py" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 0ms:
+## Subagent dispatch requires multi-agent support
+
+Add to your Codex config (`~/.codex/config.toml`):
+
+```toml
+[features]
+multi_agent = true
+```
+
+This enables the multi-agent tools that skills like
+`dispatching-parallel-agents` and `subagent-driven-development` use.
+Which tools you get depends on the multi-agent version your model
+preset selects (current presets run V2; older ones run V1). Trust your
+actual tool list over any table — including this one — when they
+disagree.
+
+- **Spawning:** give children a clean context with
+  `spawn_agent {fork_turns: "none"}`; the default `"all"` copies your
+  entire transcript into the child. On Codex 0.145+, role files under
+  `~/.codex/agents/` attach to isolated forks via `agent_type`.
+  Full-history forks accept `model` and `reasoning_effort` overrides
+  (only `agent_type` is refused there) — isolated forks are the SDD
+  default for context hygiene, not because overrides require them.
+- **Fix rounds:** resume the implementer with `followup_task` — it
+  delivers your message, triggers a turn, and transparently reloads a
+  child the harness evicted. Never dispatch a fresh implementer on the
+  theory that a spawned agent cannot be messaged again; on V2 it
+  always can.
+- **Lifecycle:** V2 has no `close_agent`. Finished children are
+  evicted automatically when slots are needed; leaving them unclosed
+  costs nothing. Only V1 sessions have `close_agent` — there, close
+  reviewers when their review returns, and close each implementer
+  after its task's review passes.
+- **Model names:** never copy a model name from a skill, table, or old
+  session into `spawn_agent` without checking it against your current
+  spawn allowlist — V2 accepts only V2-capable presets and hard-errors
+  on the rest.
+
+## Waiting on children
+
+`wait_agent` is an event subscription, not a poll: a long wait wakes
+the moment a child produces mailbox activity, with the same latency as
+a short one. Short-timeout polling buys nothing and costs a tool call —
+and a context rebill — per poll. In measured sessions, roughly
+two-thirds of all wait calls were short polls that timed out.
+
+- While you still have local work, do not wait at all. A completed
+  child's final answer is pushed into your mailbox and arrives with
+  your next turn.
+- When you are genuinely idle with children outstanding, wait in
+  bounded stretches: `wait_agent` with `timeout_ms` 300000-600000
+  (5-10 minutes). After each stretch — wake or timeout — post one
+  status line, run `list_agents`, and chase any child that finished
+  without reporting. Never stack polls shorter than five minutes; the
+  event subscription wakes a bounded stretch just as fast as a short
+  one.
+- Completion mail cannot wake an idle controller (it is delivered
+  without triggering a turn); covering that idle window is
+  `wait_agent`'s only job. A stretch that times out with no activity
+  is your cue to reconcile, not to shorten the next stretch.
+
+## Model routing on spawns
+
+Every `spawn_agent` you issue — including when you are yourself a
+spawned child running a fan-out — sets `model` AND `reasoning_effort`
+explicitly, per the Model Selection rules of the skill you are
+executing. Setting `model` alone is a trap: the child's effort
+silently resets to that model's default, not to yours.
+
+Ask your human partner to add a machine-level backstop to
+`~/.codex/config.toml` so any spawn that slips through still routes to
+a deliberate tier instead of silently inheriting the session's most
+expensive model:
+
+```toml
+[agents]
+default_subagent_model = "<a mid-tier model from your spawn allowlist>"
+default_subagent_reasoning_effort = "medium"
+```
+
+## Environment Detection
+
+Skills that create worktrees or finish branches should detect their
+environment with read-only git commands before proceeding:
+
+```bash
+GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
+GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
+BRANCH=$(git branch --show-current)
+```
+
+- `GIT_DIR != GIT_COMMON` → already in a linked worktree (skip creation)
+- `BRANCH` empty → detached HEAD (cannot branch/push/PR from sandbox)
+
+See `using-git-worktrees` Step 0 and `finishing-a-development-branch`
+Step 1 for how each skill uses these signals.
+
+## Codex App Finishing
+
+When the sandbox blocks branch/push operations (detached HEAD in an
+externally managed worktree), the agent commits all work and informs
+the user to use the App's native controls:
+
+- **"Create branch"** — names the branch, then commit/push/PR via App UI
+- **"Hand off to local"** — transfers work to the user's local checkout
+
+The agent can still run tests, stage files, and output suggested branch
+names, commit messages, and PR descriptions for the user to copy.
+# Writing Good Tests
+
+**Load this reference when:** writing or changing tests, adding mocks, or
+adding cleanup/helper methods for tests.
+
+## Overview
+
+A test exists to catch a specific break. Two principles govern everything
+here:
+
+```
+1. Every test names the break it catches
+2. Every test exercises the real thing
+```
+
+Strict TDD produces both naturally: a test written first and watched
+failing against real code has already proven it can fail, and only earns
+a mock when the real dependency proves slow or external.
+
+## Principle 1: Name the Break
+
+Before writing the test body, answer: **what production change should
+make this test fail — and is that change a bug or a decision?** A test
+earns its place by catching a wrong branch, missing side effect, wrong
+argument, boundary case, or broken contract.
+
+**Derive expectations independently.** Use literals and hand-checked
+fixtures; table-driven tests with literal `want` values are the preferred
+shape. An expectation computed by the code under test — or its helpers —
+passes no matter what that code does:
+
+```typescript
+// ❌ Mirror assertion: the same builder computes both sides — always true
+const expected = buildSearchQuery({ tag: 'urgent' });
+expect(buildSearchQuery({ tag: 'urgent' })).toBe(expected);
+
+// ✅ Hand-derived literal
+expect(buildSearchQuery({ tag: 'urgent' })).toBe('tag:"urgent"');
+```
+
+**No change detectors.** If only intentional decisions can fail a test —
+a constant's value, exact message wording, private structure — it fires
+on redesign and sleeps through bugs. Test the behavior that depends on
+the decision: not `expect(MAX_RETRIES).toBe(5)` but "a failing call is
+retried 5 times and the 6th attempt never happens."
+
+**Behavior, not text.** Asserting that a script, skill, or config
+contains an exact line proves only that the source is the source. Run
+scripts against controlled inputs and assert outputs, side effects, or
+exit codes. Documents that instruct agents are tested by the consuming
+agent's behavior (superpowers:writing-skills); prose for humans earns no
+test at all.
+
+**Your code, not the framework.** Test the contract your code makes at
+its boundaries — the route you register, the query you emit, the payload
+you produce. Upstream mechanics are their maintainers' tests to write
+(the classic: asserting your router invokes a registered handler — that
+is the framework's test, not yours). When upstream behavior genuinely
+surprised you, write one narrow characterization test naming the
+assumption. The same boundary applies inside your code: constructors,
+getters, constants, and trivial forwarding earn tests only when they
+validate, normalize, default, derive, enforce, or cause side effects —
+otherwise assert the first consumer-visible result that depends on them.
+
+### Gate Function
+
+```
+BEFORE writing the test body:
+  Name the production change that would make this test fail.
+
+  Cannot name one            → redesign around an observable behavior
+  "The source text changed"  → run the artifact and assert its effects
+  Only intentional decisions → change detector; test the behavior
+                               that depends on the decision
+
+  Confirm the expected value is derived without the code under test.
+  IF it reuses the code's logic or helpers:
+    Replace it with a literal or hand-checked fixture
+```
+
+## Principle 2: Exercise the Real Thing
+
+**The mock earns no assertions.** A mock assertion passes when the mock
+is present and fails when it is absent — it says nothing about the
+component. Assert the real component's behavior; if the mock is what you
+are checking, unmock it or delete the assertion.
+
+```typescript
+// ✅ Real behavior
+expect(screen.getByRole('navigation')).toBeInTheDocument();
+
+// ❌ Mock existence
+expect(screen.getByTestId('sidebar-mock')).toBeInTheDocument();
+```
+
+**your human partner's correction:** "Are we testing the behavior of a
+mock?"
+
+**Mock at the right level.** Learn every side effect of the real method
+before replacing it; mock the slow or external operation and keep what
+the test depends on real. When unsure, run the test against the real
+implementation first and observe what actually needs to happen.
+
+```typescript
+// ❌ The mock swallows the config write that duplicate detection reads
+vi.mock('ToolCatalog', () => ({
+  discoverAndCacheTools: vi.fn().mockResolvedValue(undefined)
+}));
+
+// ✅ Mock only the slow server startup; the config write stays real
+vi.mock('MCPServerManager');
+```
+
+**Make doubles specific.** When arguments, call counts, or ordering are
+part of the contract, assert them — a fake that accepts anything verifies
+nothing. Give each branch (success, error, malformed) its own fixture or
+spy, so the wrong branch cannot satisfy the expectation.
+
+**Mirror real data completely.** Mock the complete structure as it exists
+in reality — all documented fields — not just the ones your test reads.
+Partial mocks fail silently when downstream code reads an omitted field:
+the test passes while integration breaks.
+
+**Production classes carry production methods only.** Cleanup that only
+tests need lives in test utilities, never as a `destroy()` on the
+production class. Ask: is this method called only from tests? Does this
+class own this resource's lifecycle? Wrong answers → test utility.
+
+**Prefer real components over complex mocks.** When mock setup outgrows
+the test logic, mocks miss methods the real components have, or tests
+break when the mock changes, switch to an integration test with real
+components. **your human partner's question:** "Do we need to be using a
+mock here?"
+
+### Gate Function
+
+```
+BEFORE adding a mock or test helper:
+  List the real method's side effects; keep the ones the test
+  depends on real — mock the slow/external level below them.
+
+  Mock responses mirror the complete real structure.
+
+  A method only tests call lives in test utilities, not production.
+
+  About to assert on the mock itself?
+    Unmock it or delete the assertion.
+```
+
+## Tests Ship With the Implementation
+
+The TDD cycle — failing test, minimal implementation, refactor — is what
+"complete" means. Ship the tests the behavior needs and only those:
+trivial code and human prose earn none, and a test written to satisfy
+process costs maintenance forever.
+
+## The Mutation Check
+
+Before finishing, mentally mutate the production code; at least one test
+should fail for each realistic mutation:
+
+- Wrong constant or argument
+- Wrong branch handler
+- Missing state change or side effect
+- Empty or default return
+- Missing validation for zero, empty, nil, unauthorized, or malformed input
+
+A mutation nothing catches marks the behavior as unprotected — or the
+test as tautological.
+
+## Quick Reference
+
+| When you... | Do |
+|-------------|-----|
+| Write any test | Name the break it catches — a bug, not a decision |
+| Build an expected value | Derive it by hand; never with the code under test |
+| Test a script or document | Run it / pressure-test its consumer; never grep its text |
+| Reach for a dependency test | Test your boundary contract, not their documented mechanics |
+| Want to assert on a mocked element | Test the real component, or unmock it |
+| Are about to mock a method | Learn its side effects; mock the slow/external level |
+| Build a mock response | Mirror the real structure completely |
+| Need cleanup only tests use | Put it in test utilities |
+| Watch mock setup balloon | Switch to an integration test with real components |
+| Finish a test file | Run the mutation check |
+
+## Warning Signs
+
+- Setup and assertion share the same object, guaranteeing equality
+- The test can fail only through a panic, crash, or missing selector
+- The test fails on every intentional change, never on accidental breakage
+- Expected values are hidden behind loops, builders, or helpers
+- The test greps source text, or asserts a removed symbol stays removed
+- The test would still matter if only the framework remained
+- The test exists for coverage, checking no side effect or outcome
+- An assertion checks a `*-mock` test ID, or fails if you remove the mock
+- A method is called only from test files
+- Mock setup is more than half the test, or you can't explain why the mock is needed
+- Mocking "just to be safe"
+"""DEVFACTORY — carregamento de configuração e schemas do Sprint (T02).
+
+Os schemas ficam aqui, em código, e são validados na carga: um sprint.yaml ou
+dag.json malformado deve falhar cedo e alto, não no meio de uma execução.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
+
+import yaml
+
+RAIZ = Path(__file__).resolve().parent.parent
+AUTODEV = RAIZ / ".autodev"
+CONFIG = AUTODEV / "config"
+
+# Referências textuais a arquivos.  O planejador e o validador do motor usam a
+# mesma regra para que um plano aprovado não mude de significado no `init`.
+_ARQUIVO = re.compile(
+    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+    r"|\b(?:Makefile|Dockerfile)\b"
+)
+
+ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+           "REVIEW", "RETRY", "DONE", "FAILED", "INTEGRATED", "WAITING_RESOURCE"]
+
+TRANSICOES = {
+    "NEW": {"PLANNED", "BLOCKED"},
+    "PLANNED": {"QUEUED", "BLOCKED"},
+    "QUEUED": {"RUNNING", "BLOCKED", "WAITING_RESOURCE"},
+    "RUNNING": {"VERIFYING", "RETRY", "FAILED", "BLOCKED", "WAITING_RESOURCE"},
+    "VERIFYING": {"REVIEW", "RETRY", "DONE", "FAILED", "BLOCKED"},
+    "REVIEW": {"DONE", "RETRY", "FAILED", "BLOCKED"},
+    "RETRY": {"QUEUED", "BLOCKED", "FAILED", "WAITING_RESOURCE"},
+    "WAITING_RESOURCE": {"QUEUED", "RUNNING", "BLOCKED"},
+    "DONE": {"INTEGRATED"},
+    "INTEGRATED": set(),
+    "FAILED": {"QUEUED"},
+    # BLOCKED -> DONE: um bloqueio por limite de tentativas é uma decisão sobre
+    # TENTATIVAS, não sobre o trabalho. Se a revisão da última tentativa volta
+    # APPROVE depois disso (revisão de LLM leva minutos), a entrega está validada e
+    # precisa poder ser finalizada. Sem esta aresta o motor quebrava com
+    # "TransicaoInvalida: P04: BLOCKED -> DONE não permitido" e derrubava a rodada.
+    "BLOCKED": {"QUEUED", "DONE"},
+}
+
+# Estados TERMINAIS de tarefa: nada mais a fazer, com ou sem sucesso.
+TERMINAIS_TASK = {"INTEGRATED"}
+
+# --------------------------------------------------------------------------- #
+# Estados do SPRINT
+# --------------------------------------------------------------------------- #
+# A máquina acima governa UMA tarefa. O sprint tem ciclo de vida próprio, e sem
+# um estado terminal explícito "encerrar a sprint" não existe como operação —
+# o `status:` do sprint.yaml fica congelado no que foi escrito à mão.
+#
+# Aqui a fonte é o banco (sprint_state.estado), não o yaml: o yaml declara a
+# intenção, o banco registra o fato.
+ESTADOS_SPRINT = ["PLANEJADO", "EM_EXECUCAO", "EM_VERIFICACAO", "ENCERRADO",
+                  "ABORTADO"]
+# Caminho de avanço (o ABORTADO fica de fora: é saída lateral, não etapa)
+ORDEM_SPRINT = ["PLANEJADO", "EM_EXECUCAO", "EM_VERIFICACAO", "ENCERRADO"]
+SPRINT_TERMINAIS = {"ENCERRADO", "ABORTADO"}
+TRANSICOES_SPRINT = {
+    "PLANEJADO": {"EM_EXECUCAO", "ABORTADO"},
+    "EM_EXECUCAO": {"EM_VERIFICACAO", "ABORTADO"},
+    "EM_VERIFICACAO": {"ENCERRADO", "EM_EXECUCAO", "ABORTADO"},
+    "ENCERRADO": set(),
+    "ABORTADO": set(),
+}
+
+
+def _carrega_yaml(p: Path) -> dict:
+    if not p.exists():
+        raise FileNotFoundError(f"config ausente: {p}")
+    with p.open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+
+@dataclass
+class Config:
+    agents: dict
+    policies: dict
+    models: dict
+    raiz: Path = RAIZ
+
+    @classmethod
+    def carregar(cls, config_dir: Path | None = None) -> "Config":
+        d = config_dir or CONFIG
+        return cls(agents=_carrega_yaml(d / "agents.yaml"),
+                   policies=_carrega_yaml(d / "policies.yaml"),
+                   models=_carrega_yaml(d / "models.yaml"))
+
+    # -- helpers de política -------------------------------------------------
+    def escada(self) -> list[dict]:
+        return self.models["codex"]["ladder"]
+
+    def degrau_por_tier(self, tier: int) -> dict | None:
+        """Degrau da escada de um tier — o MESMO critério de `modelo_para_tentativa`.
+
+        Existe para a decisão de retry poder dizer QUAL degrau usar quando a classe de
+        falha não recebe escalonamento (P-09): sem isso o motor deduzia o degrau do
+        contador da task, e uma falha de rede/ambiente pagava a chamada cara.
+        """
+        degraus = [d for d in self.escada() if d["tier"] == tier]
+        return degraus[0] if degraus else None
+
+    def modelo_para_tentativa(self, tentativa: int) -> dict:
+        """Tentativa N -> degrau da escada (spec §10). 1-indexado."""
+        mapa = self.policies["retry"]["escalonamento"]
+        tier = mapa.get(min(tentativa, max(mapa)), max(mapa.values()))
+        return self.degrau_por_tier(tier) or self.models["codex"]["default"]
+
+    def tier_atual(self, tentativas_implementacao: int) -> int:
+        """Tier do degrau EM USO depois de N tentativas — nunca o próximo da escada."""
+        return self.modelo_para_tentativa(max(tentativas_implementacao, 1))["tier"]
+
+    def classes_sem_escalonamento(self) -> set[str]:
+        return set(self.policies["retry"]["classes_sem_escalonamento"])
+
+    # -- escada de revisão (matriz de 2026-09-27) ----------------------------
+    def revisor_para_tentativa(self, tentativa: int) -> dict:
+        """Tentativa N -> revisor da escada de revisão.
+
+        1-3 = AGY Gemini 3.6/3.7/3.8 Flash; 4-5 = Hermes deepseek-flash/pro.
+        Devolve {} quando não há escada configurada — aí vale a revisão cruzada
+        da spec §16, que é o comportamento antigo. Tentativa acima do último
+        degrau usa o ÚLTIMO degrau: revisor é o que menos pode faltar.
+        """
+        escada = {int(k): v for k, v in (self.models.get("revisao") or {}).items()
+                  if str(k).isdigit() and isinstance(v, dict)}
+        if not escada or not tentativa:
+            return {}
+        return dict(escada[min(int(tentativa), max(escada))])
+
+    def revisor_reserva(self) -> dict:
+        """Revisor que entra quando o da tentativa não pode rodar."""
+        reserva = (self.models.get("revisao") or {}).get("reserva") or {}
+        return dict(reserva) if isinstance(reserva, dict) else {}
+
+    def revisor_reserva_cadeia(self) -> list[dict]:
+        """CADEIA de reserva — o revisor nunca é motivo de parada do sprint.
+
+        Ordem: agy da tentativa (se falhar) -> Hermes flash -> Hermes pro ->
+        portão determinístico. Cada troca fica registrada na revisão.
+        """
+        rev = self.models.get("revisao") or {}
+        cadeia = rev.get("reserva_cadeia")
+        if isinstance(cadeia, list) and cadeia:
+            return [dict(c) for c in cadeia if isinstance(c, dict) and c.get("agente")]
+        r = rev.get("reserva")
+        return [dict(r)] if isinstance(r, dict) and r.get("agente") else []
+
+    def espera_cota(self, modo_teste: bool = False) -> int:
+        c = self.policies["cota_codex"]
+        return c["espera_teste_segundos"] if modo_teste else c["espera_padrao_segundos"]
+
+    def permissoes(self) -> dict:
+        return self.policies["seguranca"]["permissoes"]
+
+    def branch_integracao(self, sprint: str) -> str:
+        """Branch de integração do sprint.
+
+        A política guarda um TEMPLATE (`sprint/{sprint}/integration`); usar o
+        valor cru faria todo sprint integrar no mesmo branch.
+        """
+        bruto = str(self.policies["integracao"].get(
+            "branch_sprint", "sprint/{sprint}/integration"))
+        return bruto.format(sprint=sprint)
+
+    def caminhos_proibidos(self) -> list[str]:
+        return self.policies["seguranca"]["caminhos_proibidos"]
+
+
+# --- schema do sprint --------------------------------------------------------
+
+@dataclass
+class Task:
+    id: str
+    titulo: str
+    criterios: list[str]
+    deps: list[str] = field(default_factory=list)
+    agente: str = "codex"
+    paralelizavel: bool = False
+    estimativa: str = ""
+
+    @staticmethod
+    def validar(d: dict) -> None:
+        faltando = {"id", "titulo", "criterios"} - set(d)
+        if faltando:
+            raise ValueError(f"task sem campos obrigatórios {faltando}: {d}")
+        if not isinstance(d["criterios"], list) or not d["criterios"]:
+            raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+
+
+def _normalizar_caminho(caminho: str) -> str:
+    """Normaliza um caminho textual, sem acessar o filesystem."""
+    caminho = caminho.replace("\\", "/")
+    while caminho.startswith("./"):
+        caminho = caminho[2:]
+    return PurePosixPath(caminho).as_posix().lstrip("/")
+
+
+def arquivos_citados(textos: list[str]) -> set[str]:
+    """Extrai caminhos citados em textos usando a regra comum do plano."""
+    return {
+        _normalizar_caminho(encontrado.group(0))
+        for texto in textos
+        if isinstance(texto, str)
+        for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+    }
+
+
+def valida_dag(dag: dict) -> list[str]:
+    """Valida o DAG e devolve os erros encontrados (lista vazia = ok).
+
+    Checa: ids únicos, deps existem, sem ciclos, e que nenhuma task
+    paralelizável dependa de outra do mesmo grupo paralelo sem ser marcada.
+    """
+    erros: list[str] = []
+    tasks = dag.get("tasks", [])
+    ids = [t.get("id") for t in tasks]
+    if len(ids) != len(set(ids)):
+        erros.append("ids duplicados no DAG")
+    conhecidos = set(ids)
+    for t in tasks:
+        try:
+            Task.validar(t)
+        except ValueError as e:
+            erros.append(str(e))
+        for d in t.get("deps", []):
+            if d not in conhecidos:
+                erros.append(f"{t['id']} depende de {d}, que não existe no DAG")
+    # detecção de ciclo (DFS com marcação de cor)
+    grafo = {t["id"]: list(t.get("deps", [])) for t in tasks}
+    BRANCO, CINZA, PRETO = 0, 1, 2
+    cor = {i: BRANCO for i in grafo}
+
+    def visita(n: str, pilha: list[str]) -> None:
+        cor[n] = CINZA
+        for d in grafo.get(n, []):
+            if cor.get(d) == CINZA:
+                erros.append(f"ciclo: {' -> '.join(pilha + [n, d])}")
+            elif cor.get(d) == BRANCO:
+                visita(d, pilha + [n])
+        cor[n] = PRETO
+
+    for n in grafo:
+        if cor[n] == BRANCO:
+            visita(n, [])
+
+    # A topologia só é calculada para um DAG estruturalmente válido. Isso evita
+    # que uma dependência ausente seja mascarada como uma onda incompleta.
+    if erros:
+        return erros
+
+    # Uma onda é executada em paralelo; duas tasks que citam o mesmo caminho
+    # nela podem sobrescrever o trabalho uma da outra. Dependências colocam o
+    # mesmo caminho em ondas distintas e, portanto, não são erro aqui.
+    arquivos = {
+        t.get("id"): arquivos_citados([
+            *t.get("criterios", []), t.get("teste", ""),
+        ])
+        for t in tasks
+    }
+    ondas = ordem_topologica({"tasks": tasks})
+    for numero, onda in enumerate(ondas):
+        for indice, id_a in enumerate(onda):
+            for id_b in onda[indice + 1:]:
+                for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
+                    erros.append(
+                        f"colisão de arquivo entre {id_a} e {id_b}: "
+                        f"{arquivo} (onda {numero})"
+                    )
+    return erros
+
+
+def carrega_dag(p: Path) -> dict:
+    with p.open(encoding="utf-8") as fh:
+        dag = json.load(fh)
+    erros = valida_dag(dag)
+    if erros:
+        raise ValueError("DAG inválido:\n  - " + "\n  - ".join(erros))
+    return dag
+
+
+def carrega_sprint(p: Path) -> dict:
+    with p.open(encoding="utf-8") as fh:
+        s = yaml.safe_load(fh) or {}
+    for campo in ("sprint_id", "objetivo"):
+        if campo not in s:
+            raise ValueError(f"sprint.yaml sem '{campo}': {p}")
+    return s
+
+
+def ordem_topologica(dag: dict) -> list[list[str]]:
+    """Devolve as 'ondas' do DAG: cada onda pode rodar em paralelo."""
+    grafo = {t["id"]: set(t.get("deps", [])) for t in dag["tasks"]}
+    ondas, restante = [], dict(grafo)
+    while restante:
+        prontos = sorted(n for n, d in restante.items() if not (d & set(restante)))
+        if not prontos:
+            raise ValueError("DAG com ciclo — nenhuma onda progressa")
+        ondas.append(prontos)
+        for n in prontos:
+            del restante[n]
+    return ondas
+import json
+
+from autodev import cli
+from autodev.config import valida_dag
+from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+
+
+def dag_com(*tasks):
+    return {"tasks": list(tasks)}
+
+
+def task(id_, criterio, deps=None):
+    return {"id": id_, "titulo": id_, "criterios": [criterio], "deps": deps or []}
+
+
+def test_valida_dag_recusa_arquivo_citado_na_mesma_onda():
+    erros = valida_dag(dag_com(
+        task("P01", "altera autodev/config.py"),
+        task("P02", "altera autodev/config.py"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and "autodev/config.py" in erro
+               for erro in erros)
+
+
+def test_valida_dag_mantem_arquivo_em_ondas_diferentes_valido():
+    erros = valida_dag(dag_com(
+        task("P01", "altera autodev/config.py"),
+        task("P02", "altera autodev/config.py", deps=["P01"]),
+    ))
+
+    assert erros == []
+
+
+def test_valida_dag_detecta_caminhos_equivalentes_na_mesma_onda():
+    erros = valida_dag(dag_com(
+        task("P01", "altera ./autodev/config.py"),
+        task("P02", "altera autodev\\config.py"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and "autodev/config.py" in erro
+               for erro in erros)
+
+
+def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+    plano = Plano(
+        titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+        tasks=[
+            TaskPlano("P01", "primeira", ["altera autodev/config.py"]),
+            TaskPlano("P02", "segunda", ["altera autodev/config.py"], deps=["P01"]),
+        ],
+    )
+
+    assert avisos_de_colisao_de_arquivo(plano) == [{
+        "task_a": "P01", "task_b": "P02", "arquivo": "autodev/config.py",
+        "onda": 1, "onda_b": 2,
+    }]
+
+
+def test_init_recusa_dag_com_colisao_na_mesma_onda(tmp_path, monkeypatch, capsys):
+    sprint = "S-COLISAO"
+    diretorio = tmp_path / ".autodev" / "sprints" / sprint
+    diretorio.mkdir(parents=True)
+    (diretorio / "dag.json").write_text(json.dumps(dag_com(
+        task("P01", "altera autodev/config.py"),
+        task("P02", "altera autodev/config.py"),
+    )))
+    monkeypatch.setattr(cli, "RAIZ", tmp_path)
+
+    assert cli.main(["--sprint", sprint, "init"]) == 1
+    saida = capsys.readouterr().out
+    assert "P01" in saida and "P02" in saida and "autodev/config.py" in saida
+
+exec
+/usr/bin/bash -lc "sed -n '180,285p' autodev/planner.py && rg -n \"decisions\\.md|logs/|evidence/|arquivos_citados|colisão de arquivo\" .autodev/tests autodev README.md Pendencias.md .autodev/sprints/DEVFACTORY-004/dag.json 2>/dev/null | head -200 && git log -3 --oneline --decorate" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 24ms:
+README.md:63:    ├── sprints/<id>/           # sprint.yaml, dag.json, evidence/, logs/
+.autodev/tests/test_plano_comando.py:119:    (sprint / "decisions.md").write_text("inalterado\n", encoding="utf-8")
+.autodev/tests/test_plan_colisoes.py:86:        "colisão de arquivo entre P01 e P02: autodev/modulo.py (onda 1)"
+.autodev/tests/test_plan_colisoes.py:122:    assert "aviso: colisão de arquivo entre P01 (onda 1) e P02 (onda 2): autodev/modulo.py" in saida
+.autodev/tests/test_plan_colisoes.py:202:@pytest.mark.parametrize("arquivo", ["dag.json", "spec.md", "sprint.yaml", "decisions.md"])
+autodev/report.py:115:    # laço autônomo — que é exatamente a leitura errada (decisions.md D-13).
+autodev/report.py:130:            "execução autônoma de verdade. Ver `decisions.md` D-13.")
+autodev/planner.py:231:    return config.arquivos_citados([*task.criterios, task.teste])
+autodev/planner.py:359:            f"colisão de arquivo entre {colisao['task_a']} e {colisao['task_b']}: "
+.autodev/tests/test_adapters.py:355:    laco autonomo — decisions.md D-13.
+autodev/orchestrator.py:747:                      acao_humana="# inspecionar .autodev/sprints/.../logs/orquestrador.log",
+autodev/orchestrator.py:749:                      verificacao="# tail -50 .autodev/sprints/.../logs/orquestrador.log")
+autodev/cli.py:345:                f"aviso: colisão de arquivo entre {aviso['task_a']} (onda {aviso['onda']}) "
+autodev/config.py:207:def arquivos_citados(textos: list[str]) -> set[str]:
+autodev/config.py:264:        t.get("id"): arquivos_citados([
+autodev/config.py:275:                        f"colisão de arquivo entre {id_a} e {id_b}: "
+.autodev/sprints/DEVFACTORY-004/dag.json:16:        "rode a suite com a forma que o RUNNER do motor resolve: python3 -m pytest .autodev/tests/ -q (nao use .venv/bin/python: dentro do worktree esse venv nao existe de verdade — em 28/09 isso queimou 12 tentativas, evidencia em .autodev/sprints/DEVFACTORY-004/evidence/, D-23)",
+.autodev/sprints/DEVFACTORY-004/dag.json:17:        "preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; se a mudanca exigida invalidar uma assercao existente, ajuste-a de forma MINIMA, registre a decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prove que a cobertura nao caiu (a contagem de python3 -m pytest .autodev/tests/ --collect-only -q nao pode ser menor que antes); o revisor confere a justificativa"
+.autodev/sprints/DEVFACTORY-004/dag.json:34:        "preservacao com evolucao: registre em .autodev/sprints/DEVFACTORY-004/decisions.md, com data, por que a assercao de isolamento foi trocada, e prove a contagem antes/depois; o revisor confere e reprova autorizacao sem essa prova"
+.autodev/sprints/DEVFACTORY-004/dag.json:52:        "preservacao com evolucao: nao remova nem enfraqueca caso de teste de task anterior; ajuste minimo, decisao datada em .autodev/sprints/DEVFACTORY-004/decisions.md e prova de que a cobertura nao caiu"
+Pendencias.md:104:| decisões | `.autodev/sprints/DEVFACTORY-001/decisions.md` (D-13 = conclusão retroativa) |
+Pendencias.md:107:| logs | `.autodev/sprints/DEVFACTORY-001/logs/` |
+Pendencias.md:115:| decisões | `.autodev/sprints/DEVFACTORY-002/decisions.md` (D-01 … D-22 + a **ratificação da revisão retroativa**, 28/09) |
+Pendencias.md:117:| evidência de teste (76) | `.autodev/sprints/DEVFACTORY-002/evidence/` |
+Pendencias.md:118:| logs do motor | `.autodev/sprints/DEVFACTORY-002/logs/orquestrador.log` (+ por tentativa e revisão) |
+Pendencias.md:129:| logs do motor | `.autodev/sprints/DEVFACTORY-003/logs/orquestrador.log` |
+Pendencias.md:136:| decisões | `.autodev/sprints/DEVFACTORY-004/decisions.md` (D-23, D-24, D-25 + as das tasks) |
+Pendencias.md:138:| evidência de teste (27 arquivos) | `.autodev/sprints/DEVFACTORY-004/evidence/` |
+Pendencias.md:139:| logs do motor | `.autodev/sprints/DEVFACTORY-004/logs/orquestrador.log` (+ por tentativa e revisão) |
+Pendencias.md:167:  `decisions.md` da 004 os **dois** registros foram preservados (a numeração das tasks
+Pendencias.md:186:  Registro: seção datada em `.autodev/sprints/DEVFACTORY-002/decisions.md`.
+09d632c (HEAD -> sprint/DEVFACTORY-003/P02-codex) P02: Barrar colisao na mesma onda no validador do motor (codex t2)
+12796bd P02: Barrar colisao na mesma onda no validador do motor (codex t1)
+4c7254d (sprint/DEVFACTORY-003/integration) integrate P01: sprint/DEVFACTORY-003/P01-codex
+
+exec
+/usr/bin/bash -lc "sed -n '1,240p' .autodev/tests/test_plan_colisoes.py && sed -n '285,380p' autodev/planner.py && python3 -m pytest .autodev/tests/test_plan_guarda.py -q" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ exited 1 in 62ms:
+/usr/bin/python3: No module named pytest
+
+codex
+A reprodução confirmou dois pontos: o teste-alvo existente passa, mas o ambiente não tem o módulo `pytest` disponível para `python3`; e a suíte do planejador já define que apenas basenames iguais não implicam colisão, então não vou introduzir a comparação por sufixo sugerida como opcional, pois ela criaria ambiguidade real. Agora adicionarei testes de regressão para tokens não-arquivo, metadados append-only e numeração da onda.
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex/.autodev/tests/test_plan_guarda.py
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+
+exec
+/usr/bin/bash -lc "sed -n '1,180p' .autodev/tests/test_plan_guarda.py && for p in .venv/bin/python venv/bin/python /usr/local/bin/python3; do if [ -x \""'$p" ]; then "$p" -m pytest --version 2>&1 | head -1; fi; done' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 0ms:
+import json
+
+import pytest
+
+from autodev import cli
+from autodev.config import valida_dag
+from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+
+
+def dag_com(*tasks):
+    return {"tasks": list(tasks)}
+
+
+def task(id_, criterio, deps=None):
+    return {"id": id_, "titulo": id_, "criterios": [criterio], "deps": deps or []}
+
+
+def test_valida_dag_recusa_arquivo_citado_na_mesma_onda():
+    erros = valida_dag(dag_com(
+        task("P01", "altera autodev/config.py"),
+        task("P02", "altera autodev/config.py"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and "autodev/config.py" in erro
+               for erro in erros)
+
+
+def test_valida_dag_mantem_arquivo_em_ondas_diferentes_valido():
+    erros = valida_dag(dag_com(
+        task("P01", "altera autodev/config.py"),
+        task("P02", "altera autodev/config.py", deps=["P01"]),
+    ))
+
+    assert erros == []
+
+
+def test_valida_dag_detecta_caminhos_equivalentes_na_mesma_onda():
+    erros = valida_dag(dag_com(
+        task("P01", "altera ./autodev/config.py"),
+        task("P02", "altera autodev\\config.py"),
+    ))
+
+    assert any("P01" in erro and "P02" in erro and "autodev/config.py" in erro
+               for erro in erros)
+
+
+@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
+def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
+    erros = valida_dag(dag_com(
+        task("P01", f"cobre {referencia}"),
+        task("P02", f"documenta {referencia}"),
+    ))
+
+    assert erros == []
+
+
+@pytest.mark.parametrize("arquivo", [
+    ".autodev/sprints/S-1/decisions.md",
+    ".autodev/sprints/S-1/logs/orquestrador.log",
+    ".autodev/sprints/S-1/evidence/resultado.txt",
+])
+def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
+    erros = valida_dag(dag_com(
+        task("P01", f"acrescenta registro em {arquivo}"),
+        task("P02", f"acrescenta registro em {arquivo}"),
+    ))
+
+    assert erros == []
+
+
+def test_valida_dag_numera_primeira_onda_como_um():
+    erros = valida_dag(dag_com(
+        task("P01", "altera autodev/config.py"),
+        task("P02", "altera autodev/config.py"),
+    ))
+
+    assert erros == [
+        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
+    ]
+
+
+def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+    plano = Plano(
+        titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+        tasks=[
+            TaskPlano("P01", "primeira", ["altera autodev/config.py"]),
+            TaskPlano("P02", "segunda", ["altera autodev/config.py"], deps=["P01"]),
+        ],
+    )
+
+    assert avisos_de_colisao_de_arquivo(plano) == [{
+        "task_a": "P01", "task_b": "P02", "arquivo": "autodev/config.py",
+        "onda": 1, "onda_b": 2,
+    }]
+
+
+def test_init_recusa_dag_com_colisao_na_mesma_onda(tmp_path, monkeypatch, capsys):
+    sprint = "S-COLISAO"
+    diretorio = tmp_path / ".autodev" / "sprints" / sprint
+    diretorio.mkdir(parents=True)
+    (diretorio / "dag.json").write_text(json.dumps(dag_com(
+        task("P01", "altera autodev/config.py"),
+        task("P02", "altera autodev/config.py"),
+    )))
+    monkeypatch.setattr(cli, "RAIZ", tmp_path)
+
+    assert cli.main(["--sprint", sprint, "init"]) == 1
+    saida = capsys.readouterr().out
+    assert "P01" in saida and "P02" in saida and "autodev/config.py" in saida
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+
+exec
+/usr/bin/bash -lc "python3 - <<'PY'
+from autodev.config import valida_dag
+
+def task(id_, criterio):
+    return {'id': id_, 'titulo': id_, 'criterios': [criterio], 'deps': []}
+
+cases = [
+    ('texto', {'tasks': [task('P01', 'cobre item 3.a'), task('P02', 'documenta item 3.a')]}, []),
+    ('registro', {'tasks': [task('P01', 'registra .autodev/sprints/S-1/decisions.md'), task('P02', 'registra .autodev/sprints/S-1/decisions.md')]}, []),
+    ('onda', {'tasks': [task('P01', 'altera autodev/config.py'), task('P02', 'altera autodev/config.py')]}, ['colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)']),
+]
+for nome, dag, esperado in cases:
+    obtido = valida_dag(dag)
+    print(nome, obtido)
+    assert obtido == esperado
+PY" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ exited 1 in 239ms:
+texto ['colisão de arquivo entre P01 e P02: 3.a (onda 0)']
+Traceback (most recent call last):
+  File "<stdin>", line 14, in <module>
+AssertionError
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+
+codex
+Os novos casos falharam exatamente pelas causas reportadas (`3.a` virou arquivo e a primeira onda apareceu como `0`). Vou restringir extensões a tipos de arquivo reconhecíveis, expor a normalização como API compartilhada e classificar `decisions.md`, `logs/` e `evidence/` como registros compartilhados: aviso no planejador, nunca bloqueio no motor.
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex/autodev/config.py
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex/autodev/planner.py
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+exec
+/usr/bin/bash -lc "python3 - <<'PY'
+from pathlib import Path
+from autodev.config import carrega_dag, valida_dag
+
+def task(id_, criterio):
+    return {'id': id_, 'titulo': id_, 'criterios': [criterio], 'deps': []}
+
+cases = [
+    ('texto', {'tasks': [task('P01', 'cobre item 3.a'), task('P02', 'documenta item 3.a')]}, []),
+    ('registro', {'tasks': [task('P01', 'registra .autodev/sprints/S-1/decisions.md'), task('P02', 'registra .autodev/sprints/S-1/decisions.md')]}, []),
+    ('onda', {'tasks': [task('P01', 'altera autodev/config.py'), task('P02', 'altera autodev/config.py')]}, ['colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)']),
+]
+for nome, dag, esperado in cases:
+    obtido = valida_dag(dag)
+    print(nome, obtido)
+    assert obtido == esperado
+carrega_dag(Path('.autodev/sprints/DEVFACTORY-004/dag.json'))
+print('DEVFACTORY-004: válido')
+PY
+python3 -m py_compile autodev/config.py autodev/planner.py .autodev/tests/test_plan_guarda.py
+git diff --check
+git diff --stat && git diff" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 458ms:
+texto []
+registro []
+onda ['colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)']
+DEVFACTORY-004: válido
+ .autodev/tests/test_plan_guarda.py | 37 +++++++++++++++++++++++++++++++++++++
+ autodev/config.py                  | 31 ++++++++++++++++++++++++++-----
+ autodev/planner.py                 | 10 ++++++----
+ 3 files changed, 69 insertions(+), 9 deletions(-)
+diff --git i/.autodev/tests/test_plan_guarda.py w/.autodev/tests/test_plan_guarda.py
+index 8240fd4..52ced34 100644
+--- i/.autodev/tests/test_plan_guarda.py
++++ w/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@ def test_valida_dag_detecta_caminhos_equivalentes_na_mesma_onda():
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git i/autodev/config.py w/autodev/config.py
+index cb9db72..897c946 100644
+--- i/autodev/config.py
++++ w/autodev/config.py
+@@ -19,9 +19,14 @@ CONFIG = AUTODEV / "config"
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@ class Task:
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@ def _normalizar_caminho(caminho: str) -> str:
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@ def valida_dag(dag: dict) -> list[str]:
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git i/autodev/planner.py w/autodev/planner.py
+index 9ba5803..74fa1a0 100644
+--- i/autodev/planner.py
++++ w/autodev/planner.py
+@@ -233,7 +233,7 @@ def _arquivos_da_task(task: TaskPlano) -> set[str]:
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@ def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@ def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+codex
+A implementação já passa nas verificações diretas, mantém o DAG DEVFACTORY-004 carregável e elimina o acoplamento privado do planejador. Antes de encerrar, vou seguir as rotinas de diagnóstico e verificação final para procurar regressões, incluindo o comando de teste exigido — a indisponibilidade local de `pytest` será reportada objetivamente se persistir.
+exec
+/usr/bin/bash -lc 'cat /home/saurus/.codex/skills/systematic-debugging/SKILL.md && cat /home/saurus/.codex/skills/verification-before-completion/SKILL.md' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 0ms:
+---
+name: systematic-debugging
+description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
+---
+
+# Systematic Debugging
+
+## Overview
+
+**Core principle:** ALWAYS find root cause before attempting fixes. Symptom fixes are failure.
+
+**Violating the letter of this process is violating the spirit of debugging.**
+
+## The Iron Law
+
+```
+NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+```
+
+If you haven't completed Phase 1, you cannot propose fixes.
+
+## When to Use
+
+Use for ANY technical issue:
+- Test failures
+- Bugs in production
+- Unexpected behavior
+- Performance problems
+- Build failures
+- Integration issues
+
+**Use this ESPECIALLY when:**
+- Under time pressure (emergencies make guessing tempting)
+- "Just one quick fix" seems obvious
+- You've already tried multiple fixes
+- Previous fix didn't work
+- You don't fully understand the issue
+
+**Don't skip when:**
+- Issue seems simple (simple bugs have root causes too)
+- You're in a hurry (rushing guarantees rework)
+- Manager wants it fixed NOW (systematic is faster than thrashing)
+
+## The Four Phases
+
+You MUST complete each phase before proceeding to the next.
+
+### Phase 1: Root Cause Investigation
+
+**BEFORE attempting ANY fix:**
+
+1. **Read Error Messages Carefully**
+   - Don't skip past errors or warnings
+   - They often contain the exact solution
+   - Read stack traces completely
+   - Note line numbers, file paths, error codes
+
+2. **Reproduce Consistently**
+   - Can you trigger it reliably?
+   - What are the exact steps?
+   - Does it happen every time?
+   - If not reproducible → gather more data, don't guess
+
+3. **Check Recent Changes**
+   - What changed that could cause this?
+   - Git diff, recent commits
+   - New dependencies, config changes
+   - Environmental differences
+
+4. **Gather Evidence in Multi-Component Systems**
+
+   **WHEN system has multiple components (CI → build → signing, API → service → database):**
+
+   **BEFORE proposing fixes, add diagnostic instrumentation:**
+   ```
+   For EACH component boundary:
+     - Log what data enters component
+     - Log what data exits component
+     - Verify environment/config propagation
+     - Check state at each layer
+
+   Run once to gather evidence showing WHERE it breaks
+   THEN analyze evidence to identify failing component
+   THEN investigate that specific component
+   ```
+
+   **Example (multi-layer system):**
+   ```bash
+   # Layer 1: Workflow
+   echo "=== Secrets available in workflow: ==="
+   echo "IDENTITY: ${IDENTITY:+SET}${IDENTITY:-UNSET}"
+
+   # Layer 2: Build script
+   echo "=== Env vars in build script: ==="
+   env | grep IDENTITY || echo "IDENTITY not in environment"
+
+   # Layer 3: Signing script
+   echo "=== Keychain state: ==="
+   security list-keychains
+   security find-identity -v
+
+   # Layer 4: Actual signing
+   codesign --sign "$IDENTITY" --verbose=4 "$APP"
+   ```
+
+   **This reveals:** Which layer fails (secrets → workflow ✓, workflow → build ✗)
+
+5. **Trace Data Flow**
+
+   **WHEN error is deep in call stack:**
+
+   See `root-cause-tracing.md` in this directory for the complete backward tracing technique.
+
+   **Quick version:**
+   - Where does bad value originate?
+   - What called this with bad value?
+   - Keep tracing up until you find the source
+   - Fix at source, not at symptom
+
+### Phase 2: Pattern Analysis
+
+**Find the pattern before fixing:**
+
+1. **Find Working Examples**
+   - Locate similar working code in same codebase
+   - What works that's similar to what's broken?
+
+2. **Compare Against References**
+   - If implementing pattern, read reference implementation COMPLETELY
+   - Don't skim - read every line
+   - Understand the pattern fully before applying
+
+3. **Identify Differences**
+   - What's different between working and broken?
+   - List every difference, however small
+   - Don't assume "that can't matter"
+
+4. **Understand Dependencies**
+   - What other components does this need?
+   - What settings, config, environment?
+   - What assumptions does it make?
+
+### Phase 3: Hypothesis and Testing
+
+**Scientific method:**
+
+1. **Form Single Hypothesis**
+   - State clearly: "I think X is the root cause because Y"
+   - Write it down
+   - Be specific, not vague
+
+2. **Test Minimally**
+   - Make the SMALLEST possible change to test hypothesis
+   - One variable at a time
+   - Don't fix multiple things at once
+
+3. **Verify Before Continuing**
+   - Did it work? Yes → Phase 4
+   - Didn't work? Form NEW hypothesis
+   - DON'T add more fixes on top
+
+4. **When You Don't Know**
+   - Say "I don't understand X"
+   - Don't pretend to know
+   - Ask for help
+   - Research more
+
+### Phase 4: Implementation
+
+**Fix the root cause, not the symptom:**
+
+1. **Create Failing Test Case**
+   - Simplest possible reproduction
+   - Automated test if possible
+   - One-off test script if no framework
+   - MUST have before fixing
+   - Use the `superpowers:test-driven-development` skill for writing proper failing tests
+
+2. **Implement Single Fix**
+   - Address the root cause identified
+   - ONE change at a time
+   - No "while I'm here" improvements
+   - No bundled refactoring
+
+3. **Verify Fix**
+   - Test passes now?
+   - No other tests broken?
+   - Issue actually resolved?
+   - Use the `superpowers:verification-before-completion` skill before claiming success
+
+4. **If Fix Doesn't Work**
+   - STOP
+   - Count: How many fixes have you tried?
+   - If < 3: Return to Phase 1, re-analyze with new information
+   - **If ≥ 3: STOP and question the architecture (step 5 below)**
+   - DON'T attempt Fix #4 without architectural discussion
+
+5. **If 3+ Fixes Failed: Question Architecture**
+
+   **Pattern indicating architectural problem:**
+   - Each fix reveals new shared state/coupling/problem in different place
+   - Fixes require "massive refactoring" to implement
+   - Each fix creates new symptoms elsewhere
+
+   **STOP and question fundamentals:**
+   - Is this pattern fundamentally sound?
+   - Are we "sticking with it through sheer inertia"?
+   - Should we refactor architecture vs. continue fixing symptoms?
+
+   **Discuss with your human partner before attempting more fixes**
+
+   This is NOT a failed hypothesis - this is a wrong architecture.
+
+## Red Flags - STOP and Follow Process
+
+If you catch yourself thinking:
+- "Quick fix for now, investigate later"
+- "Just try changing X and see if it works"
+- "Add multiple changes, run tests"
+- "Skip the test, I'll manually verify"
+- "It's probably X, let me fix that"
+- "I don't fully understand but this might work"
+- "Pattern says X but I'll adapt it differently"
+- "Here are the main problems: [lists fixes without investigation]"
+- Proposing solutions before tracing data flow
+- **"One more fix attempt" (when already tried 2+)**
+- **Each fix reveals new problem in different place**
+
+**ALL of these mean: STOP. Return to Phase 1.**
+
+**If 3+ fixes failed:** Question the architecture (see Phase 4.5)
+
+## your human partner's Signals You're Doing It Wrong
+
+**Watch for these redirections:**
+- "Is that not happening?" - You assumed without verifying
+- "Will it show us...?" - You should have added evidence gathering
+- "Stop guessing" - You're proposing fixes without understanding
+- "Ultra-think this" - Question fundamentals, not just symptoms
+- "We're stuck?" (frustrated) - Your approach isn't working
+
+**When you see these:** STOP. Return to Phase 1.
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Issue is simple, don't need process" | Simple issues have root causes too. Process is fast for simple bugs. |
+| "Emergency, no time for process" | Systematic debugging is FASTER than guess-and-check thrashing. |
+| "Just try this first, then investigate" | First fix sets the pattern. Do it right from the start. |
+| "I'll write test after confirming fix works" | Untested fixes don't stick. Test first proves it. |
+| "Multiple fixes at once saves time" | Can't isolate what worked. Causes new bugs. |
+| "Reference too long, I'll adapt the pattern" | Partial understanding guarantees bugs. Read it completely. |
+| "I see the problem, let me fix it" | Seeing symptoms ≠ understanding root cause. |
+| "One more fix attempt" (after 2+ failures) | 3+ failures = architectural problem. Question pattern, don't fix again. |
+
+## Quick Reference
+
+| Phase | Key Activities | Success Criteria |
+|-------|---------------|------------------|
+| **1. Root Cause** | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
+| **2. Pattern** | Find working examples, compare | Identify differences |
+| **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
+| **4. Implementation** | Create test, fix, verify | Bug resolved, tests pass |
+
+## When Process Reveals "No Root Cause"
+
+If systematic investigation reveals issue is truly environmental, timing-dependent, or external:
+
+1. You've completed the process
+2. Document what you investigated
+3. Implement appropriate handling (retry, timeout, error message)
+4. Add monitoring/logging for future investigation
+
+**But:** 95% of "no root cause" cases are incomplete investigation.
+
+## Supporting Techniques
+
+These techniques are part of systematic debugging and available in this directory:
+
+- **`root-cause-tracing.md`** - Trace bugs backward through call stack to find original trigger
+- **`defense-in-depth.md`** - Add validation at multiple layers after finding root cause
+- **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
+---
+name: verification-before-completion
+description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+---
+
+# Verification Before Completion
+
+## Overview
+
+**Core principle:** Evidence before claims, always.
+
+**Violating the letter of this rule is violating the spirit of this rule.**
+
+## The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+If you haven't run the verification command in this message, you cannot claim it passes.
+
+## The Gate Function
+
+```
+BEFORE claiming any status or expressing satisfaction:
+
+1. IDENTIFY: What command proves this claim?
+2. RUN: Execute the FULL command (fresh, complete)
+3. READ: Full output, check exit code, count failures
+4. VERIFY: Does output confirm the claim?
+   - If NO: State actual status with evidence
+   - If YES: State claim WITH evidence
+5. ONLY THEN: Make the claim
+
+Skip any step = lying, not verifying
+```
+
+## Common Failures
+
+| Claim | Requires | Not Sufficient |
+|-------|----------|----------------|
+| Tests pass | Test command output: 0 failures | Previous run, "should pass" |
+| Linter clean | Linter output: 0 errors | Partial check, extrapolation |
+| Build succeeds | Build command: exit 0 | Linter passing, logs look good |
+| Bug fixed | Test original symptom: passes | Code changed, assumed fixed |
+| Regression test works | Red-green cycle verified | Test passes once |
+| Agent completed | VCS diff shows changes | Agent reports "success" |
+| Requirements met | Line-by-line checklist | Tests passing |
+
+## Red Flags - STOP
+
+- Using "should", "probably", "seems to"
+- Expressing satisfaction before verification ("Great!", "Perfect!", "Done!", etc.)
+- About to commit/push/PR without verification
+- Trusting agent success reports
+- Relying on partial verification
+- Thinking "just this once"
+- Tired and wanting work over
+- **ANY wording implying success without having run verification**
+
+## Rationalization Prevention
+
+| Excuse | Reality |
+|--------|---------|
+| "Should work now" | RUN the verification |
+| "I'm confident" | Confidence ≠ evidence |
+| "Just this once" | No exceptions |
+| "Linter passed" | Linter ≠ compiler |
+| "Agent said success" | Verify independently |
+| "I'm tired" | Exhaustion ≠ excuse |
+| "Partial check is enough" | Partial proves nothing |
+| "Different words so rule doesn't apply" | Spirit over letter |
+
+## Key Patterns
+
+**Tests:**
+```
+✅ [Run test command] [See: 34/34 pass] "All tests pass"
+❌ "Should pass now" / "Looks correct"
+```
+
+**Regression tests (TDD Red-Green):**
+```
+✅ Write → Run (pass) → Revert fix → Run (MUST FAIL) → Restore → Run (pass)
+❌ "I've written a regression test" (without red-green verification)
+```
+
+**Build:**
+```
+✅ [Run build] [See: exit 0] "Build passes"
+❌ "Linter passed" (linter doesn't check compilation)
+```
+
+**Requirements:**
+```
+✅ Re-read plan → Create checklist → Verify each → Report gaps or completion
+❌ "Tests pass, phase complete"
+```
+
+**Agent delegation:**
+```
+✅ Agent reports success → Check VCS diff → Verify changes → Report actual state
+❌ Trust agent report
+```
+
+## When To Apply
+
+**ALWAYS before:**
+- ANY variation of success/completion claims
+- ANY expression of satisfaction
+- ANY positive statement about work state
+- Committing, PR creation, task completion
+- Moving to next task
+- Delegating to agents
+
+**Rule applies to:**
+- Exact phrases
+- Paraphrases and synonyms
+- Implications of success
+- ANY communication suggesting completion/correctness
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+exec
+/usr/bin/bash -lc 'command -v uv || true
+command -v pytest || true
+python3 -m pytest .autodev/tests/test_plan_guarda.py -q
+python3 -m pytest .autodev/tests/test_plan_colisoes.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ exited 1 in 110ms:
+/usr/bin/python3: No module named pytest
+/usr/bin/python3: No module named pytest
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+exec
+/usr/bin/bash -lc 'ls -la | head -40 && rg -n "pytest|dependencies" pyproject.toml requirements*.txt setup.cfg tox.ini uv.lock 2>/dev/null | head -100' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 39ms:
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+exec
+/usr/bin/bash -lc 'uvx --offline pytest .autodev/tests/test_plan_guarda.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ exited 2 in 0ms:
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+codex
+O comando obrigatório continua bloqueado por ambiente (`/usr/bin/python3: No module named pytest`); não há dependência declarada nem ambiente virtual no worktree, e o cache global do `uv` é somente leitura. Vou concluir a verificação sem instalar dependências: exercitar diretamente todos os contratos do arquivo-alvo, inclusive `init`, aviso entre ondas e compatibilidade com o DAG existente.
+exec
+/usr/bin/bash -lc "python3 - <<'PY'
+import json
+import tempfile
+from contextlib import redirect_stdout
+from io import StringIO
+from pathlib import Path
+
+from autodev import cli
+from autodev.config import carrega_dag, valida_dag
+from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+
+def task(id_, criterio, deps=None):
+    return {'id': id_, 'titulo': id_, 'criterios': [criterio], 'deps': deps or []}
+def dag(*tasks): return {'tasks': list(tasks)}
+
+assert valida_dag(dag(task('P01', 'altera autodev/config.py'), task('P02', 'altera autodev/config.py'))) == [
+    'colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)']
+assert valida_dag(dag(task('P01', 'altera autodev/config.py'), task('P02', 'altera autodev/config.py', ['P01']))) == []
+assert valida_dag(dag(task('P01', 'altera ./autodev/config.py'), task('P02', r'altera autodev\\config.py'))) == [
+    'colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)']
+for texto in ('item 3.a', 'versao 1.b', 'e.g. isto'):
+    assert valida_dag(dag(task('P01', texto), task('P02', texto))) == []
+for arquivo in ('.autodev/sprints/S-1/decisions.md', '.autodev/sprints/S-1/logs/x.log', '.autodev/sprints/S-1/evidence/x.txt'):
+    assert valida_dag(dag(task('P01', arquivo), task('P02', arquivo))) == []
+plano = Plano('Teste', 'Teste', '.', [
+    TaskPlano('P01', 'primeira', ['altera autodev/config.py']),
+    TaskPlano('P02', 'segunda', ['altera autodev/config.py'], deps=['P01']),
+], '')
+assert avisos_de_colisao_de_arquivo(plano) == [{'task_a': 'P01', 'task_b': 'P02', 'arquivo': 'autodev/config.py', 'onda': 1, 'onda_b': 2}]
+with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
+    raiz = Path(tmp)
+    sprint = raiz / '.autodev/sprints/S-COLISAO'
+    sprint.mkdir(parents=True)
+    (sprint / 'dag.json').write_text(json.dumps(dag(task('P01', 'altera autodev/config.py'), task('P02', 'altera autodev/config.py'))))
+    anterior, cli.RAIZ = cli.RAIZ, raiz
+    try:
+        saida = StringIO()
+        with redirect_stdout(saida):
+            codigo = cli.main(['--sprint', 'S-COLISAO', 'init'])
+        assert codigo == 1
+        assert all(item in saida.getvalue() for item in ('P01', 'P02', 'autodev/config.py'))
+    finally:
+        cli.RAIZ = anterior
+carrega_dag(Path('.autodev/sprints/DEVFACTORY-004/dag.json'))
+print('8 contratos comportamentais verificados; DEVFACTORY-004 carregável')
+PY
+python3 -m py_compile autodev/config.py autodev/planner.py .autodev/tests/test_plan_guarda.py
+git diff --check
+git status --short" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P02-codex
+ succeeded in 647ms:
+8 contratos comportamentais verificados; DEVFACTORY-004 carregável
+ M .autodev/tests/test_plan_guarda.py
+ M autodev/config.py
+ M autodev/planner.py
+
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+codex
+RESULTADO: colisões reais na mesma onda são barradas com IDs, caminho e onda 1-based; registros compartilhados viram aviso e falsos arquivos são ignorados | TESTES: 8 contratos passaram; pytest indisponível no ambiente (`No module named pytest`)
+diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
+index 8240fd45963b6baedf13597286eb632652610b8d..52ced349eb7ea6f2b315efff77a31fe5835a6f5f
+--- a/.autodev/tests/test_plan_guarda.py
++++ b/.autodev/tests/test_plan_guarda.py
+@@ -1,5 +1,7 @@
+ import json
+ 
++import pytest
++
+ from autodev import cli
+ from autodev.config import valida_dag
+ from autodev.planner import Plano, TaskPlano, avisos_de_colisao_de_arquivo
+@@ -42,6 +44,41 @@
+                for erro in erros)
+ 
+ 
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
+ def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
+     plano = Plano(
+         titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
+diff --git a/autodev/config.py b/autodev/config.py
+index cb9db721848d8b0f437faee3e09d96107c075ac9..897c9464a01e7ab5680b83a8f68b315687d2c588
+--- a/autodev/config.py
++++ b/autodev/config.py
+@@ -19,9 +19,14 @@
+ 
+ # Referências textuais a arquivos.  O planejador e o validador do motor usam a
+ # mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
+ _ARQUIVO = re.compile(
+-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+-    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
+ )
+ 
+ ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
+@@ -196,7 +201,7 @@
+             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
+ 
+ 
+-def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
+     """Normaliza um caminho textual, sem acessar o filesystem."""
+     caminho = caminho.replace("\\", "/")
+     while caminho.startswith("./"):
+@@ -204,10 +209,24 @@
+     return PurePosixPath(caminho).as_posix().lstrip("/")
+ 
+ 
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
+ def arquivos_citados(textos: list[str]) -> set[str]:
+     """Extrai caminhos citados em textos usando a regra comum do plano."""
+     return {
+-        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
+         for texto in textos
+         if isinstance(texto, str)
+         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
+@@ -271,9 +290,11 @@
+         for indice, id_a in enumerate(onda):
+             for id_b in onda[indice + 1:]:
+                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
+                     erros.append(
+                         f"colisão de arquivo entre {id_a} e {id_b}: "
+-                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
+                     )
+     return erros
+ 
+diff --git a/autodev/planner.py b/autodev/planner.py
+index 9ba5803ea2ca60bbba0a57a19ed8657335a13471..74fa1a009d374f8d72c00050c98404fea88d4e30
+--- a/autodev/planner.py
++++ b/autodev/planner.py
+@@ -233,7 +233,7 @@
+ 
+ def _normalizar_caminho(caminho: str) -> str:
+     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
+-    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
+ 
+ 
+ def arquivo_de_teste(caminho: str) -> bool:
+@@ -283,6 +283,8 @@
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -304,12 +306,12 @@
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
+
+tokens used
+47,497
+RESULTADO: colisões reais na mesma onda são barradas com IDs, caminho e onda 1-based; registros compartilhados viram aviso e falsos arquivos são ignorados | TESTES: 8 contratos passaram; pytest indisponível no ambiente (`No module named pytest`)

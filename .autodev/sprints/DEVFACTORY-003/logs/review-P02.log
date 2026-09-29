@@ -1,4 +1,4 @@
-# exit_code=0 duracao=191.8s modelo=deepseek-flash effort=(default) failure_class=None tokens=nao medido(-)
+# exit_code=0 duracao=243.9s modelo=deepseek-flash effort=(default) failure_class=None tokens=nao medido(-)
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -18,11 +18,13 @@ P02: Barrar colisao na mesma onda no validador do motor
 ```diff
 diff --git a/.autodev/tests/test_plan_guarda.py b/.autodev/tests/test_plan_guarda.py
 new file mode 100644
-index 0000000..8240fd4
+index 0000000..52ced34
 --- /dev/null
 +++ b/.autodev/tests/test_plan_guarda.py
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,109 @@
 +import json
++
++import pytest
 +
 +from autodev import cli
 +from autodev.config import valida_dag
@@ -66,6 +68,41 @@ index 0000000..8240fd4
 +               for erro in erros)
 +
 +
++@pytest.mark.parametrize("referencia", ["item 3.a", "versao 1.b", "e.g. isto"])
++def test_valida_dag_nao_confunde_referencia_textual_com_arquivo(referencia):
++    erros = valida_dag(dag_com(
++        task("P01", f"cobre {referencia}"),
++        task("P02", f"documenta {referencia}"),
++    ))
++
++    assert erros == []
++
++
++@pytest.mark.parametrize("arquivo", [
++    ".autodev/sprints/S-1/decisions.md",
++    ".autodev/sprints/S-1/logs/orquestrador.log",
++    ".autodev/sprints/S-1/evidence/resultado.txt",
++])
++def test_valida_dag_permite_registros_compartilhados_na_mesma_onda(arquivo):
++    erros = valida_dag(dag_com(
++        task("P01", f"acrescenta registro em {arquivo}"),
++        task("P02", f"acrescenta registro em {arquivo}"),
++    ))
++
++    assert erros == []
++
++
++def test_valida_dag_numera_primeira_onda_como_um():
++    erros = valida_dag(dag_com(
++        task("P01", "altera autodev/config.py"),
++        task("P02", "altera autodev/config.py"),
++    ))
++
++    assert erros == [
++        "colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)"
++    ]
++
++
 +def test_mesmo_arquivo_em_ondas_diferentes_emite_aviso_do_plano():
 +    plano = Plano(
 +        titulo="Teste", objetivo="Teste", repositorio=".", prompt_original="",
@@ -95,7 +132,7 @@ index 0000000..8240fd4
 +    saida = capsys.readouterr().out
 +    assert "P01" in saida and "P02" in saida and "autodev/config.py" in saida
 diff --git a/autodev/config.py b/autodev/config.py
-index 0f02e2b..cb9db72 100644
+index 0f02e2b..897c946 100644
 --- a/autodev/config.py
 +++ b/autodev/config.py
 @@ -7,8 +7,9 @@ from __future__ import annotations
@@ -109,25 +146,30 @@ index 0f02e2b..cb9db72 100644
  
  import yaml
  
-@@ -16,6 +17,13 @@ RAIZ = Path(__file__).resolve().parent.parent
+@@ -16,6 +17,18 @@ RAIZ = Path(__file__).resolve().parent.parent
  AUTODEV = RAIZ / ".autodev"
  CONFIG = AUTODEV / "config"
  
 +# Referências textuais a arquivos.  O planejador e o validador do motor usam a
 +# mesma regra para que um plano aprovado não mude de significado no `init`.
++_EXTENSOES_ARQUIVO = (
++    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
++    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
++)
 +_ARQUIVO = re.compile(
-+    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
-+    r"|\b(?:Makefile|Dockerfile)\b"
++    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
++    r"|\b(?:Makefile|Dockerfile)\b",
++    re.IGNORECASE,
 +)
 +
  ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
             "REVIEW", "RETRY", "DONE", "FAILED", "INTEGRATED", "WAITING_RESOURCE"]
  
-@@ -188,6 +196,24 @@ class Task:
+@@ -188,6 +201,38 @@ class Task:
              raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
  
  
-+def _normalizar_caminho(caminho: str) -> str:
++def normalizar_caminho(caminho: str) -> str:
 +    """Normaliza um caminho textual, sem acessar o filesystem."""
 +    caminho = caminho.replace("\\", "/")
 +    while caminho.startswith("./"):
@@ -135,10 +177,24 @@ index 0f02e2b..cb9db72 100644
 +    return PurePosixPath(caminho).as_posix().lstrip("/")
 +
 +
++# Compatibilidade para consumidores antigos; código novo usa a API pública.
++_normalizar_caminho = normalizar_caminho
++
++
++def registro_compartilhado(caminho: str) -> bool:
++    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
++    partes = PurePosixPath(normalizar_caminho(caminho)).parts
++    return bool(
++        partes
++        and (partes[-1].casefold() == "decisions.md"
++             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
++    )
++
++
 +def arquivos_citados(textos: list[str]) -> set[str]:
 +    """Extrai caminhos citados em textos usando a regra comum do plano."""
 +    return {
-+        _normalizar_caminho(encontrado.group(0))
++        normalizar_caminho(encontrado.group(0))
 +        for texto in textos
 +        if isinstance(texto, str)
 +        for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
@@ -148,7 +204,7 @@ index 0f02e2b..cb9db72 100644
  def valida_dag(dag: dict) -> list[str]:
      """Valida o DAG e devolve os erros encontrados (lista vazia = ok).
  
-@@ -225,6 +251,30 @@ def valida_dag(dag: dict) -> list[str]:
+@@ -225,6 +270,32 @@ def valida_dag(dag: dict) -> list[str]:
      for n in grafo:
          if cor[n] == BRANCO:
              visita(n, [])
@@ -172,15 +228,17 @@ index 0f02e2b..cb9db72 100644
 +        for indice, id_a in enumerate(onda):
 +            for id_b in onda[indice + 1:]:
 +                for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
++                    if registro_compartilhado(arquivo):
++                        continue
 +                    erros.append(
 +                        f"colisão de arquivo entre {id_a} e {id_b}: "
-+                        f"{arquivo} (onda {numero})"
++                        f"{arquivo} (onda {numero + 1})"
 +                    )
      return erros
  
  
 diff --git a/autodev/planner.py b/autodev/planner.py
-index 9fff066..9ba5803 100644
+index 9fff066..74fa1a0 100644
 --- a/autodev/planner.py
 +++ b/autodev/planner.py
 @@ -16,11 +16,6 @@ from .plan_prompt import montar_prompt_plano
@@ -214,16 +272,41 @@ index 9fff066..9ba5803 100644
 -    while caminho.startswith("./"):
 -        caminho = caminho[2:]
 -    return PurePosixPath(caminho).as_posix().lstrip("/")
-+    return config._normalizar_caminho(caminho)
++    return config.normalizar_caminho(caminho)
  
  
  def arquivo_de_teste(caminho: str) -> bool:
+@@ -296,6 +283,8 @@ def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
++                if config.registro_compartilhado(arquivo):
++                    continue
+                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
+                     colisoes.append({
+                         "task_a": task_a.id,
+@@ -317,12 +306,12 @@ def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
+         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
+             onda_a = onda_por_task[task_a.id]
+             onda_b = onda_por_task[task_b.id]
+-            if onda_a == onda_b:
+-                continue
+             for arquivo in sorted(
+                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
+             ):
+-                if not arquivo_de_teste(arquivo):
++                if config.registro_compartilhado(arquivo) or (
++                    onda_a != onda_b and not arquivo_de_teste(arquivo)
++                ):
+                     avisos.append({
+                         "task_a": task_a.id,
+                         "task_b": task_b.id,
 ```
 
 ## Saida dos testes
 ```
-.....                                                                    [100%]
-5 passed in 0.19s
+............                                                             [100%]
+12 passed in 0.12s
 
 ```
 
@@ -260,84 +343,82 @@ Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
 
 
 ===== STDOUT =====
-```json
 {
   "veredito": "REQUEST_CHANGES",
-  "confianca": 0.88,
+  "confianca": 0.92,
   "criterios_atendidos": [
     {
-      "criterio": "valida_dag em autodev/config.py recusa DAG com duas tasks na mesma onda citando o mesmo arquivo, citando os ids e o caminho",
+      "criterio": "valida_dag recusa DAG com duas tasks na mesma onda citando o mesmo arquivo, citando ids e caminho",
       "atende": true,
-      "evidencia": "autodev/config.py:255-278 faz o cruzamento por onda (arquivos_citados sobre criterios+teste, ordem_topologica) e emite 'colisão de arquivo entre {id_a} e {id_b}: {arquivo} (onda {n})'. Reproduzido: valida_dag({'tasks':[P01,P02 citando autodev/config.py]}) devolve erro com os dois ids e o caminho; ./autodev/config.py vs autodev\\config.py colidem após _normalizar_caminho."
+      "evidencia": "autodev/config.py:236-299 (bloco novo) monta 'colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)'. Reproduzido no worktree: valida_dag com P01/P02 sem deps na mesma onda -> ['colisão de arquivo entre P01 e P02: autodev/config.py (onda 1)']; teste test_valida_dag_numera_primeira_onda_como_um asserta a string EXATA."
     },
     {
-      "criterio": "a recusa alcanca o comando autodev init, que ja chama valida_dag",
+      "criterio": "a recusa alcança o comando autodev init",
       "atende": true,
-      "evidencia": "autodev/cli.py:52-59 (cmd_init) chama valida_dag, imprime 'DAG INVALIDO' com cada erro e retorna 1 — nada foi alterado nesse caminho além do comportamento herdado. O teste test_init_recusa_dag_com_colisao_na_mesma_onda roda cli.main([...]) == 1 e confere P01/P02/autodev/config.py no stdout."
+      "evidencia": "autodev/cli.py:51-60 (cmd_init) chama valida_dag(dag) e devolve 1 no ramo de erro; o teste test_init_recusa_dag_com_colisao_na_mesma_onda cria .autodev/sprints/S-COLISAO/dag.json, monkeypatcha cli.RAIZ e verifica cli.main([...]) == 1 + P01/P02/autodev/config.py no stdout. Verificado que o patch de cli.RAIZ realmente governa o caminho lido (linha 53 usa o global RAIZ)."
     },
     {
       "criterio": "plano com o mesmo arquivo em ondas diferentes continua valido (aviso, nao erro)",
       "atende": true,
-      "evidencia": "valida_dag só compara pares dentro da MESMA onda (config.py:270-273); test_valida_dag_mantem_arquivo_em_ondas_diferentes_valido afirma erros == [] e o aviso continua vindo do planejador via avisos_de_colisao_de_arquivo (planner.py:296-320, teste com dict exato onda 1 / onda_b 2)."
+      "evidencia": "valida_dag devolve [] para P01/P02 com deps (mesmo arquivo, ondas 1 e 2) e planner.avisos_de_colisao_de_arquivo devolve onda 1 -> onda_b 2; o aviso chega ao usuário via autodev/cli.py:343."
     },
     {
-      "criterio": "os testes ficam em .autodev/tests/test_plan_guarda.py e rodam com python3 -m pytest .autodev/tests/test_plan_guarda.py -q",
+      "criterio": "testes em .autodev/tests/test_plan_guarda.py rodando com python3 -m pytest .autodev/tests/test_plan_guarda.py -q",
       "atende": true,
-      "evidencia": "Arquivo existe (72 linhas) e passa: 5 passed in 0.10s, executado no worktree .autodev/worktrees/DEVFACTORY-003-P02-codex. Ressalva de ambiente (não do diff): /usr/bin/python3 deste host não tem pytest instalado, então o comando literal 'python3 -m pytest' falha aqui; rodei com 'uv run --with pytest'."
+      "evidencia": "Arquivo existe no worktree DEVFACTORY-003-P02-codex; no venv do projeto (/home/saurus/Code/Coding_Machine/.venv) o comando dá '12 passed in 0.10s', igual ao reportado."
     },
     {
-      "criterio": "estende autodev/config.py preservando valida_dag, ordem_topologica e carga_dag existentes, sem remover nem renomear nada",
+      "criterio": "estende autodev/config.py preservando valida_dag, ordem_topologica e carga_dag sem remover/renomear nada",
       "atende": true,
-      "evidencia": "config.py mantém as três funções com a mesma assinatura (linhas 217, 281, 299); ordem_topologica e carrega_dag não foram tocadas; valida_dag preserva todas as checagens estruturais anteriores e só acrescenta o bloco de colisão. Porém o diff violou a MESMA regra em planner.py (ver finding 1), o que quebra o módulo."
+      "evidencia": "Comparação por AST base(4c7254db) x HEAD: removidos/renomeados = {} ; ordem_topologica e carrega_dag byte-idênticos; valida_dag apenas ganhou o ramo novo. Nomes adicionados: _EXTENSOES_ARQUIVO, _ARQUIVO, normalizar_caminho, _normalizar_caminho, registro_compartilhado, arquivos_citados."
     }
   ],
   "findings": [
     {
       "severidade": "alta",
       "arquivo": "autodev/planner.py",
-      "linha": 380,
-      "descricao": "Regressão dura introduzida por este diff. O diff remove o binding de módulo `_ARQUIVO` de planner.py (movido para config.py:22), mas planner.py:380 continua usando `_ARQUIVO.search(criterio)`. Sempre que um critério contém palavra vaga (melhorar/otimizar/refatorar/revisar/ajustar) — caminho normal do `autodev plan` (cli.py:348) — validar_e_ordenar levanta `NameError: name '_ARQUIVO' is not defined`. Prova: reprodução direta + suíte completa no worktree = `16 failed, 347 passed` (test_plan_validacao.py x15 e test_plan_aceitacao.py::test_aceitacao_do_planejador), todos com NameError em planner.py:380. O gate da task só rodou test_plan_guarda.py ('5 passed'), então a quebra passou batido; o diff do próprio P02 não toca a linha 380 (git diff 4c7254d..09d632c lista apenas a remoção da definição e do finditer), logo a falha nasceu aqui e não existia na base (base tinha _ARQUIVO em planner.py:20). Isso também viola o critério do P01 ('estende autodev/planner.py ... sem remover nem renomear nada').",
-      "correcao_sugerida": "Trocar a referência órfã por `config._ARQUIVO.search(criterio)` na linha 380 — ou, melhor, expor a regra como pública em config.py (ex.: `config.arquivos_citados([criterio])` ou `config.tem_referencia_de_arquivo(criterio)`) e usar essa função tanto aqui quanto em _arquivos_da_task. Rodar a suíte inteira (python3 -m pytest .autodev/tests -q) antes de fechar, não só o arquivo novo."
+      "linha": 382,
+      "descricao": "O diff REMOVE a definição de _ARQUIVO de planner.py (agora só existe em config.py) mas deixa a referência pendente em validar_e_ordenar: 'and not _ARQUIVO.search(criterio)'. Toda validação de plano cujo critério contenha palavra vaga (melhorar/otimizar/refatorar/revisar/ajustar) levanta NameError em vez de PlanoInvalido. Prova real: 'python3 -m pytest .autodev/tests -q' -> 16 failed, 354 passed, todos os 16 com 'NameError: name _ARQUIVO is not defined' em autodev/planner.py:382 (test_plan_aceitacao.py e 15 casos de test_plan_validacao.py). Repetindo a suíte com o alias reposto apenas em memória (planner._ARQUIVO = config._ARQUIVO, sem tocar em arquivo) o resultado é 370 passed — ou seja, a regressão é 100% do nome removido. O autor rodou só o arquivo de teste novo (12 passed), não a suíte.",
+      "correcao_sugerida": "Em autodev/planner.py:382 usar 'config._ARQUIVO.search(criterio)' (ou reexpor 'from .config import _ARQUIVO' / '_ARQUIVO = config._ARQUIVO' no topo do planner) e rodar a suíte completa antes de fechar a task."
     },
     {
       "severidade": "media",
       "arquivo": "autodev/config.py",
-      "linha": 284,
-      "descricao": "A nova recusa é hard error e chega também em carrega_dag, que o orquestrador usa para QUALQUER sprint já existente (orchestrator.py:213) — sem migração, sem allow-list e sem isenção para arquivos de log/registro append-only. Efeito medido agora no repo: DEVFACTORY-004/dag.json (rastreado no git) passa a falhar em carrega_dag com 'colisão de arquivo entre P02 e P03: .autodev/sprints/DEVFACTORY-004/decisions.md (onda 1)'. Editar o mesmo decisions.md por duas tasks paralelas é convenção documentada do projeto (os merges das sprints 002/004 reconciliam justamente 'decisions.md com os DOIS registros preservados'), então um DAG válido e já planejado fica inutilizável de um commit para o outro.",
-      "correcao_sugerida": "Isentar caminhos de registro compartilhados (ex.: <sprint>/decisions.md, logs/**, evidence/**) da colisão dura — mantendo-os como aviso —, ou introduzir a checagem apenas no portão de escrita (init/plan) em vez de no carregamento, e declarar explicitamente no README/Pendencias.md o que fazer com DAGs existentes reprovados."
+      "linha": 26,
+      "descricao": "A regra de detecção mudou de 'qualquer extensão alfanumérica' (base) para uma whitelist de ~36 extensões. Arquivos reais com extensão fora dela passam a não ser vistos: verificado arquivos_citados(['altera .autodev/state.db']) == set() e valida_dag devolve [] para duas tasks na mesma onda citando '.autodev/state.db' ou 'report/x.png' (antes colidiriam). Varredura dos dags reais do repo: das 111 citações com extensão, 1 perde cobertura (state.db) e 1 falso positivo é eliminado (agents.invocar) — o ganho é legítimo, a perda é silenciosa e não está documentada nem testada.",
+      "correcao_sugerida": "Manter a whitelist (ela mata o falso positivo 'item 3.a'/'agents.invocar'), mas incluir as extensões usadas pelo projeto (db, png, pdf, ipynb, svg, lock) e cobrir com teste o caso 'extensão fora da whitelist' para que a limitação seja deliberada e visível."
     },
     {
       "severidade": "media",
       "arquivo": "autodev/config.py",
-      "linha": 22,
-      "descricao": "A regex _ARQUIVO herdada do planejador (onde gerava apenas aviso) virou critério de recusa dura no motor, mas continua permissiva: extrai tokens que não são arquivos. Medido: 'cobre o caso 3.a da spec' -> {'3.a'}, 'atualiza a versao 1.b do doc' -> {'1.b'}, 'resumo: e.g. isto nao muda nada' -> {'e.g'}. Duas tasks na mesma onda cujos critérios citem 'caso 3.a' (numeração de item de spec) seriam recusadas no init com uma 'colisão de arquivo' inexistente — falso positivo que bloqueia trabalho, não que o alerta.",
-      "correcao_sugerida": "Antes de reusar a regex como hard error, restringi-la a tokens com separador de diretório ou extensão conhecida (ex.: exigir '/' no caminho quando não for Makefile/Dockerfile, ou validar contra uma lista de extensões de código/doc), e cobrir esse caso com um teste negativo (texto com 'item 3.a' não deve gerar colisão)."
+      "linha": 216,
+      "descricao": "registro_compartilhado isenta colisão para QUALQUER caminho que tenha um componente de diretório 'logs' ou 'evidence' (casefold), em qualquer profundidade, não só sob .autodev/sprints/<sprint>/. Verificado: valida_dag devolve [] para P01/P02 na mesma onda citando 'src/evidence/coleta.py' e 'logs/rotacao.py' — dois arquivos de CÓDIGO, exatamente o caso que a guarda existe para barrar. É uma válvula de escape fora do escopo dos critérios de aceitação (o AC não pede carve-out) e não há teste que a limite a .autodev.",
+      "correcao_sugerida": "Ancorar a isenção no prefixo do sprint ('.autodev/sprints/<sprint>/') e restringir a extensões append-only (.log/.md/.txt), ex.: exigir caminho com partes[:2] == ('.autodev','sprints'); cobrir com teste que 'src/evidence/x.py' NÃO é isento."
     },
     {
       "severidade": "baixa",
       "arquivo": "autodev/config.py",
-      "linha": 276,
-      "descricao": "Numeração de onda inconsistente entre as duas mensagens do mesmo sprint: valida_dag usa índice 0-based ('(onda 0)') enquanto o planejador usa 1-based (tests esperam onda 1 / onda_b 2 em avisos_de_colisao_de_arquivo) e o próprio texto do P02 fala de ondas. O usuário lê 'onda 0' no init e 'onda 1' no plano para a mesma primeira onda.",
-      "correcao_sugerida": "Usar `numero + 1` na mensagem de valida_dag (e no print de cli.cmd_init, se quiser alinhar tudo) ou padronizar 0-based nos dois módulos, decidindo isso explicitamente."
+      "linha": 213,
+      "descricao": "O alias '_normalizar_caminho = normalizar_caminho', justificado como 'compatibilidade para consumidores antigos', não tem nenhum consumidor: grep em todo o repo só encontra a própria definição. Código morto.",
+      "correcao_sugerida": "Remover o alias enquanto não houver consumidor (ou nomear o consumidor real no comentário)."
     },
     {
       "severidade": "baixa",
       "arquivo": "autodev/config.py",
-      "linha": 199,
-      "descricao": "A comparação é textual e trivialmente evadível: 'autodev/config.py' vs 'config.py' (sem diretório) ou um caminho absoluto não colidem, então a guarda passa a depender de como o planejador escreveu o critério. O teste novo só prova as formas './' e '\\\\', as duas normalizadas; nenhum teste cobre o falso negativo. Uso agora também em valida_dag, que só olha 'criterios' e 'teste' — se o dag.json não persistir o campo 'teste', a checagem do init fica mais fraca que a do planejador.",
-      "correcao_sugerida": "Comparar por sufixo/últimos segmentos (ou pelo caminho resolvido quando o arquivo existir) além da forma normalizada, e adicionar teste cobrindo 'config.py' vs 'autodev/config.py'; documentar que a guarda é textual e best-effort."
+      "linha": 289,
+      "descricao": "A guarda nova do motor não espelha a regra de arquivo_de_teste que o portão do plano usa (D-16: arquivo de teste colide em QUALQUER onda). Verificado: DAG com P01/P02 citando '.autodev/tests/test_x.py' em ondas diferentes passa em valida_dag (init -> válido), enquanto planner.colisoes_de_arquivo no plano equivalente acusa colisão. O comentário no código afirma que 'o planejador e o validador do motor usam a mesma regra', o que só vale para caminho/registro compartilhado.",
+      "correcao_sugerida": "Ou replicar a regra de teste no valida_dag, ou ajustar o comentário para deixar explícita a divergência entre `init` e o portão do plano."
     },
     {
       "severidade": "baixa",
-      "arquivo": "autodev/planner.py",
-      "linha": 236,
-      "descricao": "planner._normalizar_caminho passou a ser só um wrapper sobre `config._normalizar_caminho`, acessando um símbolo privado (underscore) de outro módulo. Funciona e não há dead code (PurePosixPath continua usado na linha 241), mas cria acoplamento a nome privado num pacote que declara regra comum entre planejador e motor.",
-      "correcao_sugerida": "Tornar a função pública em config.py (ex.: `normalizar_caminho`) — junto com a regra de caminhos — e chamá-la dos dois lados; nenhuma dependência nova é necessária (re e pathlib são stdlib)."
+      "arquivo": "autodev/config.py",
+      "linha": 204,
+      "descricao": "normalizar_caminho não colapsa '..': valida_dag devolve [] para P01 'altera src/../autodev/config.py' contra P02 'altera autodev/config.py' na mesma onda (verificado). Era limitação pré-existente do planner, mas agora virou a regra do motor e é trivialmente explorável por texto de critério gerado pelo planejador.",
+      "correcao_sugerida": "Colapsar componentes '.'/'..' antes do as_posix() (sem tocar no filesystem) ou recusar caminhos que contenham '..'."
     }
   ],
-  "resumo": "As 5 regras do sprint estão implementadas e os 5 testes novos passam, mas o diff deixa uma referência órfã a `_ARQUIVO` em autodev/planner.py:380 (a regex foi removida do módulo no mesmo commit), derrubando validar_e_ordenar com NameError — 16 testes da suíte existente falham — e, como efeito colateral não migrado, o dag.json da sprint DEVFACTORY-004 passa a ser recusado por carrega_dag."
+  "resumo": "A funcionalidade pedida existe e os 5 critérios de aceitação são atendidos (12 testes verdes, mensagem com ids e caminho, recusa chegando ao `autodev init`), mas o diff remove `_ARQUIVO` do planner e deixa a referência pendente em validar_e_ordenar, causando NameError que derruba 16 testes da suíte e todo plano com critério vago — regressão de uma linha que impede a integração."
 }
-```
 
 
 ===== STDERR =====

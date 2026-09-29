@@ -169,9 +169,12 @@ def _escolhe_revisor(cfg, agente_impl: str, disponiveis: dict,
                         f"escada (tentativa {tentativa})")
             res = cfg.revisor_reserva() if hasattr(cfg, "revisor_reserva") else {}
             if res:
+                _m = res.get("modelo") or "?"
+                _e = f"/{res['effort']}" if res.get("effort") else ""
                 return (res.get("agente") or "hermes", res.get("modelo"),
                         res.get("effort"),
-                        f"reserva (revisor da escada '{ag}' indisponivel)")
+                        f"reserva ({res.get('agente') or 'hermes'}/{_m}{_e} — revisor "
+                        f"da escada '{ag}' indisponivel)")
     return escolher_revisor(agente_impl, disponiveis), modelo_revisor, None, "cruzada"
 
 
