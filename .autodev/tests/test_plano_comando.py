@@ -150,6 +150,25 @@ def test_preserva_regras_e2_e3_e4_a1_e_a2():
     assert any(aviso.startswith("A2:") for aviso in avisos)
 
 
+def test_verificador_usa_mesma_regra_de_citacao_do_planner():
+    dag = {"tasks": [
+        {"id": "P1", "criterios": ["consulta autodev/compartilhado.py"],
+         "teste": "python3 -m pytest tests/test_p1.py -q", "deps": []},
+        {"id": "P2", "criterios": ["valida autodev/compartilhado.py"],
+         "teste": "python3 -m pytest tests/test_p2.py -q", "deps": []},
+    ]}
+
+    erros, _ = verificar_plano.verificar(dag, "X")
+
+    assert any(
+        erro.startswith("E2:")
+        and "P1" in erro
+        and "P2" in erro
+        and "autodev/compartilhado.py" in erro
+        for erro in erros
+    )
+
+
 @pytest.mark.parametrize("criterio", [
     "os testes usam pytest e a suite roda em menos de 30 s",
     "o arquivo de teste cobre o caso de pytest sem comando",
