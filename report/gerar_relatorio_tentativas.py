@@ -916,8 +916,13 @@ insiste nem bloqueia**: para em `WAITING_HUMAN`, avisa no Telegram e espera resp
 - **Regra de convivência:** cada task grava a estratégia com que **começou**. Trocar a
   política não muda a escada de quem já entrou — os pacotes em andamento terminam na
   escada antiga (é por isso que os dois blocos convivem neste relatório).
-- **Primeiro pacote na estratégia nova:** 003/P07 (em andamento).
-- **Modelos antigos continuam demarcados** nos gráficos (laranja): `sol/medium` foi a
+- **Ainda sem pacote executado:** nenhum pacote da 003 ou da 004 rodou nos "3 degraus".
+  O 003/P07 chegou a ser marcado nela (foi o primeiro task novo depois da decisão), mas
+  **fechou na escada antiga** — a troca de código só passou a valer para o processo
+  seguinte. **O próximo pacote novo** (próxima sprint) será o primeiro a rodar a
+  estratégia: 1º `luna/low`, 2º `astra/low`, 3º `luna/low` e, falhando o terceiro, a
+  parada para decisão do autor.
+- **Modelos antigos continuam demarcados** nos gráficos (laranja): `sol/med*` foi a
   matriz até 27/09 e aparece nas chamadas das 003/004 que rodaram antes da troca.
 
 """
@@ -1138,10 +1143,10 @@ invocação).
    as outras foram **estimadas** pela régua do modelo. Todo valor em US$ diz de qual dos
    dois vem — sólido é medição, hachurado é estimativa.
 2. **Por que só as sprints 003 e 004.** {NOTA_PROTOCOLO}
-3. **A 003 ainda está em execução.** Entrou em 28/09 22:58; no fecho desta foto tem
+3. **A 003 fechou.** Entrou em 28/09 22:58 e fecha com
    **{sum(1 for p in d['pacotes'] if p['sprint'].endswith('003') and p['commit_final'])} de 7
-   pacotes integrados** e o próximo em andamento. Os números dela **mudam a cada rodada** —
-   este documento é uma foto do momento, não um fechamento.
+   pacotes integrados** — o último (P07) em 5 chamadas, aprovado no `astra/low`. Os
+   números dela **não mudam mais**; o que ainda vai mudar é a sprint seguinte.
 4. **A sprint 004 está fechada** (4/4 integradas em 28/09) — os números dela não mudam mais.
 5. **"Nª tentativa" não é o degrau da escada de modelos — são dois contadores.** O número
    nas tabelas é a **chamada** (`attempt`, sequência do banco, sempre `max+1`); o modelo vem

@@ -1,0 +1,125 @@
+# exit_code=0 duracao=311.8s modelo=gpt-5.6-sol effort=low failure_class=None tokens=50556(codex-cli:rodape)
+
+===== PROMPT ENVIADO =====
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P07: Documentar o portao do plano e o checklist derivado do D-16
+
+## Criterios de aceitacao (todos obrigatorios)
+- README.md ganha a secao Portao do plano descrevendo o fluxo planejar, prever, aprovar, rodar
+- a secao traz o checklist de plano derivado do D-16: arquivo de teste proprio por task, sem colisao de arquivo na mesma onda, criterio de preservacao ao editar modulo de outra task e criterio sempre citando arquivo ou comando
+- README.md atualiza a secao Estado atual com a contagem de testes e o estado das sprints 1, 2 e 3
+- o README.md documenta o script .autodev/scripts/verificar_plano.py com um exemplo de uso
+- .autodev/sprints/DEVFACTORY-003/decisions.md registra a decisao de exigir aprovacao humana e cita o D-16 da sprint 2 como evidencia
+- os testes ficam em .autodev/tests/test_plan_docs.py e provam que as secoes citadas existem no README.md
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+  - tentativa 2: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+diff tirou a forma de rodar a suite 'a mao' no terminal (.venv/bin/python -m pytest) e deixou so 'python3 -m pytest .autodev/tests/ -q', justificando que 'o runner resolve python3'. Fora do runner isso nao vale: nesta maquina /usr/bin/python3 (3.14.7) devolve ModuleNotFoundError: No module named 'pytest' (o pytest 9.1.1 existe apenas em .venv). O proprio projeto registra isso em DEVFACTORY-004/decisions.md D-23 ('o comando escrito nos criterios nao roda no terminal desta maquina') e em spec.md ('Para rodar a suite a mao, fora do motor, o README manda .venv/bin/python -m pytest') — o diff torna as duas afirmacoes falsas. Como o criterio e justamente documentar a contagem da suite, o comando documentado nao entrega o numero para um humano no terminal.", "correcao_sugerida": "Manter as duas formas, como no texto anterior: terminal '.venv/bin/python -m pytest .autodev/tests/ -q' e, dentro do runner, 'python3 -m pytest .autodev/tests/ -q' (o teste pre-existente test_estado_atual_mede_suite_sem_contagem_fixa exige apenas a segunda string, entao as duas convivem)."}, {"severidade": "media", "arquivo": "README.md", "linha": 236, "descricao": "A secao descreve o verificador como quem 'trata E2/E3/E4 como erro', omitindo E1 e E5, que tambem geram erro e exit != 0 (docstring do script em 096deb5, linhas 15-22). Reproduzi: `verificar_plano.py --todos` retorna exit=1 e imprime 'E5: P04 usa comando de teste fora da forma exigida' para a DEVFACTORY-004. Quem seguir o README sera surpreendido por um bloqueio de classe nao documentada — e E5 e exatamente a classe que queimou 12 tentativas (D-23). Nenhum teste cobre essa descricao (o teste so confere o caminho do script e o exemplo).", "correcao_sugerida": "Completar a lista na secao: E1 (ids duplicados/dep inexistente/ciclo) e E5 (comando pytest fora da forma `python3 -m pytest ...`), como no docstring do script; e acrescentar uma assercao no teste para as classes citadas."}, {"severidade": "baixa", "arquivo": "README.md", "linha": 222, "descricao": "'so entao `run` pode executar o sprint' e uma garantia absoluta que o codigo nao da: em autodev/orchestrator.py:228-243 (_validar_aprovacao) um sprint sem bloco `aprovacao` que ja esteja fora de PLANEJADO retorna None (liberado). Prova viva: a propria DEVFACTORY-003 roda com `aprovacao: null` no sprint.yaml e estado EM_EXECUCAO. O texto do README (e a 'Consequencia' do D-01 em decisions.md) afirma mais do que o portao entrega, e nem o teste do README nem o de decisions.md tocam nisso.", "correcao_sugerida": "Qualificar a frase: o portao vale para plano em PLANEJADO; sprints iniciados antes do portao seguem retomaveis (excecao ja comentada no codigo), ou registrar que a excecao sera removida — e asserir esse texto no teste."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_docs.py", "linha": 93, "descricao": "A assercao assert \"portao do plano\" in texto e tautologica: _corpo_da_secao() devolve texto[inicio.start():fim], isto e, inclui a propria linha do titulo '## Portao do plano' — ela passa mesmo que o corpo nao mencione o portao. Alem disso, as assercoes de contagem (l.105-107) duplicam o contrato ja existente em .autodev/tests/test_readme_afirmacoes.py::test_estado_atual_mede_suite_sem_contagem_fixa, dobrando a manutencao sem ganho de cobertura.", "correcao_sugerida": "Ancorar a assercao no corpo sem o titulo (usar inicio.end()) e verificar algo que so o corpo possa satisfazer; se a intencao e cobrir o fluxo, assegurar a ordem das palavras 'planejar', 'prever', 'aprovar', 'rodar' no texto. Remover a duplicata de contagem ou referencia-la."}, {"severidade": "baixa", "arquivo": "README.md", "linha": 246, "descricao": "A secao nova foi inserida sem o separador '---' que precede todas as outras secoes de nivel 2: '## Seguranca' cola direto no paragrafo anterior do 'Portao do plano'. Cosmetico, mas quebra o padrao do documento que o proprio teste de estrutura preserva.", "correcao_sugerida": "Inserir '---' antes de '## Seguranca'."}]
+```
+### Arquivos ja tocados
+  - .autodev/sprints/DEVFACTORY-003/decisions.md
+  - .autodev/tests/test_plan_docs.py
+  - .autodev/tests/test_readme_estrutura.py
+  - README.md
+
+## INSTRUCAO
+Esta e a tentativa #3.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-sol/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+
+
+===== STDOUT =====
+RESULTADO: documentação do portão, checklist D-16, E1–E5, exceção legada, estado das sprints e comandos de teste corrigidos; decisão humana registrada e testes reforçados | TESTES: 429 passed (`.venv/bin/python -m pytest .autodev/tests/ -q`)
+
+===== STDERR =====
+

@@ -165,3 +165,26 @@
 [08:34:32] P07: revisao por hermes [reserva (hermes/deepseek-flash/high — revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (6 findings)
 [08:34:32] P07: escalonamento de degrau gpt-5.6-terra/low -> gpt-5.6-sol/low
 [08:34:32] P07 tentativa 3: codex gpt-5.6-sol/low
+[08:39:44] P07 t3: 50,556 tokens (codex-cli:rodape)
+[08:39:46] P07: testes exit=0 passed=10 failed=0 (configurado)
+[08:43:14] P07: revisao por hermes [reserva (hermes/deepseek-flash/high — revisor da escada 'agy' indisponivel)] -> REQUEST_CHANGES (4 findings)
+[08:43:14] P07: agy esta fora desta rodada (cota) — seguindo com codex
+[08:43:14] P07: escalonamento de degrau gpt-5.6-sol/low -> gpt-6-astra/low
+[08:43:14] P07 tentativa 4: codex gpt-6-astra/low
+[08:46:26] P07 t4: 46,663 tokens (codex-cli:rodape)
+[08:46:27] P07: testes exit=0 passed=10 failed=0 (configurado)
+[08:51:00] P07: revisao por hermes [escada (tentativa 4)] -> REQUEST_CHANGES (6 findings)
+[08:51:00] P07: agy esta fora desta rodada (cota) — seguindo com codex
+[08:51:00] P07 tentativa 5: codex gpt-6-astra/low
+[08:54:36] P07 t5: 44,079 tokens (codex-cli:rodape)
+[08:54:37] P07: testes exit=0 passed=12 failed=0 (configurado)
+[08:59:01] P07: revisao por hermes [escada (tentativa 5)] -> APPROVE (6 findings)
+[08:59:01] P07: DONE em 5 tentativa(s) — commit 0234d788
+[08:59:01] integrando 1 task(s) da onda 5
+[08:59:56]   portao build: OK
+[08:59:56]   portao testes: OK
+[08:59:56]   portao lint: OK
+[08:59:56]   portao seguranca: OK
+[08:59:56] branch atual do repo: 345c40d3 (main intacta — merge automatico proibido)
+[09:00:01] sprint DEVFACTORY-003: 7 tasks (0 novas) — ondas [['P01'], ['P02', 'P03'], ['P04'], ['P05'], ['P06'], ['P07']]
+[09:00:01] rodada dona: pid 588222 — rodada única garantida pelo motor

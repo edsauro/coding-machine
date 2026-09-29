@@ -1,4 +1,4 @@
-# exit_code=0 duracao=214.9s modelo=deepseek-flash effort=high failure_class=None tokens=nao medido(-)
+# exit_code=0 duracao=263.4s modelo=deepseek-flash effort=high failure_class=None tokens=nao medido(-)
 
 ===== PROMPT ENVIADO =====
 Voce e o REVISOR INDEPENDENTE de uma task de implementacao.
@@ -19,10 +19,10 @@ P07: Documentar o portao do plano e o checklist derivado do D-16
 ```diff
 diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
 new file mode 100644
-index 0000000..cc91484
+index 0000000..4f6bc65
 --- /dev/null
 +++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,44 @@
 +# DEVFACTORY-003 — Decisões
 +
 +## D-01 — Aprovação humana é um portão obrigatório
@@ -30,28 +30,56 @@ index 0000000..cc91484
 +**Contexto:** o planejador gera `dag.json` automaticamente, mas a Sprint 2
 +demonstrou que a validação estrutural não basta para garantir um plano seguro.
 +
-+**Evidência:** o D-16 da Sprint 2 registrou colisões de arquivos entre tasks,
++**Evidência:** o [D-16 da Sprint 2](../DEVFACTORY-002/decisions.md) registrou
++colisões de arquivos entre tasks,
 +inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
 +reprovações e tasks bloqueadas.
 +
-+**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
-+O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
-+alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
 +
 +**Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
-+rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
-+agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
++
++## D-02 — 2026-09-29 — Contagem medida e preservação do contrato do README
++
++**Contexto:** o critério de P07 pede a contagem de testes em `Estado atual`, mas
++o [D-27 da Sprint 4](../DEVFACTORY-004/decisions.md) substituiu números fixos pelo
++comando que mede a suíte. Esse contrato é protegido por
++`.autodev/tests/test_readme_afirmacoes.py::test_estado_atual_mede_suite_sem_contagem_fixa`.
++
++**Decisão:** neste critério, a contagem é satisfeita pelo comando de medição
++`python3 -m pytest .autodev/tests/ -q` no runner (no terminal, usar o interpretador
++do ambiente virtual do projeto). O resumo da execução fornece o número vigente;
++não reintroduzir uma contagem fixa no README nem enfraquecer o teste do D-27.
++Esta é a conciliação explícita do critério de P07 com a decisão posterior.
++
++**Preservação:** manter a árvore de títulos e os textos de referência de
++`Como rodar` e `Planejador`, incluindo a seção `Portão do plano` na estrutura
++esperada. Verificar conjuntamente `.autodev/tests/test_plan_docs.py`,
++`.autodev/tests/test_readme_estrutura.py` e `.autodev/tests/test_readme_afirmacoes.py`.
++
++**Limite do portão:** o checklist do D-16 e a execução de
++`.autodev/scripts/verificar_plano.py` são procedimentos manuais do aprovador;
++`aprovar` registra a aprovação, mas não chama esse script. E4 verifica arquivos
++nomeados por task, não a concretude de cada comando ou de cada critério.
 diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
-index be308a9..44b0435 100644
+index be308a9..db2605a 100644
 --- a/.autodev/tests/test_plan_docs.py
 +++ b/.autodev/tests/test_plan_docs.py
-@@ -1,10 +1,22 @@
+@@ -1,10 +1,24 @@
  """Contrato da documentacao publica do planejador."""
  
 -from pathlib import Path
++import json
  import re
++import shlex
++import shutil
 +import subprocess
-+import sys
 +from pathlib import Path
  
  
@@ -66,11 +94,11 @@ index be308a9..44b0435 100644
 +    assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
 +    proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
 +    fim = len(texto) if proximo is None else inicio.end() + proximo.start()
-+    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
  
  
  def _secao_planejador() -> str:
-@@ -73,3 +85,50 @@ Mais texto.
+@@ -73,3 +87,105 @@ Mais texto.
      assert "Texto próprio do planejador." in secao
      assert "Ciclo de vida do sprint" not in secao
      assert "Texto de outro assunto." not in secao
@@ -79,9 +107,8 @@ index be308a9..44b0435 100644
 +def test_readme_documenta_portao_e_checklist_derivado_do_d16():
 +    texto = _corpo_da_secao("Portão do plano").lower()
 +
-+    assert "portão do plano" in texto
-+    assert "planejar" in texto and "prever" in texto
-+    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
 +    assert "arquivo de teste próprio" in texto
 +    assert "sem colisão de arquivo na mesma onda" in texto
 +    assert "critério de preservação" in texto
@@ -94,16 +121,70 @@ index be308a9..44b0435 100644
 +
 +    assert ".autodev/scripts/verificar_plano.py" in portao
 +    assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
-+    assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
-+    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
-+    assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
-+    assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
-+    assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
++    # A contagem/comando da suíte já é coberta em test_readme_afirmacoes.py
++    # por test_estado_atual_mede_suite_sem_contagem_fixa.
++    bullets = re.findall(r"^- .*?(?=^- |\Z)", estado_atual, re.MULTILINE | re.DOTALL)
++    retratos = [bullet for bullet in bullets if "Retrato do `state.db`" in bullet]
++    assert len(retratos) == 1
++    for sprint in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-003"):
++        assert re.search(
++            rf"`{sprint}`: (?:ENCERRADO|EM EXECUÇÃO|PLANEJADO)\*\*",
++            retratos[0],
++        ), f"{sprint} precisa de estado explícito no mesmo retrato do state.db"
++    assert "estado factual vem do `state.db`" in estado_atual
++    assert "declaração de intenção" in estado_atual
 +
 +
-+def test_exemplo_documentado_do_verificador_roda_sem_erros():
++def test_readme_distingue_checklist_manual_das_checagens_automaticas():
++    portao = " ".join(_corpo_da_secao("Portão do plano").split())
++
++    assert "passo manual do aprovador" in portao
++    assert "`aprovar` não executa esse script" in portao
++    assert "E4 cobre apenas caminhos de arquivo" in portao
++    assert "comando sozinho não satisfaz essa checagem" in portao
++
++
++def test_decisions_concilia_contagem_com_contrato_do_d27():
++    texto = (ROOT / ".autodev/sprints/DEVFACTORY-003/decisions.md").read_text(
++        encoding="utf-8"
++    )
++
++    assert "2026-09-29" in texto
++    assert "D-27" in texto
++    assert "test_estado_atual_mede_suite_sem_contagem_fixa" in texto
++    assert "contagem é satisfeita pelo comando de medição" in texto
++
++
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
++def test_exemplo_documentado_do_verificador_roda_sem_erros(tmp_path):
++    portao = _corpo_da_secao("Portão do plano")
++    exemplo = re.search(r"^python3 .autodev/scripts/verificar_plano.py .+$", portao, re.MULTILINE)
++    assert exemplo
++    comando = shlex.split(exemplo.group())
++    python3 = shutil.which(comando[0])
++    assert python3, "python3 documentado precisa estar disponível no PATH"
++    comando[0] = python3
++    # Exercita a CLI documentada com um plano isolado: mudanças futuras no
++    # DAG operacional não devem quebrar o contrato de documentação.
++    dag = tmp_path / "dag.json"
++    dag.write_text(json.dumps({"tasks": [{
++        "id": "DOC01",
++        "titulo": "Documentar exemplo",
++        "criterios": ["README.md ganha exemplo de uso"],
++        "teste": "python3 -m pytest tests/test_docs.py -q",
++        "deps": [],
++    }]}), encoding="utf-8")
++    comando[-1] = str(dag)
 +    resultado = subprocess.run(
-+        [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
++        comando,
 +        cwd=ROOT,
 +        text=True,
 +        capture_output=True,
@@ -111,7 +192,7 @@ index be308a9..44b0435 100644
 +    )
 +
 +    assert resultado.returncode == 0, resultado.stdout + resultado.stderr
-+    assert "OK    DEVFACTORY-003:" in resultado.stdout
++    assert f"OK    {tmp_path.name}:" in resultado.stdout
 +
 +
 +def test_decisions_registra_aprovacao_humana_e_d16():
@@ -121,6 +202,8 @@ index be308a9..44b0435 100644
 +    assert "aprovação humana" in texto
 +    assert "d-16" in texto
 +    assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
 diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
 index 4bce481..3c5df54 100644
 --- a/.autodev/tests/test_readme_estrutura.py
@@ -134,10 +217,10 @@ index 4bce481..3c5df54 100644
  ]
  
 diff --git a/README.md b/README.md
-index 293f3be..180be3d 100644
+index 293f3be..37309da 100644
 --- a/README.md
 +++ b/README.md
-@@ -186,12 +186,14 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
+@@ -186,12 +186,18 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
  
  ## Estado atual
  
@@ -148,17 +231,21 @@ index 293f3be..180be3d 100644
 -- **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
 -  ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
 +- Para medir a contagem atual da suíte do orquestrador, rode
-+  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
-+  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
-+- **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
-+  **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
-+  `status:` do `sprint.yaml` é apenas declaração de intenção.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
++- Retrato do `state.db` informado pela revisão em 29/09/2026:
++  **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: ENCERRADO**
++  desde 28/09/2026 às 11:21:21 (10/10 tasks integradas);
++  **`DEVFACTORY-003`: EM EXECUÇÃO** desde 29/09/2026 às 08:14:02.
++  O estado factual vem do `state.db`; o `status:` do `sprint.yaml` é apenas
++  declaração de intenção. Esse banco operacional não é versionado no worktree.
 +- A Sprint `DEVFACTORY-001` percorreu `EM_EXECUCAO → EM_VERIFICACAO →
-+  ENCERRADO`; suas tarefas estão concluídas e o relatório está em
++  ENCERRADO`. As 15 tarefas (T01–T15) estão concluídas e o relatório está em
    `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
  - **Como as tarefas foram concluídas — leia antes de confiar no número:** as 14
    primeiras (T01–T14) foram concluídas por **evidência retroativa**. O código que
-@@ -214,6 +216,34 @@ O projeto-fixture é gerado e não é versionado:
+@@ -214,6 +220,48 @@ O projeto-fixture é gerado e não é versionado:
  
  ---
  
@@ -166,10 +253,13 @@ index 293f3be..180be3d 100644
 +
 +Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
 +plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
-+com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
-+sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
 +
-+O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
++O checklist de plano derivado do D-16 é obrigatório como procedimento humano
++antes de aprovar:
 +
 +- cada task tem um **arquivo de teste próprio**, sem compartilhá-lo com outra task;
 +- sem colisão de arquivo na mesma onda: nenhuma task pode compartilhar arquivo
@@ -179,9 +269,18 @@ index 293f3be..180be3d 100644
 +- todo critério cita um **arquivo ou comando** concreto e verificável;
 +- uma task que estende módulo de outra depende dela, direta ou transitivamente.
 +
-+O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
-+aviso; preservação e dependência exigem julgamento na aprovação humana.
-+Execute-o antes da aprovação:
++E4 cobre apenas caminhos de arquivo reconhecidos nos critérios ou no campo
++`teste` de cada task; um comando sozinho não satisfaz essa checagem.
++A exigência de concretude de cada critério também precisa de revisão humana.
++
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
++A execução do verificador é um passo manual do aprovador antes da aprovação:
++`aprovar` não executa esse script. Corrija os erros e avalie os avisos antes de
++registrar a aprovação humana.
 +
 +```bash
 +python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
@@ -190,6 +289,8 @@ index 293f3be..180be3d 100644
 +Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
 +direto para `dag.json` ou `--todos` para verificar todos os planos.
 +
++---
++
  ## Segurança
  
  - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
@@ -197,8 +298,8 @@ index 293f3be..180be3d 100644
 
 ## Saida dos testes
 ```
-.........                                                                [100%]
-9 passed in 0.41s
+............                                                             [100%]
+12 passed in 0.40s
 
 ```
 
@@ -237,85 +338,85 @@ Sua resposta e o produto: um unico bloco JSON, nada antes e nada depois dele.
 ===== STDOUT =====
 ```json
 {
-  "veredito": "REQUEST_CHANGES",
-  "confianca": 0.8,
+  "veredito": "APPROVE",
+  "confianca": 0.78,
   "criterios_atendidos": [
     {
       "criterio": "README.md ganha a secao Portao do plano descrevendo o fluxo planejar, prever, aprovar, rodar",
       "atende": true,
-      "evidencia": "README.md (ca1acd4) linhas 219-245: 'Todo sprint segue o fluxo **planejar -> prever -> aprovar -> rodar**', com plan/prever/aprovar/run descritos. Confere com o codigo em 096deb5: autodev/cli.py cmd_plan (l.398), cmd_prever (l.437, imprime 'onda N' a partir de plan_impacto.impacto), cmd_aprovar (l.154, grava por/quando/hash_dag) e orchestrator.rodar() (l.700-711) bloqueando via checar_aprovacao/_validar_aprovacao. RESSALVA: a afirmacao 'so entao run pode executar o sprint' e absoluta demais (ver finding baixa)."
+      "evidencia": "README.md:223 '## Portao do plano'; linhas 225-230 descrevem 'planejar -> prever -> aprovar -> rodar' com plan/prever/aprovar/run, hash do dag.json e invalidacao por mudanca no DAG. test_plan_docs.py:92-100 checa a ordem dos quatro verbos no corpo da secao (recorte delimitado pelo proximo '^## '). test_readme_estrutura.py:19 confirma o titulo (2, 'Portao do plano') na arvore exata de titulos; suite completa 430 passed no worktree."
     },
     {
-      "criterio": "a secao traz o checklist de plano derivado do D-16: arquivo de teste proprio por task, sem colisao de arquivo na mesma onda, criterio de preservacao ao editar modulo de outra task e criterio sempre citando arquivo ou comando",
+      "criterio": "a secao traz o checklist de plano derivado do D-16 (arquivo de teste proprio por task, sem colisao de arquivo na mesma onda, criterio de preservacao ao editar modulo de outra task, criterio sempre citando arquivo ou comando)",
       "atende": true,
-      "evidencia": "README.md linhas 227-235, quatro bullets identicos ao exigido (arquivo de teste proprio; sem colisao na mesma onda; criterio de preservacao; arquivo ou comando) + o 5o item de dependencia. Casa com o checklist do proprio dono em .autodev/sprints/DEVFACTORY-003/spec.md secao 'Checklist de plano (vira criterio de aceitacao na P07)'."
+      "evidencia": "README.md:235-241 traz os quatro itens literais ('arquivo de teste proprio', 'sem colisao de arquivo na mesma onda', 'criterio de preservacao', 'arquivo ou comando'); test_plan_docs.py:97-100 assere as quatro frases. D-16 real existe em .autodev/sprints/DEVFACTORY-002/decisions.md:372-397 e de fato descreve 8 de 10 tasks gravando no mesmo arquivo de teste e 6 editando autodev/planner.py."
     },
     {
       "criterio": "README.md atualiza a secao Estado atual com a contagem de testes e o estado das sprints 1, 2 e 3",
-      "atende": false,
-      "evidencia": "Sprints presentes mas DUAS das tres erradas: README.md:192 diz 'DEVFACTORY-002: EM EXECUCAO' e 'DEVFACTORY-003: PLANEJADO' enquanto state.db (sprint_state + checkpoints) registra 002 ENCERRADO em 2026-09-28 11:21:21 e 003 EM_EXECUCAO desde 2026-09-28 23:39:40 (com P01..P06 integradas) — tudo antes da edicao (29/09 08:30). Os valores do README sao exatamente os do sprint.yaml (002 'EM_EXECUCAO', 003 'PLANEJADO'), ou seja, a secao copiou a 'declaracao de intencao' que ela mesma diz nao ser o fato. Quanto a 'contagem': a secao traz o comando de medicao (l.189-191), nao um numero — interpretacao compativel com o teste pre-existente .autodev/tests/test_readme_afirmacoes.py::test_estado_atual_mede_suite_sem_contagem_fixa, que proibe contagem fixa; nao reprovo por isso, reprovo pelos estados falsos. Como efeito colateral, o teste novo cravou as strings erradas (test_plan_docs.py:111-112), entao a suite passa defendendo a informacao incorreta."
+      "atende": true,
+      "evidencia": "Estado das sprints 1/2/3 presente e factualmente correto: README.md:193-198 vs .autodev/state.db (sprint_state) — 001 ENCERRADO, 002 ENCERRADO em 2026-09-28 11:21:21, 003 EM_EXECUCAO desde 2026-09-29 08:14:02; os epochs 1790605281.9 e 1790680442.7 convertem exatamente nesses instantes. A contagem NAO aparece como numero: o README entrega o comando que a mede (linhas 189-192) e decisions.md:19-31 (D-02, datado) concilia isso com o D-27/DEVFACTORY-004, cujo contrato test_readme_afirmacoes.py::test_estado_atual_mede_suite_sem_contagem_fixa proibe contagem fixa nessa secao. Confirmado que o teste existe e que qualquer numero seguido de 'testes/passed/verdes' reprovaria — ou seja, o criterio literal e insatisfazivel junto do contrato vigente. Desvio documentado, nao silencioso."
     },
     {
       "criterio": "o README.md documenta o script .autodev/scripts/verificar_plano.py com um exemplo de uso",
       "atende": true,
-      "evidencia": "README.md linhas 236-245: o caminho .autodev/scripts/verificar_plano.py, o exemplo 'python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003', o codigo de saida diferente de zero em caso de erro e as formas alternativas (caminho do dag.json, --todos). Exemplo executado por mim no worktree do P07: 'OK    DEVFACTORY-003: 7 tasks, 0 erro(s), 0 aviso(s)', exit=0; '--todos' devolve exit=1 com E4/E5, coerente com 'retorna codigo diferente de zero'. RESSALVA: a lista de regras do README omite E1 e E5 (ver finding medio)."
+      "evidencia": "README.md:247-261 documenta as classes de erro E1-E5, avisos A1/A2, o codigo de saida, as formas alternativas (dag.json direto, --todos) e o bloco bash 'python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003'. Semantica conferida contra o script (autodev/scripts/verificar_plano.py:15-24, 187-207, 214-273, 300-312) — bate. Executei o exemplo documentado no worktree: 'OK    DEVFACTORY-003: 7 tasks, 0 erro(s), 0 aviso(s)', exit=0."
     },
     {
       "criterio": ".autodev/sprints/DEVFACTORY-003/decisions.md registra a decisao de exigir aprovacao humana e cita o D-16 da sprint 2 como evidencia",
       "atende": true,
-      "evidencia": "Arquivo novo de 18 linhas, 'D-01 - Aprovacao humana e um portao obrigatorio', com Contexto/Evidencia/Decisao/Consequencia; a Evidencia cita 'o D-16 da Sprint 2' e descreve o conteudo real do D-16 (.autodev/sprints/DEVFACTORY-002/decisions.md:372, 'o DAG mandava 8 tasks escreverem no MESMO arquivo de teste'). A decisao (quem/quando/hash do dag.json, invalidada se o DAG mudar) bate com cmd_aprovar + _validar_aprovacao em 096deb5."
+      "evidencia": "decisions.md:3-22 (D-01 'Aprovacao humana e um portao obrigatorio') cita '[D-16 da Sprint 2](../DEVFACTORY-002/decisions.md)' como evidencia das colisoes; o link relativo resolve (.autodev/sprints/DEVFACTORY-002/decisions.md existe) e o conteudo do D-16 confere. O fluxo descrito bate com o codigo: autodev/cli.py:154-200 (cmd_aprovar grava por/quando/hash_dag) e autodev/orchestrator.py:227-245 (bloqueia PLANEJADO sem aprovacao, invalida por divergencia de hash, libera sprints pre-portao). test_plan_docs.py:183-191 cobre o texto."
     },
     {
       "criterio": "os testes ficam em .autodev/tests/test_plan_docs.py e provam que as secoes citadas existem no README.md",
       "atende": true,
-      "evidencia": "test_plan_docs.py:90-145: _corpo_da_secao() le ROOT/README.md de verdade e os testes asseguram o corpo de 'Portao do plano' e de 'Estado atual'; test_exemplo_documentado_do_verificador_roda_sem_erros roda o script por subprocess e checa 'OK    DEVFACTORY-003:' (esse prova comportamento, nao string). RESSALVA: uma das assercoes e tautologica e ha contrato duplicado (ver finding baixa); as assercoes de estado sao presenca de string — passam mesmo com o texto errado."
+      "evidencia": "test_plan_docs.py:15-21 (_corpo_da_secao) usa busca por '^## <titulo>$' com assert de existencia do titulo e delimita pelo proximo '^## ' — se a secao sumir, o teste falha com mensagem explicita, em vez de passar por vacuidade. 7 casos novos no arquivo, 12 no total (coincide com a saida reportada '12 passed'), rodando inclusive um subprocesso real do CLI documentado. Suite completa no worktree: 430 passed em 111s com .venv/bin/python; git status do worktree limpo depois (nada escrito no repo)."
     }
   ],
   "findings": [
     {
-      "severidade": "alta",
-      "arquivo": "README.md",
-      "linha": 192,
-      "descricao": "Estado atual afirma 'DEVFACTORY-002: EM EXECUCAO' e 'DEVFACTORY-003: PLANEJADO' logo depois de dizer que 'o estado factual vem do state.db'. O state.db diz o contrario: sprint_state = 001 ENCERRADO, 002 ENCERRADO (checkpoint em 2026-09-28 11:21:21), 003 EM_EXECUCAO (desde 2026-09-28 23:39:40), 004 ENCERRADO. Os dois valores do README sao exatamente os do sprint.yaml (002 'EM EXECUCAO', 003 'PLANEJADO') — a secao transcreveu a declaracao enquanto afirmava estar lendo o fato. E o teste novo (.autodev/tests/test_plan_docs.py:111-112) assevera essas mesmas strings erradas, de modo que a suite 'passa' protegendo a informacao falsa; nenhum teste deriva o estado do banco.",
-      "correcao_sugerida": "Ler o estado de state.db (sprint_state.estado / `autodev status`) e escrever 001 ENCERRADO, 002 ENCERRADO, 003 EM EXECUCAO; atualizar as assercoes em test_plan_docs.py:111-112 para os mesmos valores (idealmente derivando as strings do state.db, nao literalmente, para nao voltar a envelhecer)."
-    },
-    {
-      "severidade": "media",
-      "arquivo": "README.md",
-      "linha": 189,
-      "descricao": "O diff tirou a forma de rodar a suite 'a mao' no terminal (.venv/bin/python -m pytest) e deixou so 'python3 -m pytest .autodev/tests/ -q', justificando que 'o runner resolve python3'. Fora do runner isso nao vale: nesta maquina /usr/bin/python3 (3.14.7) devolve ModuleNotFoundError: No module named 'pytest' (o pytest 9.1.1 existe apenas em .venv). O proprio projeto registra isso em DEVFACTORY-004/decisions.md D-23 ('o comando escrito nos criterios nao roda no terminal desta maquina') e em spec.md ('Para rodar a suite a mao, fora do motor, o README manda .venv/bin/python -m pytest') — o diff torna as duas afirmacoes falsas. Como o criterio e justamente documentar a contagem da suite, o comando documentado nao entrega o numero para um humano no terminal.",
-      "correcao_sugerida": "Manter as duas formas, como no texto anterior: terminal '.venv/bin/python -m pytest .autodev/tests/ -q' e, dentro do runner, 'python3 -m pytest .autodev/tests/ -q' (o teste pre-existente test_estado_atual_mede_suite_sem_contagem_fixa exige apenas a segunda string, entao as duas convivem)."
-    },
-    {
-      "severidade": "media",
-      "arquivo": "README.md",
-      "linha": 236,
-      "descricao": "A secao descreve o verificador como quem 'trata E2/E3/E4 como erro', omitindo E1 e E5, que tambem geram erro e exit != 0 (docstring do script em 096deb5, linhas 15-22). Reproduzi: `verificar_plano.py --todos` retorna exit=1 e imprime 'E5: P04 usa comando de teste fora da forma exigida' para a DEVFACTORY-004. Quem seguir o README sera surpreendido por um bloqueio de classe nao documentada — e E5 e exatamente a classe que queimou 12 tentativas (D-23). Nenhum teste cobre essa descricao (o teste so confere o caminho do script e o exemplo).",
-      "correcao_sugerida": "Completar a lista na secao: E1 (ids duplicados/dep inexistente/ciclo) e E5 (comando pytest fora da forma `python3 -m pytest ...`), como no docstring do script; e acrescentar uma assercao no teste para as classes citadas."
-    },
-    {
       "severidade": "baixa",
       "arquivo": "README.md",
-      "linha": 222,
-      "descricao": "'so entao `run` pode executar o sprint' e uma garantia absoluta que o codigo nao da: em autodev/orchestrator.py:228-243 (_validar_aprovacao) um sprint sem bloco `aprovacao` que ja esteja fora de PLANEJADO retorna None (liberado). Prova viva: a propria DEVFACTORY-003 roda com `aprovacao: null` no sprint.yaml e estado EM_EXECUCAO. O texto do README (e a 'Consequencia' do D-01 em decisions.md) afirma mais do que o portao entrega, e nem o teste do README nem o de decisions.md tocam nisso.",
-      "correcao_sugerida": "Qualificar a frase: o portao vale para plano em PLANEJADO; sprints iniciados antes do portao seguem retomaveis (excecao ja comentada no codigo), ou registrar que a excecao sera removida — e asserir esse texto no teste."
+      "linha": 189,
+      "descricao": "O criterio do P07 pede 'a contagem de testes' em Estado atual e a secao nao traz numero nenhum — so o comando de medicao. E um desvio literal de criterio, embora forçado: o D-27 (DEVFACTORY-004, ja mergeado) e o teste protegido test_readme_afirmacoes.py::test_estado_atual_mede_suite_sem_contagem_fixa proibem contagem fixa nessa secao. O desvio esta documentado em decisions.md D-02, mas o README nao aponta para o D-02, entao quem le so o README ve o criterio descumprido sem explicacao.",
+      "correcao_sugerida": "Adicionar na secao Estado atual uma frase do tipo '(a contagem fixa e proibida aqui desde o D-27; ver D-02 da sprint 3)', ou registrar a contagem vigente no SPRINT-REPORT.md do DEVFACTORY-003, onde nenhum contrato a proibe."
     },
     {
       "severidade": "baixa",
       "arquivo": ".autodev/tests/test_plan_docs.py",
-      "linha": 93,
-      "descricao": "A assercao assert \"portao do plano\" in texto e tautologica: _corpo_da_secao() devolve texto[inicio.start():fim], isto e, inclui a propria linha do titulo '## Portao do plano' — ela passa mesmo que o corpo nao mencione o portao. Alem disso, as assercoes de contagem (l.105-107) duplicam o contrato ja existente em .autodev/tests/test_readme_afirmacoes.py::test_estado_atual_mede_suite_sem_contagem_fixa, dobrando a manutencao sem ganho de cobertura.",
-      "correcao_sugerida": "Ancorar a assercao no corpo sem o titulo (usar inicio.end()) e verificar algo que so o corpo possa satisfazer; se a intencao e cobrir o fluxo, assegurar a ordem das palavras 'planejar', 'prever', 'aprovar', 'rodar' no texto. Remover a duplicata de contagem ou referencia-la."
+      "linha": 114,
+      "descricao": "O teste do 'estado das sprints 1, 2 e 3' aceita qualquer um dos tres estados via regex '(?:ENCERRADO|EM EXECUCAO PLANEJADO)' — prova presenca do rotulo, nao factualidade. Um README dizendo 'DEVFACTORY-001: PLANEJADO' passa, embora contradiga o state.db. A factualidade eu tive de conferir a mao (estava correta).",
+      "correcao_sugerida": "Assertar o estado esperado por sprint (ENCERRADO/ENCERRADO/EM EXECUCAO) ou, quando .autodev/state.db existir, comparar com sprint_state e pular (skip) quando o banco nao estiver presente."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 170,
+      "descricao": "O teste do 'exemplo documentado' troca o ultimo argumento pelo dag sintetico em tmp, entao a forma realmente documentada ('... verificar_plano.py DEVFACTORY-003', que exercita a resolucao de sprint_id em carregar()) nunca e executada pela suite. Uma quebra nesse caminho (por exemplo no fallback RAIZ/.autodev/sprints/<id>) nao seria detectada, e a doc ficaria mentindo em verde.",
+      "correcao_sugerida": "Manter o caso isolado atual e somar uma assercao sobre a forma sprint_id: rodar o comando com um id inexistente e exigir a mensagem/exit de 'nao encontrei', ou rodar com a sprint real aceitando 0/1 — assim a resolucao de id fica coberta."
     },
     {
       "severidade": "baixa",
       "arquivo": "README.md",
-      "linha": 246,
-      "descricao": "A secao nova foi inserida sem o separador '---' que precede todas as outras secoes de nivel 2: '## Seguranca' cola direto no paragrafo anterior do 'Portao do plano'. Cosmetico, mas quebra o padrao do documento que o proprio teste de estrutura preserva.",
-      "correcao_sugerida": "Inserir '---' antes de '## Seguranca'."
+      "linha": 193,
+      "descricao": "O bullet se chama 'Retrato do state.db' mas lista so as sprints 001-003; o mesmo banco tem DEVFACTORY-004: ENCERRADO desde 2026-09-28 19:54:19, anterior a esta entrega (a propria D-02 cita a 004). O rotulo promete um retrato do banco e entrega um retrato parcial, que e exatamente o tipo de meia-verdade que o D-27 combateu no README.",
+      "correcao_sugerida": "Incluir '**`DEVFACTORY-004`: ENCERRADO** desde 28/09/2026 as 19:54:19' ou renomear o bullet para 'Retrato das sprints 001-003 no state.db'."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/tests/test_plan_docs.py",
+      "linha": 180,
+      "descricao": "Dois acoplamentos frageis no teste de execucao: (a) assere o espacamento exato do script ('OK    ' com 4 espacos, em verificar_plano.py:305), entao trocar a formatacao da saida reprova um teste de documentacao por motivo cosmetico; (b) usa shutil.which('python3') do PATH do processo de teste, que resolve para /usr/bin/python3 fora do runner (verifiquei: sem pytest, mas com stdlib suficiente) e para o venv dentro dele — o teste passa por sorte do ambiente, nao por contrato.",
+      "correcao_sugerida": "Trocar o literal por regex '^OK\\s+<nome>:' e escolher o interpretador explicitamente (sys.executable) quando o objetivo e so exercitar a CLI documentada."
+    },
+    {
+      "severidade": "baixa",
+      "arquivo": ".autodev/sprints/DEVFACTORY-003/decisions.md",
+      "linha": 3,
+      "descricao": "D-01 nao tem data no titulo, enquanto D-02 tem ('## D-02 — 2026-09-29 — ...') e a convencao ja usada na sprint 004 ('## D-27 — 2026-09-28 — ...'). Num arquivo que sera citado como evidencia de um portao de aprovacao, a decisao sem data e justamente a mais importante e a unica que nao pode ser situada no tempo.",
+      "correcao_sugerida": "Renomear para '## D-01 — 2026-09-29 — Aprovacao humana e um portao obrigatorio'."
     }
   ],
-  "resumo": "As seis entregas existem e o exemplo do verificador roda de verdade (exit 0 em DEVFACTORY-003), mas a secao Estado atual documenta estados de sprint que contradizem o state.db (002 ja ENCERRADO ha 21h e 003 EM_EXECUCAO com P01-P06 integradas) enquanto afirma ler o banco, e o teste novo cravou esses valores errados; alem disso o diff trocou a forma de medir a suite por uma que falha no terminal (sem pytest no python3 do sistema), descreve o verificador sem E1/E5 e afirma um portao de aprovacao mais absoluto do que o codigo — nada disso coberto por teste; sem segredos, sem caminho absoluto, sem dependencia nova e sem escrita fora do repo."
+  "resumo": "Aprovado: os seis criterios estao substancialmente atendidos, os fatos do README batem com o state.db e com o codigo do portao (verifiquei timestamps, cmd_aprovar, _validar_aprovacao e o proprio verificar_plano.py, que rodei no worktree com exit 0), a suite completa passa (430 verdes) sem sujar o repo, e os unicos desvios sao de baixa severidade — sendo o principal a contagem de testes substituida pelo comando de medicao, desvio forçado pelo contrato protegido do D-27 e documentado no D-02."
 }
 ```
 

@@ -1,0 +1,4062 @@
+Reading additional input from stdin...
+OpenAI Codex v0.154.0
+--------
+workdir: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 01a0ecf1-ef22-7fb2-902e-2e4fd4709dfb
+--------
+user
+Voce e o agente de implementacao de uma task de um Sprint autonomo.
+
+## Task P07: Documentar o portao do plano e o checklist derivado do D-16
+
+## Criterios de aceitacao (todos obrigatorios)
+- README.md ganha a secao Portao do plano descrevendo o fluxo planejar, prever, aprovar, rodar
+- a secao traz o checklist de plano derivado do D-16: arquivo de teste proprio por task, sem colisao de arquivo na mesma onda, criterio de preservacao ao editar modulo de outra task e criterio sempre citando arquivo ou comando
+- README.md atualiza a secao Estado atual com a contagem de testes e o estado das sprints 1, 2 e 3
+- o README.md documenta o script .autodev/scripts/verificar_plano.py com um exemplo de uso
+- .autodev/sprints/DEVFACTORY-003/decisions.md registra a decisao de exigir aprovacao humana e cita o D-16 da sprint 2 como evidencia
+- os testes ficam em .autodev/tests/test_plan_docs.py e provam que as secoes citadas existem no README.md
+
+## Contexto do projeto
+# DEVFACTORY-003 — Portao de qualidade do plano e aprovacao humana
+
+## Objetivo
+
+Transformar as duas licoes que a sprint 2 produziu **na marra** em produto:
+
+1. **D-16 (causa-raiz):** o DAG da sprint 2 mandava 8 das 10 tasks gravarem os
+   testes no MESMO arquivo e 6 editarem o mesmo modulo. Cada task que obedecia aos
+   proprios criterios apagava o trabalho da anterior; o revisor reprovava por
+   regressao (corretamente); a task queimava as 5 tentativas e bloqueava. Nove
+   tasks bloqueadas, nenhuma por falta de capacidade do modelo.
+2. **D-17:** agente que responde com pergunta de design em modo headless nao
+   entregava nada, a suite pre-existente continuava verde e o motor gastava
+   revisao para descobrir o obvio.
+
+O que **hoje so existe na cabeca do autor** (e por isso falhou) passa a ser
+verificado por codigo, antes de qualquer agente rodar:
+
+- colisao de arquivo entre tasks da mesma onda = **erro**, nao surpresa na
+  integracao;
+- mesmo arquivo de teste em duas tasks = **erro** (a armadilha D-16);
+- criterio sem arquivo ou comando concreto = **erro**;
+- editar modulo entregue por outra task sem criterio de preservacao = **aviso**.
+
+E fecha a limitacao que a propria sprint 2 documenta na P10 — *"o plano gerado
+sempre precisa de revisao humana antes de rodar"* — deixando de ser recomendacao e
+passando a ser **portao**: o sprint so roda com aprovacao registrada (quem, quando
+e o hash do `dag.json`). Alterar o DAG depois de aprovado invalida a aprovacao.
+
+## Por que esta sprint agora
+
+- A sprint 2 entrega o planejador (`autodev plan`): a partir dela o DAG passa a ser
+  **gerado por agente**. Sem o portao de qualidade, o mesmo defeito de contrato que
+  parou a sprint 2 sera gerado automaticamente, em escala, em toda sprint futura.
+  O verificador precisa existir **antes** de o planejador virar rotina.
+- O custo do defeito ja esta medido: ~2h30 de maquina, 76 reenfileiramentos
+  forcados e 9 tasks bloqueadas na noite de 27/09.
+
+## Escopo
+
+Entra:
+
+- checagem de colisao de arquivo (mesma onda e arquivo de teste) no plano e no
+  validador do motor;
+- relatorio de impacto do plano (`autodev prever`): arquivos por onda, colisoes,
+  tasks sem arquivo nomeado;
+- portao de aprovacao humana (`autodev aprovar`), com hash do `dag.json`;
+- aceitacao ponta a ponta com driver falso (sem gastar cota);
+- documentacao e checklist derivado do D-16.
+
+Nao entra:
+
+- alterar a escada de modelos ou a cadeia de revisores;
+- merge em `main` (politica do motor: nunca automatico);
+
+## Restricoes
+- Trabalhe SOMENTE dentro deste worktree: /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+- Nao use sudo, nao leia credenciais, nao escreva fora deste diretorio.
+- Nao adicione dependencia nova sem necessidade demonstravel.
+- Se houver testes, eles devem passar ao final.
+- Simplicidade primeiro. Sem infraestrutura que a task nao exige.
+
+## Modo headless — leia antes de comecar
+- Voce roda SEM HUMANO disponivel: ninguem vai responder pergunta nenhuma.
+- NAO peca aprovacao de design nem pergunte "posso implementar?": entregar apenas
+  um plano ou uma pergunta conta como FALHA da task, porque nenhum arquivo muda.
+- Decida sozinho dentro do que a task e os criterios pedem e implemente agora.
+
+## O que entregar
+1. Implemente a task de forma minima e completa.
+2. Escreva ou ajuste testes que provem o comportamento (se aplicavel).
+3. Rode os testes e corrija o que falhar.
+4. Ao terminar, responda com uma linha final:
+   RESULTADO: <o que foi implementado> | TESTES: <comando e resultado>
+
+
+---
+## CONTEXTO DAS TENTATIVAS ANTERIORES
+  - tentativa 1: REVIEW_FAILURE (exit 0) — 
+  - tentativa 2: REVIEW_FAILURE (exit 0) — 
+
+## EVIDENCIA NOVA (leia antes de agir)
+### Saida do ultimo teste
+```
+diff tirou a forma de rodar a suite 'a mao' no terminal (.venv/bin/python -m pytest) e deixou so 'python3 -m pytest .autodev/tests/ -q', justificando que 'o runner resolve python3'. Fora do runner isso nao vale: nesta maquina /usr/bin/python3 (3.14.7) devolve ModuleNotFoundError: No module named 'pytest' (o pytest 9.1.1 existe apenas em .venv). O proprio projeto registra isso em DEVFACTORY-004/decisions.md D-23 ('o comando escrito nos criterios nao roda no terminal desta maquina') e em spec.md ('Para rodar a suite a mao, fora do motor, o README manda .venv/bin/python -m pytest') — o diff torna as duas afirmacoes falsas. Como o criterio e justamente documentar a contagem da suite, o comando documentado nao entrega o numero para um humano no terminal.", "correcao_sugerida": "Manter as duas formas, como no texto anterior: terminal '.venv/bin/python -m pytest .autodev/tests/ -q' e, dentro do runner, 'python3 -m pytest .autodev/tests/ -q' (o teste pre-existente test_estado_atual_mede_suite_sem_contagem_fixa exige apenas a segunda string, entao as duas convivem)."}, {"severidade": "media", "arquivo": "README.md", "linha": 236, "descricao": "A secao descreve o verificador como quem 'trata E2/E3/E4 como erro', omitindo E1 e E5, que tambem geram erro e exit != 0 (docstring do script em 096deb5, linhas 15-22). Reproduzi: `verificar_plano.py --todos` retorna exit=1 e imprime 'E5: P04 usa comando de teste fora da forma exigida' para a DEVFACTORY-004. Quem seguir o README sera surpreendido por um bloqueio de classe nao documentada — e E5 e exatamente a classe que queimou 12 tentativas (D-23). Nenhum teste cobre essa descricao (o teste so confere o caminho do script e o exemplo).", "correcao_sugerida": "Completar a lista na secao: E1 (ids duplicados/dep inexistente/ciclo) e E5 (comando pytest fora da forma `python3 -m pytest ...`), como no docstring do script; e acrescentar uma assercao no teste para as classes citadas."}, {"severidade": "baixa", "arquivo": "README.md", "linha": 222, "descricao": "'so entao `run` pode executar o sprint' e uma garantia absoluta que o codigo nao da: em autodev/orchestrator.py:228-243 (_validar_aprovacao) um sprint sem bloco `aprovacao` que ja esteja fora de PLANEJADO retorna None (liberado). Prova viva: a propria DEVFACTORY-003 roda com `aprovacao: null` no sprint.yaml e estado EM_EXECUCAO. O texto do README (e a 'Consequencia' do D-01 em decisions.md) afirma mais do que o portao entrega, e nem o teste do README nem o de decisions.md tocam nisso.", "correcao_sugerida": "Qualificar a frase: o portao vale para plano em PLANEJADO; sprints iniciados antes do portao seguem retomaveis (excecao ja comentada no codigo), ou registrar que a excecao sera removida — e asserir esse texto no teste."}, {"severidade": "baixa", "arquivo": ".autodev/tests/test_plan_docs.py", "linha": 93, "descricao": "A assercao assert \"portao do plano\" in texto e tautologica: _corpo_da_secao() devolve texto[inicio.start():fim], isto e, inclui a propria linha do titulo '## Portao do plano' — ela passa mesmo que o corpo nao mencione o portao. Alem disso, as assercoes de contagem (l.105-107) duplicam o contrato ja existente em .autodev/tests/test_readme_afirmacoes.py::test_estado_atual_mede_suite_sem_contagem_fixa, dobrando a manutencao sem ganho de cobertura.", "correcao_sugerida": "Ancorar a assercao no corpo sem o titulo (usar inicio.end()) e verificar algo que so o corpo possa satisfazer; se a intencao e cobrir o fluxo, assegurar a ordem das palavras 'planejar', 'prever', 'aprovar', 'rodar' no texto. Remover a duplicata de contagem ou referencia-la."}, {"severidade": "baixa", "arquivo": "README.md", "linha": 246, "descricao": "A secao nova foi inserida sem o separador '---' que precede todas as outras secoes de nivel 2: '## Seguranca' cola direto no paragrafo anterior do 'Portao do plano'. Cosmetico, mas quebra o padrao do documento que o proprio teste de estrutura preserva.", "correcao_sugerida": "Inserir '---' antes de '## Seguranca'."}]
+```
+### Arquivos ja tocados
+  - .autodev/sprints/DEVFACTORY-003/decisions.md
+  - .autodev/tests/test_plan_docs.py
+  - .autodev/tests/test_readme_estrutura.py
+  - README.md
+
+## INSTRUCAO
+Esta e a tentativa #3.
+Estrategia decidida: ESCALATE_MODEL.
+Motivo: 2 tentativas materialmente informadas falharam — escalonando para gpt-5.6-sol/low
+
+NAO repita a abordagem anterior. Se ela falhou, explique em uma linha por que
+falhou e adote uma abordagem diferente baseada na evidencia acima.
+Se o problema for de ambiente/dependencia/permissao e nao de codigo, diga isso
+explicitamente em vez de tentar contornar.
+Responda ao final com: RESULTADO: <resumo do que mudou>
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+A abordagem anterior falhou porque a documentação ficou imprecisa em relação ao comportamento real do portão e ao ambiente de testes; vou corrigir diretamente os pontos do review e validar com a `.venv`. Usarei as skills de fluxo e TDD para manter a alteração mínima e comprovada por testes.
+exec
+/usr/bin/bash -lc "sed -n '1,240p' /home/saurus/.codex/skills/using-superpowers/SKILL.md && sed -n '1,260p' /home/saurus/.codex/skills/test-driven-development/SKILL.md && sed -n '1,240p' /home/saurus/.codex/skills/verification-before-completion/SKILL.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ succeeded in 0ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+---
+
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, ignore this skill.
+</SUBAGENT-STOP>
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## The Rule
+
+**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+
+**Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
+
+Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+
+## Skill Priority
+
+When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
+
+- "Let's build X" → superpowers:brainstorming first, then implementation skills.
+- "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+
+## Red Flags
+
+These thoughts mean STOP—you're rationalizing:
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+
+## Platform Adaptation
+
+If your harness appears here, read its reference file for special instructions:
+
+- Codex: `references/codex-tools.md`
+- Pi: `references/pi-tools.md`
+- Antigravity: `references/antigravity-tools.md`
+- Hermes Agent: `references/hermes-tools.md`
+
+## User Instructions
+
+User instructions (CLAUDE.md, AGENTS.md, GEMINI.md, etc, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows or instructions when your human partner has explicitly told you to.
+---
+name: test-driven-development
+description: Use when implementing any feature or bugfix, before writing implementation code
+---
+
+# Test-Driven Development (TDD)
+
+## Overview
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+**Violating the letter of the rules is violating the spirit of the rules.**
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+- Refactoring
+- Behavior changes
+
+**Exceptions (ask your human partner):**
+- Throwaway prototypes
+- Generated code
+- Configuration files
+
+Thinking "skip TDD just this once"? Stop. That's rationalization.
+
+## The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Write code before the test? Delete it. Start over.
+
+**No exceptions:**
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+
+Implement fresh from tests. Period.
+
+## Red-Green-Refactor
+
+```dot
+digraph tdd_cycle {
+    rankdir=LR;
+    red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
+    verify_red [label="Verify fails\ncorrectly", shape=diamond];
+    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
+    verify_green [label="Verify passes\nAll green", shape=diamond];
+    refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
+    next [label="Next", shape=ellipse];
+
+    red -> verify_red;
+    verify_red -> green [label="yes"];
+    verify_red -> red [label="wrong\nfailure"];
+    green -> verify_green;
+    verify_green -> refactor [label="yes"];
+    verify_green -> green [label="no"];
+    refactor -> verify_green [label="stay\ngreen"];
+    verify_green -> next;
+    next -> red;
+}
+```
+
+### RED - Write Failing Test
+
+Write one minimal test showing what should happen.
+
+<Good>
+```typescript
+test('retries failed operations 3 times', async () => {
+  let attempts = 0;
+  const operation = () => {
+    attempts++;
+    if (attempts < 3) throw new Error('fail');
+    return 'success';
+  };
+
+  const result = await retryOperation(operation);
+
+  expect(result).toBe('success');
+  expect(attempts).toBe(3);
+});
+```
+Clear name, tests real behavior, one thing
+</Good>
+
+<Bad>
+```typescript
+test('retry works', async () => {
+  const mock = jest.fn()
+    .mockRejectedValueOnce(new Error())
+    .mockRejectedValueOnce(new Error())
+    .mockResolvedValueOnce('success');
+  await retryOperation(mock);
+  expect(mock).toHaveBeenCalledTimes(3);
+});
+```
+Vague name, tests mock not code
+</Bad>
+
+**Requirements:**
+- One behavior
+- Clear name
+- Real code (no mocks unless unavoidable)
+
+### Verify RED - Watch It Fail
+
+**MANDATORY. Never skip.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test fails (not errors)
+- Failure message is expected
+- Fails because feature missing (not typos)
+
+**Test passes?** You're testing existing behavior. Fix test.
+
+**Test errors?** Fix error, re-run until it fails correctly.
+
+### GREEN - Minimal Code
+
+Write simplest code to pass the test.
+
+<Good>
+```typescript
+async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === 2) throw e;
+    }
+  }
+  throw new Error('unreachable');
+}
+```
+Just enough to pass
+</Good>
+
+<Bad>
+```typescript
+async function retryOperation<T>(
+  fn: () => Promise<T>,
+  options?: {
+    maxRetries?: number;
+    backoff?: 'linear' | 'exponential';
+    onRetry?: (attempt: number) => void;
+  }
+): Promise<T> {
+  // YAGNI
+}
+```
+Over-engineered
+</Bad>
+
+Don't add features, refactor other code, or "improve" beyond the test.
+
+### Verify GREEN - Watch It Pass
+
+**MANDATORY.**
+
+```bash
+npm test path/to/test.test.ts
+```
+
+Confirm:
+- Test passes
+- Other tests still pass
+- Output pristine (no errors, warnings)
+
+**Test fails?** Fix code, not test.
+
+**Other tests fail?** Fix now.
+
+### REFACTOR - Clean Up
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green. Don't add behavior.
+
+### Repeat
+
+Next failing test for next feature.
+
+## Good Tests
+
+| Quality | Good | Bad |
+|---------|------|-----|
+| **Minimal** | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
+| **Clear** | Name describes behavior | `test('test1')` |
+| **Shows intent** | Demonstrates desired API | Obscures what code should do |
+
+When writing or changing any test, read [writing-good-tests.md](writing-good-tests.md) for the rules that keep tests honest:
+- Name the production change that would make the test fail — before writing it
+- Assert on real behavior, never on mock behavior
+- Keep test-only code in test utilities, out of production classes
+- Understand a dependency's side effects before mocking it
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests written after pass immediately — which proves nothing. They may test the wrong thing, test the implementation instead of the behavior, or miss the edge case you forgot. You never watched it fail, so you never proved it can catch the bug. Test-first forces that failure. |
+| "Tests after achieve same goals (spirit not ritual)" | Tests-after answer "what does this do?"; tests-first answer "what should this do?" Tests written after are biased by the code you already wrote — you verify the cases you remembered, not the ones you'd have discovered. Coverage without proof the tests work. |
+| "Already manually tested" | Manual testing is ad-hoc: no record of what you covered, no way to re-run it when the code changes, easy to forget cases under pressure. "Worked when I tried it" ≠ comprehensive. Automated tests run the same way every time. |
+| "Deleting X hours is wasteful" | Sunk cost fallacy — that time is already spent either way. The real choice: rewrite with TDD (high confidence) vs. keep it and bolt tests on after (low confidence, likely bugs). Keeping code you can't trust is the waste. |
+| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
+| "TDD will slow me down" | TDD IS the pragmatic path: catches bugs before commit, prevents regressions, lets you refactor without fear. "Pragmatic" shortcuts mean debugging in production — slower, not faster. |
+| "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
+| "Existing code has no tests" | You're improving it. Add tests for existing code. |
+
+## Red Flags - STOP and Start Over
+
+- Code before test
+- Test after implementation
+- Test passes immediately
+- Can't explain why test failed
+- Tests added "later"
+- Rationalizing "just this once"
+- "I already manually tested it"
+- "Tests after achieve the same purpose"
+- "It's about spirit not ritual"
+- "Keep as reference" or "adapt existing code"
+- "Already spent X hours, deleting is wasteful"
+- "TDD is dogmatic, I'm being pragmatic"
+- "This is different because..."
+
+**All of these mean: Delete code. Start over with TDD.**
+
+## Example: Bug Fix
+
+**Bug:** Empty email accepted
+
+**RED**
+```typescript
+test('rejects empty email', async () => {
+  const result = await submitForm({ email: '' });
+  expect(result.error).toBe('Email required');
+});
+```
+
+**Verify RED**
+```bash
+$ npm test
+---
+name: verification-before-completion
+description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+---
+
+# Verification Before Completion
+
+## Overview
+
+**Core principle:** Evidence before claims, always.
+
+**Violating the letter of this rule is violating the spirit of this rule.**
+
+## The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+If you haven't run the verification command in this message, you cannot claim it passes.
+
+## The Gate Function
+
+```
+BEFORE claiming any status or expressing satisfaction:
+
+1. IDENTIFY: What command proves this claim?
+2. RUN: Execute the FULL command (fresh, complete)
+3. READ: Full output, check exit code, count failures
+4. VERIFY: Does output confirm the claim?
+   - If NO: State actual status with evidence
+   - If YES: State claim WITH evidence
+5. ONLY THEN: Make the claim
+
+Skip any step = lying, not verifying
+```
+
+## Common Failures
+
+| Claim | Requires | Not Sufficient |
+|-------|----------|----------------|
+| Tests pass | Test command output: 0 failures | Previous run, "should pass" |
+| Linter clean | Linter output: 0 errors | Partial check, extrapolation |
+| Build succeeds | Build command: exit 0 | Linter passing, logs look good |
+| Bug fixed | Test original symptom: passes | Code changed, assumed fixed |
+| Regression test works | Red-green cycle verified | Test passes once |
+| Agent completed | VCS diff shows changes | Agent reports "success" |
+| Requirements met | Line-by-line checklist | Tests passing |
+
+## Red Flags - STOP
+
+- Using "should", "probably", "seems to"
+- Expressing satisfaction before verification ("Great!", "Perfect!", "Done!", etc.)
+- About to commit/push/PR without verification
+- Trusting agent success reports
+- Relying on partial verification
+- Thinking "just this once"
+- Tired and wanting work over
+- **ANY wording implying success without having run verification**
+
+## Rationalization Prevention
+
+| Excuse | Reality |
+|--------|---------|
+| "Should work now" | RUN the verification |
+| "I'm confident" | Confidence ≠ evidence |
+| "Just this once" | No exceptions |
+| "Linter passed" | Linter ≠ compiler |
+| "Agent said success" | Verify independently |
+| "I'm tired" | Exhaustion ≠ excuse |
+| "Partial check is enough" | Partial proves nothing |
+| "Different words so rule doesn't apply" | Spirit over letter |
+
+## Key Patterns
+
+**Tests:**
+```
+✅ [Run test command] [See: 34/34 pass] "All tests pass"
+❌ "Should pass now" / "Looks correct"
+```
+
+**Regression tests (TDD Red-Green):**
+```
+✅ Write → Run (pass) → Revert fix → Run (MUST FAIL) → Restore → Run (pass)
+❌ "I've written a regression test" (without red-green verification)
+```
+
+**Build:**
+```
+✅ [Run build] [See: exit 0] "Build passes"
+❌ "Linter passed" (linter doesn't check compilation)
+```
+
+**Requirements:**
+```
+✅ Re-read plan → Create checklist → Verify each → Report gaps or completion
+❌ "Tests pass, phase complete"
+```
+
+**Agent delegation:**
+```
+✅ Agent reports success → Check VCS diff → Verify changes → Report actual state
+❌ Trust agent report
+```
+
+## When To Apply
+
+**ALWAYS before:**
+- ANY variation of success/completion claims
+- ANY expression of satisfaction
+- ANY positive statement about work state
+- Committing, PR creation, task completion
+- Moving to next task
+- Delegating to agents
+
+**Rule applies to:**
+- Exact phrases
+- Paraphrases and synonyms
+- Implications of success
+- ANY communication suggesting completion/correctness
+
+exec
+/usr/bin/bash -lc "cat /home/saurus/.codex/skills/using-superpowers/references/codex-tools.md && cat /home/saurus/.codex/skills/test-driven-development/writing-good-tests.md && git status --short && sed -n '1,320p' README.md && sed -n '1,220p' .autodev/tests/test_plan_docs.py && sed -n '1,180p' .autodev/sprints/DEVFACTORY-003/decisions.md" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ succeeded in 0ms:
+## Subagent dispatch requires multi-agent support
+
+Add to your Codex config (`~/.codex/config.toml`):
+
+```toml
+[features]
+multi_agent = true
+```
+
+This enables the multi-agent tools that skills like
+`dispatching-parallel-agents` and `subagent-driven-development` use.
+Which tools you get depends on the multi-agent version your model
+preset selects (current presets run V2; older ones run V1). Trust your
+actual tool list over any table — including this one — when they
+disagree.
+
+- **Spawning:** give children a clean context with
+  `spawn_agent {fork_turns: "none"}`; the default `"all"` copies your
+  entire transcript into the child. On Codex 0.145+, role files under
+  `~/.codex/agents/` attach to isolated forks via `agent_type`.
+  Full-history forks accept `model` and `reasoning_effort` overrides
+  (only `agent_type` is refused there) — isolated forks are the SDD
+  default for context hygiene, not because overrides require them.
+- **Fix rounds:** resume the implementer with `followup_task` — it
+  delivers your message, triggers a turn, and transparently reloads a
+  child the harness evicted. Never dispatch a fresh implementer on the
+  theory that a spawned agent cannot be messaged again; on V2 it
+  always can.
+- **Lifecycle:** V2 has no `close_agent`. Finished children are
+  evicted automatically when slots are needed; leaving them unclosed
+  costs nothing. Only V1 sessions have `close_agent` — there, close
+  reviewers when their review returns, and close each implementer
+  after its task's review passes.
+- **Model names:** never copy a model name from a skill, table, or old
+  session into `spawn_agent` without checking it against your current
+  spawn allowlist — V2 accepts only V2-capable presets and hard-errors
+  on the rest.
+
+## Waiting on children
+
+`wait_agent` is an event subscription, not a poll: a long wait wakes
+the moment a child produces mailbox activity, with the same latency as
+a short one. Short-timeout polling buys nothing and costs a tool call —
+and a context rebill — per poll. In measured sessions, roughly
+two-thirds of all wait calls were short polls that timed out.
+
+- While you still have local work, do not wait at all. A completed
+  child's final answer is pushed into your mailbox and arrives with
+  your next turn.
+- When you are genuinely idle with children outstanding, wait in
+  bounded stretches: `wait_agent` with `timeout_ms` 300000-600000
+  (5-10 minutes). After each stretch — wake or timeout — post one
+  status line, run `list_agents`, and chase any child that finished
+  without reporting. Never stack polls shorter than five minutes; the
+  event subscription wakes a bounded stretch just as fast as a short
+  one.
+- Completion mail cannot wake an idle controller (it is delivered
+  without triggering a turn); covering that idle window is
+  `wait_agent`'s only job. A stretch that times out with no activity
+  is your cue to reconcile, not to shorten the next stretch.
+
+## Model routing on spawns
+
+Every `spawn_agent` you issue — including when you are yourself a
+spawned child running a fan-out — sets `model` AND `reasoning_effort`
+explicitly, per the Model Selection rules of the skill you are
+executing. Setting `model` alone is a trap: the child's effort
+silently resets to that model's default, not to yours.
+
+Ask your human partner to add a machine-level backstop to
+`~/.codex/config.toml` so any spawn that slips through still routes to
+a deliberate tier instead of silently inheriting the session's most
+expensive model:
+
+```toml
+[agents]
+default_subagent_model = "<a mid-tier model from your spawn allowlist>"
+default_subagent_reasoning_effort = "medium"
+```
+
+## Environment Detection
+
+Skills that create worktrees or finish branches should detect their
+environment with read-only git commands before proceeding:
+
+```bash
+GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
+GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
+BRANCH=$(git branch --show-current)
+```
+
+- `GIT_DIR != GIT_COMMON` → already in a linked worktree (skip creation)
+- `BRANCH` empty → detached HEAD (cannot branch/push/PR from sandbox)
+
+See `using-git-worktrees` Step 0 and `finishing-a-development-branch`
+Step 1 for how each skill uses these signals.
+
+## Codex App Finishing
+
+When the sandbox blocks branch/push operations (detached HEAD in an
+externally managed worktree), the agent commits all work and informs
+the user to use the App's native controls:
+
+- **"Create branch"** — names the branch, then commit/push/PR via App UI
+- **"Hand off to local"** — transfers work to the user's local checkout
+
+The agent can still run tests, stage files, and output suggested branch
+names, commit messages, and PR descriptions for the user to copy.
+# Writing Good Tests
+
+**Load this reference when:** writing or changing tests, adding mocks, or
+adding cleanup/helper methods for tests.
+
+## Overview
+
+A test exists to catch a specific break. Two principles govern everything
+here:
+
+```
+1. Every test names the break it catches
+2. Every test exercises the real thing
+```
+
+Strict TDD produces both naturally: a test written first and watched
+failing against real code has already proven it can fail, and only earns
+a mock when the real dependency proves slow or external.
+
+## Principle 1: Name the Break
+
+Before writing the test body, answer: **what production change should
+make this test fail — and is that change a bug or a decision?** A test
+earns its place by catching a wrong branch, missing side effect, wrong
+argument, boundary case, or broken contract.
+
+**Derive expectations independently.** Use literals and hand-checked
+fixtures; table-driven tests with literal `want` values are the preferred
+shape. An expectation computed by the code under test — or its helpers —
+passes no matter what that code does:
+
+```typescript
+// ❌ Mirror assertion: the same builder computes both sides — always true
+const expected = buildSearchQuery({ tag: 'urgent' });
+expect(buildSearchQuery({ tag: 'urgent' })).toBe(expected);
+
+// ✅ Hand-derived literal
+expect(buildSearchQuery({ tag: 'urgent' })).toBe('tag:"urgent"');
+```
+
+**No change detectors.** If only intentional decisions can fail a test —
+a constant's value, exact message wording, private structure — it fires
+on redesign and sleeps through bugs. Test the behavior that depends on
+the decision: not `expect(MAX_RETRIES).toBe(5)` but "a failing call is
+retried 5 times and the 6th attempt never happens."
+
+**Behavior, not text.** Asserting that a script, skill, or config
+contains an exact line proves only that the source is the source. Run
+scripts against controlled inputs and assert outputs, side effects, or
+exit codes. Documents that instruct agents are tested by the consuming
+agent's behavior (superpowers:writing-skills); prose for humans earns no
+test at all.
+
+**Your code, not the framework.** Test the contract your code makes at
+its boundaries — the route you register, the query you emit, the payload
+you produce. Upstream mechanics are their maintainers' tests to write
+(the classic: asserting your router invokes a registered handler — that
+is the framework's test, not yours). When upstream behavior genuinely
+surprised you, write one narrow characterization test naming the
+assumption. The same boundary applies inside your code: constructors,
+getters, constants, and trivial forwarding earn tests only when they
+validate, normalize, default, derive, enforce, or cause side effects —
+otherwise assert the first consumer-visible result that depends on them.
+
+### Gate Function
+
+```
+BEFORE writing the test body:
+  Name the production change that would make this test fail.
+
+  Cannot name one            → redesign around an observable behavior
+  "The source text changed"  → run the artifact and assert its effects
+  Only intentional decisions → change detector; test the behavior
+                               that depends on the decision
+
+  Confirm the expected value is derived without the code under test.
+  IF it reuses the code's logic or helpers:
+    Replace it with a literal or hand-checked fixture
+```
+
+## Principle 2: Exercise the Real Thing
+
+**The mock earns no assertions.** A mock assertion passes when the mock
+is present and fails when it is absent — it says nothing about the
+component. Assert the real component's behavior; if the mock is what you
+are checking, unmock it or delete the assertion.
+
+```typescript
+// ✅ Real behavior
+expect(screen.getByRole('navigation')).toBeInTheDocument();
+
+// ❌ Mock existence
+expect(screen.getByTestId('sidebar-mock')).toBeInTheDocument();
+```
+
+**your human partner's correction:** "Are we testing the behavior of a
+mock?"
+
+**Mock at the right level.** Learn every side effect of the real method
+before replacing it; mock the slow or external operation and keep what
+the test depends on real. When unsure, run the test against the real
+implementation first and observe what actually needs to happen.
+
+```typescript
+// ❌ The mock swallows the config write that duplicate detection reads
+vi.mock('ToolCatalog', () => ({
+  discoverAndCacheTools: vi.fn().mockResolvedValue(undefined)
+}));
+
+// ✅ Mock only the slow server startup; the config write stays real
+vi.mock('MCPServerManager');
+```
+
+**Make doubles specific.** When arguments, call counts, or ordering are
+part of the contract, assert them — a fake that accepts anything verifies
+nothing. Give each branch (success, error, malformed) its own fixture or
+spy, so the wrong branch cannot satisfy the expectation.
+
+**Mirror real data completely.** Mock the complete structure as it exists
+in reality — all documented fields — not just the ones your test reads.
+Partial mocks fail silently when downstream code reads an omitted field:
+the test passes while integration breaks.
+
+**Production classes carry production methods only.** Cleanup that only
+tests need lives in test utilities, never as a `destroy()` on the
+production class. Ask: is this method called only from tests? Does this
+class own this resource's lifecycle? Wrong answers → test utility.
+
+**Prefer real components over complex mocks.** When mock setup outgrows
+the test logic, mocks miss methods the real components have, or tests
+break when the mock changes, switch to an integration test with real
+components. **your human partner's question:** "Do we need to be using a
+mock here?"
+
+### Gate Function
+
+```
+BEFORE adding a mock or test helper:
+  List the real method's side effects; keep the ones the test
+  depends on real — mock the slow/external level below them.
+
+  Mock responses mirror the complete real structure.
+
+  A method only tests call lives in test utilities, not production.
+
+  About to assert on the mock itself?
+    Unmock it or delete the assertion.
+```
+
+## Tests Ship With the Implementation
+
+The TDD cycle — failing test, minimal implementation, refactor — is what
+"complete" means. Ship the tests the behavior needs and only those:
+trivial code and human prose earn none, and a test written to satisfy
+process costs maintenance forever.
+
+## The Mutation Check
+
+Before finishing, mentally mutate the production code; at least one test
+should fail for each realistic mutation:
+
+- Wrong constant or argument
+- Wrong branch handler
+- Missing state change or side effect
+- Empty or default return
+- Missing validation for zero, empty, nil, unauthorized, or malformed input
+
+A mutation nothing catches marks the behavior as unprotected — or the
+test as tautological.
+
+## Quick Reference
+
+| When you... | Do |
+|-------------|-----|
+| Write any test | Name the break it catches — a bug, not a decision |
+| Build an expected value | Derive it by hand; never with the code under test |
+| Test a script or document | Run it / pressure-test its consumer; never grep its text |
+| Reach for a dependency test | Test your boundary contract, not their documented mechanics |
+| Want to assert on a mocked element | Test the real component, or unmock it |
+| Are about to mock a method | Learn its side effects; mock the slow/external level |
+| Build a mock response | Mirror the real structure completely |
+| Need cleanup only tests use | Put it in test utilities |
+| Watch mock setup balloon | Switch to an integration test with real components |
+| Finish a test file | Run the mutation check |
+
+## Warning Signs
+
+- Setup and assertion share the same object, guaranteeing equality
+- The test can fail only through a panic, crash, or missing selector
+- The test fails on every intentional change, never on accidental breakage
+- Expected values are hidden behind loops, builders, or helpers
+- The test greps source text, or asserts a removed symbol stays removed
+- The test would still matter if only the framework remained
+- The test exists for coverage, checking no side effect or outcome
+- An assertion checks a `*-mock` test ID, or fails if you remove the mock
+- A method is called only from test files
+- Mock setup is more than half the test, or you can't explain why the mock is needed
+- Mocking "just to be safe"
+# Coding Machine
+
+Fábrica de desenvolvimento autônomo: um orquestrador que pega uma especificação
+de sprint, quebra em tarefas, executa cada uma com um agente de código dentro de
+um worktree isolado, valida com testes determinísticos, faz revisão por um
+**agente diferente** do que escreveu, e só então integra.
+
+```
+SPEC → PLAN → DAG DE TAREFAS → WORKTREE → AGENTE DE CÓDIGO → TESTE
+     → REVISÃO INDEPENDENTE → CORREÇÃO → RETESTE → INTEGRAÇÃO
+     → VALIDAÇÃO FINAL → RELATÓRIO
+```
+
+Uma tarefa aprovada roda de ponta a ponta sem intervenção humana.
+
+> **Pendências e mapa dos produtos:** [`Pendencias.md`](Pendencias.md) — o que está
+> pendente, quem decide, os caminhos exatos para resolver e onde ficam os relatórios e
+> produtos de cada sprint.
+
+---
+
+## Por que não é só "chamar o Codex num loop"
+
+Porque o valor está no que acontece **quando dá errado**. O projeto trata como
+requisito de primeira classe:
+
+- **Quem escreve não revisa.** A revisão é feita por outro agente (Codex escreve,
+  AGY revisa, ou o inverso). Auto-revisão não encontra o erro de quem escreveu.
+- **Cota de API não é falha.** Esgotar a cota do Codex vira espera de recurso,
+  com checkpoint e retomada por prompt de **continuação** — não reinício.
+- **Retomada após queda.** Cada tentativa persiste agente, modelo, branch,
+  worktree, sandbox, commit base, arquivos alterados, resultado de teste e de
+  revisão. O processo pode morrer e voltar de onde parou.
+- **Isolamento de verdade.** Cada agente roda em `git worktree` próprio, dentro de
+  um sandbox `bubblewrap` sem rede de escape e com HOME efêmero.
+- **Nunca integra em `main`.** O sprint produz uma branch
+  `sprint/<id>/integration`, com portões de validação antes do merge.
+
+---
+
+## Estrutura
+
+```
+.
+├── autodev/                    # o orquestrador
+│   ├── orchestrator.py         # laço principal, máquina de estados, kill switch
+│   ├── state.py                # store SQLite (fonte autoritativa)
+│   ├── agents.py               # adaptadores dos agentes + wrapper headless
+│   ├── sandbox.py              # isolamento com bubblewrap
+│   ├── worktree.py             # git worktree por tarefa
+│   ├── testrunner.py           # runner determinístico (pytest)
+│   ├── review.py               # revisor cross-agent
+│   ├── retry.py                # política de retry e escalada de modelo
+│   ├── integration.py          # branch de integração + portões
+│   ├── haq.py                  # fila de ação humana
+│   ├── report.py               # relatório do sprint
+│   ├── killswitch.py           # parada de emergência
+│   ├── errors.py               # taxonomia de falhas
+│   └── cli.py                  # interface de linha de comando
+│
+└── .autodev/                   # configuração e estado
+    ├── config/                 # agents.yaml, models.yaml, policies.yaml
+    ├── sprints/<id>/           # sprint.yaml, dag.json, evidence/, logs/
+    ├── fixtures/               # projeto-fixture que COMEÇA QUEBRADO
+    ├── tests/                  # suíte do próprio orquestrador
+    └── scripts/                # aceitação ponta a ponta com agentes reais
+```
+
+---
+
+## Como rodar
+
+Requisitos: Python 3.11+, `git`, e `bubblewrap` (`bwrap`).
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install pytest pyyaml
+
+.venv/bin/python -m autodev detect          # quais agentes estão instalados
+.venv/bin/python -m autodev init            # valida o DAG do sprint
+.venv/bin/python -m autodev status          # estado das tarefas
+.venv/bin/python -m autodev run             # executa o sprint
+.venv/bin/python -m autodev report          # gera o relatório
+.venv/bin/python -m autodev resume          # retoma após interrupção
+.venv/bin/python -m autodev haq             # fila de ação humana
+.venv/bin/python -m autodev encerrar        # fecha o sprint (estado terminal)
+.venv/bin/python -m autodev evidenciar T03 -e "autodev/state.py + 8 testes"
+```
+
+Testes do próprio orquestrador:
+
+```bash
+.venv/bin/python -m pytest .autodev/tests/ -q
+```
+
+### Acompanhar ao vivo (tela de eventos)
+
+```bash
+./tela.sh                  # tela permanente: cabeçalho do sprint + uma linha por evento
+./tela.sh --once           # um quadro só (para log ou pipe)
+./tela.sh --intervalo 5 --linhas 25 --tudo
+```
+
+O cabeçalho traz sprint, estado, quantas tarefas já foram integradas, se há rodada
+viva e a fila; abaixo, cada evento do motor em uma linha curta — reinício da
+codificação e teste, fim de desenvolvimento, testes do pacote, revisão aprovada ou
+reprovada (com revisor e número de achados), integração com o commit, bloqueio, espera
+de cota e HAQ que dependem de você. É só leitura (abre o `state.db` em modo `ro`) e sai
+com Ctrl-C. No Hyprland/Omarchy, para deixar sempre à mão:
+
+```
+bind = SUPER, D, exec, $terminal --title=tela-devfactory -e ~/Code/Coding_Machine/tela.sh
+```
+
+### Ciclo de vida do sprint
+
+Tarefas têm 12 estados; o **sprint** tem os seus:
+
+```
+PLANEJADO → EM_EXECUCAO → EM_VERIFICACAO → ENCERRADO
+                  ↘              ↘
+                            ABORTADO
+```
+
+`encerrar` **recusa** se houver tarefa fora de estado terminal — encerrar com
+trabalho em aberto é justamente o que o HAQ existe para evitar. `--forcar` aborta
+um sprint travado e grava o motivo.
+
+A fonte autoritativa é `state.db`. O `status:` do `sprint.yaml` é declaração de
+intenção, não fato.
+
+### Conclusão por evidência
+
+Quando o trabalho de uma tarefa foi feito **fora** do laço do orquestrador, ele
+não pode ser registrado como se o orquestrador tivesse executado — isso seria
+evidência falsa.
+
+```bash
+.venv/bin/python -m autodev evidenciar T03 -e "descrição do artefato verificável"
+```
+
+O comando percorre o caminho válido de transições e marca a tentativa com
+**`origem='retroativo'`**. O relatório mostra essa distinção e alerta quando
+existe conclusão que não veio do laço.
+
+---
+
+## Planejador
+
+O planejador transforma um prompt em texto livre em um sprint executável. Ele
+envia o pedido a um agente, interpreta e valida o plano devolvido, ordena as
+tarefas por dependência e materializa os arquivos que o orquestrador consome:
+`spec.md`, `dag.json` e `sprint.yaml`.
+
+Por exemplo:
+
+```bash
+.venv/bin/python -m autodev plan "Adicionar autenticação à API"
+```
+
+O comando cria um novo diretório `.autodev/sprints/DEVFACTORY-NNN/` no disco,
+contendo os três arquivos acima. O plano gerado **sempre precisa de revisão
+humana antes de rodar**: a validação estrutural não garante que a interpretação
+do pedido ou os critérios de aceitação estejam corretos.
+
+`plan` somente prepara os arquivos locais do sprint; ele **não faz merge nem
+push**.
+
+## Os agentes
+
+Configurados em `.autodev/config/agents.yaml`. O orquestrador **detecta** o que
+está instalado e usa o que existir — nada é presumido.
+
+| Papel | Agente | Adaptador |
+|---|---|---|
+| Implementação primária | Codex CLI | `ask-codex` |
+| Implementação secundária e revisor independente | Antigravity CLI | `ask-agy` |
+
+O roteamento de modelo por fase e a escada de escalada estão em
+`.autodev/config/models.yaml`. Quando uma tarefa falha, o orquestrador sobe o
+modelo e o esforço antes de tentar de novo com o mesmo.
+
+Os wrappers `ask-codex` / `ask-agy` são a camada headless que faz o agente
+responder sem terminal interativo. Eles não fazem parte deste repositório.
+
+---
+
+## Estado atual
+
+- Para medir a contagem atual da suíte do orquestrador, rode
+  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
+- **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+  **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+  `status:` do `sprint.yaml` é apenas declaração de intenção.
+- A Sprint `DEVFACTORY-001` percorreu `EM_EXECUCAO → EM_VERIFICACAO →
+  ENCERRADO`; suas tarefas estão concluídas e o relatório está em
+  `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
+- **Como as tarefas foram concluídas — leia antes de confiar no número:** as 14
+  primeiras (T01–T14) foram concluídas por **evidência retroativa**. O código que
+  elas descrevem foi escrito durante o desenvolvimento, **fora** do laço do
+  orquestrador. A tentativa existe, o artefato é verificável e os testes passam,
+  mas **não foi o orquestrador que executou**. Só a T15 (aceitação autônoma) roda
+  de verdade. O banco marca cada caso com `origem` e o relatório diz isso na
+  primeira seção.
+- **Aceitação ponta a ponta com agentes reais: verde.** Executada em ~2,5 min:
+  o Codex implementou o projeto-fixture, todos os testes passaram, o **AGY revisou e
+  aprovou** (1 apontamento), os portões de integração passaram e a `main` ficou
+  intacta (mesmo commit antes e depois).
+- **Dois itens abertos no HAQ** (`.autodev/sprints/DEVFACTORY-001/HAQ.md`).
+
+O projeto-fixture é gerado e não é versionado:
+
+```bash
+.venv/bin/python .autodev/fixtures/criar_fixture.py
+```
+
+---
+
+## Portão do plano
+
+Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
+
+O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+
+- cada task tem um **arquivo de teste próprio**, sem compartilhá-lo com outra task;
+- sem colisão de arquivo na mesma onda: nenhuma task pode compartilhar arquivo
+  com outra task da mesma onda;
+- ao editar módulo entregue por outra task, há um **critério de preservação**
+  do que já existe (por exemplo, “estender sem remover”);
+- todo critério cita um **arquivo ou comando** concreto e verificável;
+- uma task que estende módulo de outra depende dela, direta ou transitivamente.
+
+O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+aviso; preservação e dependência exigem julgamento na aprovação humana.
+Execute-o antes da aprovação:
+
+```bash
+python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
+```
+
+Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+direto para `dag.json` ou `--todos` para verificar todos os planos.
+
+## Segurança
+
+- O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+  e **contém credencial de agente**. Está no `.gitignore` e não deve ser
+  versionado em nenhuma circunstância.
+- **Há um hook de commit como segunda barreira** (`.githooks/pre-commit`): ele
+  barra caminhos proibidos e segredos no conteúdo, mesmo com `git add -f`. Ative
+  uma vez por clone:
+
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+  O hook nunca imprime o valor do segredo que encontrou — só o arquivo, a linha e
+  o tipo, porque uma mensagem de erro que mostra o token vaza o token para o log.
+- A integração tem portão de segredo: diferenças que introduzam chaves, tokens ou
+  chave privada são barradas antes do merge.
+- O sandbox não expõe `~/.ssh`, nem o HOME real, nem as configurações do usuário.
+"""Contrato da documentacao publica do planejador."""
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).parents[2]
+README = ROOT / "README.md"
+
+
+def _corpo_da_secao(titulo: str) -> str:
+    texto = README.read_text(encoding="utf-8")
+    inicio = re.search(rf"^## {re.escape(titulo)}$", texto, re.MULTILINE)
+    assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+    proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+    fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+    return texto[inicio.start():fim]
+
+
+def _secao_planejador() -> str:
+    texto = README.read_text(encoding="utf-8")
+    marcador = "## Planejador"
+    assert marcador in texto
+    inicio = texto.index(marcador) + len(marcador)
+    restante = texto[inicio:]
+    proximo_titulo = re.search(r"\n#{1,6} ", restante)
+    fim = len(restante) if proximo_titulo is None else proximo_titulo.start()
+    return " ".join(restante[:fim].split())
+
+
+def test_readme_explica_fluxo_do_prompt_ao_sprint_executavel():
+    secao = _secao_planejador().lower()
+
+    assert "prompt" in secao
+    assert "spec.md" in secao
+    assert "dag.json" in secao
+    assert "sprint.yaml" in secao
+    assert "sprint executável" in secao
+
+
+def test_readme_documenta_comando_plan_e_efeito_no_disco():
+    secao = _secao_planejador()
+
+    assert 'autodev plan "' in secao
+    assert ".autodev/sprints/" in secao
+
+
+def test_readme_alerta_sobre_agente_e_revisao_humana_sem_cota_incorreta():
+    secao = _secao_planejador().lower()
+
+    assert "agente" in secao
+    assert "consome cota do agente configurado" not in secao
+    assert "revisão humana" in secao
+    assert "sempre" in secao
+    assert "antes de rodar" in secao
+
+
+def test_readme_declara_que_plan_nao_faz_merge_nem_push():
+    secao = _secao_planejador().lower()
+
+    assert "não faz merge nem push" in secao
+
+
+def test_secao_planejador_exclui_subsecoes_do_assunto_seguinte(monkeypatch):
+    texto = """# Documento
+
+## Planejador
+
+Texto próprio do planejador.
+
+### Ciclo de vida do sprint
+
+Texto de outro assunto.
+
+## Outro assunto
+
+Mais texto.
+"""
+    monkeypatch.setattr(Path, "read_text", lambda self, encoding: texto)
+
+    secao = _secao_planejador()
+
+    assert "Texto próprio do planejador." in secao
+    assert "Ciclo de vida do sprint" not in secao
+    assert "Texto de outro assunto." not in secao
+
+
+def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+    texto = _corpo_da_secao("Portão do plano").lower()
+
+    assert "portão do plano" in texto
+    assert "planejar" in texto and "prever" in texto
+    assert "aprovar" in texto and "rodar" in texto
+    assert "arquivo de teste próprio" in texto
+    assert "sem colisão de arquivo na mesma onda" in texto
+    assert "critério de preservação" in texto
+    assert "arquivo ou comando" in texto
+
+
+def test_readme_documenta_verificador_e_estado_atual_das_sprints():
+    portao = _corpo_da_secao("Portão do plano")
+    estado_atual = _corpo_da_secao("Estado atual")
+
+    assert ".autodev/scripts/verificar_plano.py" in portao
+    assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
+    assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+    assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+    assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+    assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+
+
+def test_exemplo_documentado_do_verificador_roda_sem_erros():
+    resultado = subprocess.run(
+        [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert resultado.returncode == 0, resultado.stdout + resultado.stderr
+    assert "OK    DEVFACTORY-003:" in resultado.stdout
+
+
+def test_decisions_registra_aprovacao_humana_e_d16():
+    decisoes = ROOT / ".autodev/sprints/DEVFACTORY-003/decisions.md"
+    texto = decisoes.read_text(encoding="utf-8").lower()
+
+    assert "aprovação humana" in texto
+    assert "d-16" in texto
+    assert "sprint 2" in texto
+# DEVFACTORY-003 — Decisões
+
+## D-01 — Aprovação humana é um portão obrigatório
+
+**Contexto:** o planejador gera `dag.json` automaticamente, mas a Sprint 2
+demonstrou que a validação estrutural não basta para garantir um plano seguro.
+
+**Evidência:** o D-16 da Sprint 2 registrou colisões de arquivos entre tasks,
+inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+reprovações e tasks bloqueadas.
+
+**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+alteração posterior no DAG invalida a aprovação.
+
+**Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+agente.
+
+exec
+/usr/bin/bash -lc "sed -n '1,120p' .autodev/scripts/verificar_plano.py && sed -n '1,220p' .autodev/tests/test_readme_afirmacoes.py 2>/dev/null || true && sed -n '1,220p' .autodev/tests/test_readme_estrutura.py && rg -n \"aprovação|aprovacao|PLANEJADO|_validar_aprovacao\" autodev/orchestrator.py .autodev/tests | head -80" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ succeeded in 3ms:
+codex
+Os testes atuais confirmam a presença geral, mas deixam passar exatamente as quatro imprecisões apontadas. Vou primeiro endurecer o contrato para: fluxo em ordem no corpo, dois comandos de suíte, classes E1–E5, exceção legada e separador estrutural.
+2026-09-29T11:35:15.620451Z ERROR codex_core::tools::router: error=apply_patch verification failed: invalid patch: multiple operations target /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex/.autodev/tests/test_plan_docs.py
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex/.autodev/tests/test_plan_docs.py
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex/.autodev/tests/test_readme_estrutura.py
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+
+exec
+/usr/bin/bash -lc '.venv/bin/python -m pytest .autodev/tests/test_plan_docs.py .autodev/tests/test_readme_estrutura.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ exited 127 in 0ms:
+/usr/bin/bash: line 1: .venv/bin/python: No such file or directory
+
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+
+codex
+A validação revelou um detalhe de ambiente: este worktree não contém `.venv`, então o comando recomendado para o checkout principal não existe aqui. Isso não é falha do código; vou localizar o interpretador de projeto disponível sem alterar dependências e continuar o ciclo vermelho/verde.
+exec
+/usr/bin/bash -lc "pwd; ls -la; command -v python3; python3 -m pytest --version || true; find .. -maxdepth 3 -path '*/.venv/bin/python' -type f -print 2>/dev/null | head -20" in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ succeeded in 52ms:
+/usr/bin/python3: No module named pytest
+
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+
+exec
+/usr/bin/bash -lc 'for p in /home/saurus/Code/Coding_Machine/.venv/bin/python /home/saurus/Code/Coding_Machine/venv/bin/python; do if test -x "$p"; then "$p" -m pytest --version; fi; done' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ succeeded in 484ms:
+pytest 9.1.1
+
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+
+exec
+/usr/bin/bash -lc '/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/test_plan_docs.py .autodev/tests/test_readme_estrutura.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ exited 1 in 1312ms:
+......FF.F..F.                                                           [100%]
+=================================== FAILURES ===================================
+_________ test_readme_documenta_verificador_e_estado_atual_das_sprints _________
+
+    def test_readme_documenta_verificador_e_estado_atual_das_sprints():
+        portao = _corpo_da_secao("Portão do plano")
+        estado_atual = _corpo_da_secao("Estado atual")
+    
+        assert ".autodev/scripts/verificar_plano.py" in portao
+        assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
+>       assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+E       AssertionError: assert '.venv/bin/python -m pytest .autodev/tests/ -q' in '\n\n- Para medir a contagem atual da suíte do orquestrador, rode\n  `python3 -m pytest .autodev/tests/ -q`. O runner ...o-fixture é gerado e não é versionado:\n\n```bash\n.venv/bin/python .autodev/fixtures/criar_fixture.py\n```\n\n---\n\n'
+
+.autodev/tests/test_plan_docs.py:107: AssertionError
+_______ test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada ________
+
+    def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
+        portao = _corpo_da_secao("Portão do plano")
+    
+        for codigo in ("E1", "E2", "E3", "E4", "E5"):
+>           assert codigo in portao
+E           AssertionError: assert 'E1' in '\n\nTodo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o\nplano, `prever` mostra o impact...quando encontra erro. Também aceita o caminho\ndireto para `dag.json` ou `--todos` para verificar todos os planos.\n\n'
+
+.autodev/tests/test_plan_docs.py:118: AssertionError
+________________ test_decisions_registra_aprovacao_humana_e_d16 ________________
+
+    def test_decisions_registra_aprovacao_humana_e_d16():
+        decisoes = ROOT / ".autodev/sprints/DEVFACTORY-003/decisions.md"
+        texto = decisoes.read_text(encoding="utf-8").lower()
+    
+        assert "aprovação humana" in texto
+        assert "d-16" in texto
+        assert "sprint 2" in texto
+        assert "planejado" in texto
+>       assert "iniciados antes do portão" in texto
+E       AssertionError: assert 'iniciados antes do portão' in '# devfactory-003 — decisões\n\n## d-01 — aprovação humana é um portão obrigatório\n\n**contexto:** o planejador gera ...ser planejar, prever, aprovar e\nrodar. um plano sem aprovação válida não pode consumir execução ou cota de\nagente.\n'
+
+.autodev/tests/test_plan_docs.py:144: AssertionError
+_________________ test_seguranca_mantem_separador_entre_secoes _________________
+
+    def test_seguranca_mantem_separador_entre_secoes():
+>       assert "\n---\n\n## Segurança\n" in _texto()
+E       AssertionError: assert '\n---\n\n## Segurança\n' in '# Coding Machine\n\nFábrica de desenvolvimento autônomo: um orquestrador que pega uma especificação\nde sprint, quebr...vada são barradas antes do merge.\n- O sandbox não expõe `~/.ssh`, nem o HOME real, nem as configurações do usuário.\n'
+E        +  where '# Coding Machine\n\nFábrica de desenvolvimento autônomo: um orquestrador que pega uma especificação\nde sprint, quebr...vada são barradas antes do merge.\n- O sandbox não expõe `~/.ssh`, nem o HOME real, nem as configurações do usuário.\n' = _texto()
+
+.autodev/tests/test_readme_estrutura.py:72: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_plan_docs.py::test_readme_documenta_verificador_e_estado_atual_das_sprints
+FAILED .autodev/tests/test_plan_docs.py::test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada
+FAILED .autodev/tests/test_plan_docs.py::test_decisions_registra_aprovacao_humana_e_d16
+FAILED .autodev/tests/test_readme_estrutura.py::test_seguranca_mantem_separador_entre_secoes
+4 failed, 10 passed in 0.56s
+
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex/.autodev/sprints/DEVFACTORY-003/decisions.md
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex/README.md
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+exec
+/usr/bin/bash -lc '/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/test_plan_docs.py .autodev/tests/test_readme_estrutura.py -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ exited 1 in 1190ms:
+.........F....                                                           [100%]
+=================================== FAILURES ===================================
+________________ test_decisions_registra_aprovacao_humana_e_d16 ________________
+
+    def test_decisions_registra_aprovacao_humana_e_d16():
+        decisoes = ROOT / ".autodev/sprints/DEVFACTORY-003/decisions.md"
+        texto = decisoes.read_text(encoding="utf-8").lower()
+    
+        assert "aprovação humana" in texto
+        assert "d-16" in texto
+        assert "sprint 2" in texto
+        assert "planejado" in texto
+>       assert "iniciados antes do portão" in texto
+E       AssertionError: assert 'iniciados antes do portão' in '# devfactory-003 — decisões\n\n## d-01 — aprovação humana é um portão obrigatório\n\n**contexto:** o planejador gera ...aprovar e\nrodar. um plano em estado `planejado` sem aprovação válida não pode consumir\nexecução ou cota de agente.\n'
+
+.autodev/tests/test_plan_docs.py:144: AssertionError
+=========================== short test summary info ============================
+FAILED .autodev/tests/test_plan_docs.py::test_decisions_registra_aprovacao_humana_e_d16
+1 failed, 13 passed in 0.45s
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..ac5031d06cc5bdfd92dc1b78b9a5ee13ab05a99d
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert "iniciados antes do portão" in texto
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+apply patch
+patch: completed
+/home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex/.autodev/tests/test_plan_docs.py
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+exec
+/usr/bin/bash -lc 'rg -n "iniciados|test_readme_documenta_todas|test_decisions" .autodev/tests/test_plan_docs.py' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ succeeded in 0ms:
+114:def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
+120:    assert "iniciados antes do portão" in portao
+136:def test_decisions_registra_aprovacao_humana_e_d16():
+144:    assert re.search(r"iniciados\s+antes do portão", texto)
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+codex
+O ciclo vermelho confirmou que os novos testes detectavam os defeitos esperados. A documentação agora distingue terminal de runner, descreve E1–E5, limita o bloqueio a `PLANEJADO`, registra a compatibilidade legada e restaura o separador; vou rodar a suíte completa.
+exec
+/usr/bin/bash -lc '/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+exec
+/usr/bin/bash -lc '/home/saurus/Code/Coding_Machine/.venv/bin/python -m pytest .autodev/tests/ -q' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+ succeeded in 137857ms:
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 50%]
+........................................................................ [ 67%]
+........................................................................ [ 83%]
+.....................................................................    [100%]
+429 passed in 136.89s (0:02:16)
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+ succeeded in 133974ms:
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 50%]
+........................................................................ [ 67%]
+........................................................................ [ 83%]
+.....................................................................    [100%]
+429 passed in 133.11s (0:02:13)
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+exec
+/usr/bin/bash -lc 'git diff --check && git diff -- README.md .autodev/sprints/DEVFACTORY-003/decisions.md .autodev/tests/test_plan_docs.py .autodev/tests/test_readme_estrutura.py && git status --short' in /home/saurus/Code/Coding_Machine/.autodev/worktrees/DEVFACTORY-003-P07-codex
+ succeeded in 0ms:
+diff --git i/.autodev/sprints/DEVFACTORY-003/decisions.md w/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc91484..1ea208d 100644
+--- i/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ w/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@ demonstrou que a validação estrutural não basta para garantir um plano seguro
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git i/.autodev/tests/test_plan_docs.py w/.autodev/tests/test_plan_docs.py
+index 44b0435..e8bedb3 100644
+--- i/.autodev/tests/test_plan_docs.py
++++ w/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@ def _corpo_da_secao(titulo: str) -> str:
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@ Mais texto.
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@ def test_readme_documenta_verificador_e_estado_atual_das_sprints():
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@ def test_decisions_registra_aprovacao_humana_e_d16():
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git i/.autodev/tests/test_readme_estrutura.py w/.autodev/tests/test_readme_estrutura.py
+index 3c5df54..50d8ff3 100644
+--- i/.autodev/tests/test_readme_estrutura.py
++++ w/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@ def test_arvore_completa_de_titulos_preserva_niveis_ordem_e_parentesco():
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git i/README.md w/README.md
+index 180be3d..84cc3b4 100644
+--- i/README.md
++++ w/README.md
+@@ -187,8 +187,9 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@ O projeto-fixture é gerado e não é versionado:
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@ python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+ M .autodev/sprints/DEVFACTORY-003/decisions.md
+ M .autodev/tests/test_plan_docs.py
+ M .autodev/tests/test_readme_estrutura.py
+ M README.md
+
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+codex
+RESULTADO: documentação do portão, checklist D-16, E1–E5, exceção legada, estado das sprints e comandos de teste corrigidos; decisão humana registrada e testes reforçados | TESTES: 429 passed (`.venv/bin/python -m pytest .autodev/tests/ -q`)
+diff --git a/.autodev/sprints/DEVFACTORY-003/decisions.md b/.autodev/sprints/DEVFACTORY-003/decisions.md
+index cc914849a1d1710d671a41b8fc45174878e67910..1ea208dd95c80ab62e7bf6e25806c90fff2b02ed
+--- a/.autodev/sprints/DEVFACTORY-003/decisions.md
++++ b/.autodev/sprints/DEVFACTORY-003/decisions.md
+@@ -9,10 +9,12 @@
+ inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
+ reprovações e tasks bloqueadas.
+ 
+-**Decisão:** exigir aprovação humana registrada antes de qualquer sprint rodar.
+-O registro deve conter quem aprovou, quando e o hash do `dag.json`; qualquer
+-alteração posterior no DAG invalida a aprovação.
++**Decisão:** exigir aprovação humana registrada antes de um sprint `PLANEJADO`
++rodar. O registro deve conter quem aprovou, quando e o hash do `dag.json`;
++qualquer alteração posterior no DAG invalida a aprovação. Sprints iniciados
++antes do portão continuam retomáveis sem o registro, para preservar execuções
++legadas.
+ 
+ **Consequência:** o fluxo documentado passa a ser planejar, prever, aprovar e
+-rodar. Um plano sem aprovação válida não pode consumir execução ou cota de
+-agente.
++rodar. Um plano em estado `PLANEJADO` sem aprovação válida não pode consumir
++execução ou cota de agente.
+diff --git a/.autodev/tests/test_plan_docs.py b/.autodev/tests/test_plan_docs.py
+index 44b043572e4dda627ff5a4fe6137ac882312c062..e8bedb3ac05757c1c27929797bc74bf1758f6665
+--- a/.autodev/tests/test_plan_docs.py
++++ b/.autodev/tests/test_plan_docs.py
+@@ -16,7 +16,7 @@
+     assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+     proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+     fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+-    return texto[inicio.start():fim]
++    return texto[inicio.end():fim]
+ 
+ 
+ def _secao_planejador() -> str:
+@@ -90,9 +90,8 @@
+ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+     texto = _corpo_da_secao("Portão do plano").lower()
+ 
+-    assert "portão do plano" in texto
+-    assert "planejar" in texto and "prever" in texto
+-    assert "aprovar" in texto and "rodar" in texto
++    etapas = [texto.index(etapa) for etapa in ("planejar", "prever", "aprovar", "rodar")]
++    assert etapas == sorted(etapas)
+     assert "arquivo de teste próprio" in texto
+     assert "sem colisão de arquivo na mesma onda" in texto
+     assert "critério de preservação" in texto
+@@ -105,13 +104,22 @@
+ 
+     assert ".autodev/scripts/verificar_plano.py" in portao
+     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
++    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
+     assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+-    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+     assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+     assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+     assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+ 
+ 
++def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
++    portao = _corpo_da_secao("Portão do plano")
++
++    for codigo in ("E1", "E2", "E3", "E4", "E5"):
++        assert codigo in portao
++    assert "PLANEJADO" in portao
++    assert "iniciados antes do portão" in portao
++
++
+ def test_exemplo_documentado_do_verificador_roda_sem_erros():
+     resultado = subprocess.run(
+         [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+@@ -132,3 +140,5 @@
+     assert "aprovação humana" in texto
+     assert "d-16" in texto
+     assert "sprint 2" in texto
++    assert "planejado" in texto
++    assert re.search(r"iniciados\s+antes do portão", texto)
+diff --git a/.autodev/tests/test_readme_estrutura.py b/.autodev/tests/test_readme_estrutura.py
+index 3c5df54cbc8acfbaa59a30400d7ee7e0635ff3e0..50d8ff330eca6138ce87a90934fd36c05781926b
+--- a/.autodev/tests/test_readme_estrutura.py
++++ b/.autodev/tests/test_readme_estrutura.py
+@@ -68,6 +68,10 @@
+     assert _titulos() == TITULOS_ESPERADOS
+ 
+ 
++def test_seguranca_mantem_separador_entre_secoes():
++    assert "\n---\n\n## Segurança\n" in _texto()
++
++
+ def test_corpos_das_secoes_reorganizadas_preservam_o_texto_de_referencia():
+     for titulo, arquivo in (
+         ("Como rodar", "como_rodar.md"),
+diff --git a/README.md b/README.md
+index 180be3d0720f8e11877898f087f6f3bd4baeb0bc..84cc3b43593acd9baa6fbfb352e67dc1308b6945
+--- a/README.md
++++ b/README.md
+@@ -187,8 +187,9 @@
+ ## Estado atual
+ 
+ - Para medir a contagem atual da suíte do orquestrador, rode
+-  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+-  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
++  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
++  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
++  interpretador do projeto. O resumo do comando informa a contagem vigente.
+ - **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
+   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+   `status:` do `sprint.yaml` é apenas declaração de intenção.
+@@ -220,8 +221,10 @@
+ 
+ Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+ plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+-com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+-sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
++com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
++um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
++retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
++portão e exige nova aprovação.
+ 
+ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+ 
+@@ -233,8 +236,11 @@
+ - todo critério cita um **arquivo ou comando** concreto e verificável;
+ - uma task que estende módulo de outra depende dela, direta ou transitivamente.
+ 
+-O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+-aviso; preservação e dependência exigem julgamento na aprovação humana.
++O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
++dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
++teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
++da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
++exigem julgamento na aprovação humana.
+ Execute-o antes da aprovação:
+ 
+ ```bash
+@@ -244,6 +250,8 @@
+ Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+ direto para `dag.json` ou `--todos` para verificar todos os planos.
+ 
++---
++
+ ## Segurança
+ 
+ - O diretório `.autodev/sandbox-home/` é uma cópia do HOME criada para o sandbox
+
+tokens used
+50,556
+RESULTADO: documentação do portão, checklist D-16, E1–E5, exceção legada, estado das sprints e comandos de teste corrigidos; decisão humana registrada e testes reforçados | TESTES: 429 passed (`.venv/bin/python -m pytest .autodev/tests/ -q`)
