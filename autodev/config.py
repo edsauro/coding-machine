@@ -323,6 +323,12 @@ def carrega_sprint(p: Path) -> dict:
     for campo in ("sprint_id", "objetivo"):
         if campo not in s:
             raise ValueError(f"sprint.yaml sem '{campo}': {p}")
+    aprovacao = s.get("aprovacao")
+    if aprovacao is not None:
+        if not isinstance(aprovacao, dict) or set(aprovacao) != {"por", "quando", "hash_dag"}:
+            raise ValueError("aprovacao precisa conter exatamente por, quando e hash_dag")
+        if not all(isinstance(aprovacao.get(k), str) and aprovacao[k] for k in ("por", "quando", "hash_dag")):
+            raise ValueError("aprovacao precisa conter por, quando e hash_dag preenchidos")
     return s
 
 

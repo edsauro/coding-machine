@@ -19,10 +19,13 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
 from pathlib import Path
+
+import yaml
 
 RAIZ = Path(__file__).resolve().parent.parent
 SPRINT_PADRAO = "DEVFACTORY-001"
@@ -141,6 +144,26 @@ def cmd_run(args) -> int:
           f"\n  parado por: {r.parado_por or '-'}"
           f"\n  duracao: {r.duracao_s / 60:.1f} min")
     return 0 if not r.parado_por else 2
+
+
+def cmd_aprovar(args) -> int:
+    d = RAIZ / ".autodev" / "sprints" / args.sprint_id
+    yaml_path = d / "sprint.yaml"
+    dag_path = d / "dag.json"
+    if not yaml_path.exists() or not dag_path.exists():
+        print(f"sprint inexistente ou incompleto: {args.sprint_id}")
+        return 1
+    with yaml_path.open(encoding="utf-8") as fh:
+        sprint = yaml.safe_load(fh) or {}
+    sprint["aprovacao"] = {
+        "por": args.por,
+        "quando": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "hash_dag": hashlib.sha256(dag_path.read_bytes()).hexdigest(),
+    }
+    with yaml_path.open("w", encoding="utf-8") as fh:
+        yaml.safe_dump(sprint, fh, allow_unicode=True, sort_keys=False)
+    print(f"sprint {args.sprint_id} aprovado por {args.por}")
+    return 0
 
 
 def cmd_resume(args) -> int:
@@ -461,6 +484,11 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--deadline", type=float, default=None,
                    help="segundos de teto de execucao")
     s.set_defaults(fn=cmd_run)
+
+    s = sub.add_parser("aprovar", help="registra a aprovação humana do plano")
+    s.add_argument("sprint_id")
+    s.add_argument("--por", required=True)
+    s.set_defaults(fn=cmd_aprovar)
 
     s = sub.add_parser("resume")
     s.add_argument("--modo-teste", action="store_true")

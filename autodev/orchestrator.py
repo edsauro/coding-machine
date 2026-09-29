@@ -10,6 +10,7 @@ Nunca a memória conversacional.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import signal
 import threading
@@ -214,6 +215,21 @@ class Orquestrador:
         novas = self.store.criar_tasks_do_dag(self.sprint, self.dag)
         self.log(f"sprint {self.sprint}: {len(self.dag['tasks'])} tasks "
                  f"({novas} novas) — ondas {ordem_topologica(self.dag)}")
+
+    def _validar_aprovacao(self) -> str | None:
+        """Impede executar plano ainda não aprovado ou cujo DAG mudou."""
+        if (self.sprint_yaml.get("status") or "PLANEJADO") != "PLANEJADO":
+            return None
+        aprovacao = self.sprint_yaml.get("aprovacao")
+        comando = f"autodev aprovar {self.sprint} --por <nome>"
+        if not isinstance(aprovacao, dict):
+            return f"sprint PLANEJADO sem aprovacao registrada; use {comando}"
+        atual = hashlib.sha256((self.dir_sprint / "dag.json").read_bytes()).hexdigest()
+        registrado = aprovacao.get("hash_dag")
+        if registrado != atual:
+            return (f"aprovacao invalida: divergencia no hash do dag.json "
+                    f"(aprovado {registrado}, atual {atual}); use {comando}")
+        return None
 
     # ------------------------------------------------------------ recuperação
     def recuperar(self) -> dict:
@@ -650,6 +666,17 @@ class Orquestrador:
         t0 = time.time()
         res = ResultadoSprint(sprint=self.sprint)
         self.carregar()
+        bloqueio_aprovacao = self._validar_aprovacao()
+        if bloqueio_aprovacao:
+            self.log(f"RODADA NAO INICIADA: {bloqueio_aprovacao}")
+            res.parado_por = bloqueio_aprovacao
+            res.duracao_s = time.time() - t0
+            return res
+        if (self.sprint_yaml.get("status") or "PLANEJADO") == "PLANEJADO":
+            self.store.evento(self.sprint, None, "aprovacao_plano",
+                              {"por": self.sprint_yaml["aprovacao"]["por"],
+                               "quando": self.sprint_yaml["aprovacao"]["quando"],
+                               "hash_dag": self.sprint_yaml["aprovacao"]["hash_dag"]})
         self.recuperar()
 
         # ---- rodada única por sprint -------------------------------------------
