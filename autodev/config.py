@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -225,6 +226,41 @@ def valida_dag(dag: dict) -> list[str]:
     for n in grafo:
         if cor[n] == BRANCO:
             visita(n, [])
+
+    # Uma onda é executada em paralelo; duas tasks que citam o mesmo caminho
+    # nela podem sobrescrever o trabalho uma da outra.  Dependências colocam o
+    # mesmo caminho em ondas distintas e, portanto, não são erro aqui.
+    caminho = re.compile(
+        r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
+        r"|\b(?:Makefile|Dockerfile)\b"
+    )
+    arquivos = {
+        t.get("id"): {
+            encontrado.group(0).replace("\\", "/")
+            for criterio in t.get("criterios", [])
+            if isinstance(criterio, str)
+            for encontrado in caminho.finditer(criterio)
+        }
+        for t in tasks
+    }
+    restante = {t.get("id"): set(t.get("deps", [])) for t in tasks}
+    ondas: list[list[str]] = []
+    while restante:
+        prontos = sorted(n for n, deps in restante.items()
+                         if not (deps & set(restante)))
+        if not prontos:
+            break
+        ondas.append(prontos)
+        for n in prontos:
+            del restante[n]
+    for numero, onda in enumerate(ondas, start=1):
+        for indice, id_a in enumerate(onda):
+            for id_b in onda[indice + 1:]:
+                for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
+                    erros.append(
+                        f"colisão de arquivo entre {id_a} e {id_b}: "
+                        f"{arquivo} (onda {numero})"
+                    )
     return erros
 
 
