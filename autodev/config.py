@@ -100,6 +100,31 @@ class Config:
         degraus = [d for d in self.escada() if d["tier"] == tier]
         return degraus[0] if degraus else None
 
+    def tier_do_modelo(self, slug: str | None, effort: str | None) -> int | None:
+        """Degrau em que um par (modelo, esforço) aparece na escada — P-12.
+
+        Vale a PRIMEIRA ocorrência: a escada é crescente e o topo se repete (P-13),
+        então o que interessa é o degrau de ENTRADA daquele par. `None` = par fora da
+        escada — aconteceu em 27/09, antes de a matriz ser padronizada.
+        """
+        for d in self.escada():
+            if d["slug"] == slug and d["effort"] == effort:
+                return d["tier"]
+        return None
+
+    def escalonou(self, slug_ant: str | None, effort_ant: str | None,
+                  slug_novo: str | None, effort_novo: str | None) -> bool:
+        """O motor SUBIU de degrau? É a fonte do contador `escalonamentos` (P-12).
+
+        Só conta quando o degrau novo é MAIOR que o anterior: a volta ao degrau
+        barato (rearme por dependência integrada, reabertura por defeito de contrato)
+        tem de ficar de fora, senão o número mede movimento, não subida. Par fora da
+        escada em qualquer dos lados devolve False — sem degrau não há direção.
+        """
+        ta = self.tier_do_modelo(slug_ant, effort_ant)
+        tn = self.tier_do_modelo(slug_novo, effort_novo)
+        return ta is not None and tn is not None and tn > ta
+
     def modelo_para_tentativa(self, tentativa: int) -> dict:
         """Tentativa N -> degrau da escada (spec §10). 1-indexado."""
         mapa = self.policies["retry"]["escalonamento"]

@@ -169,13 +169,51 @@ def test_mesmo_lugar_detecta_loop():
 
 
 def test_escalonamento_sobe_um_degrau(cfg):
-    m1, m2, m3 = (cfg.modelo_para_tentativa(n) for n in (1, 2, 3))
-    assert (m1["slug"], m1["effort"]) == ("gpt-5.6-luna", "low")
-    # matriz do autor (2026-09-27): luna/low -> terra/low -> sol/low ->
-    # sol/medium -> astra/low
-    assert (m2["slug"], m2["effort"]) == ("gpt-5.6-terra", "low")
-    assert (m3["slug"], m3["effort"]) == ("gpt-5.6-sol", "low")
-    assert m3["tier"] > m2["tier"] > m1["tier"], "a cada tentativa sobe um degrau"
+    """A escada escala SÓ por modelo, com todo degrau Codex no esforço padrão.
+
+    Decisão do autor (29/09/2026, P-13): o padrão de esforço vale também para o
+    motor — Codex sempre no `low`. Como são 4 modelos para 5 degraus, o topo repete.
+    """
+    esperado = [("gpt-5.6-luna", "low"), ("gpt-5.6-terra", "low"),
+                ("gpt-5.6-sol", "low"), ("gpt-6-astra", "low"), ("gpt-6-astra", "low")]
+    obtido = [(cfg.modelo_para_tentativa(n)["slug"],
+               cfg.modelo_para_tentativa(n)["effort"]) for n in range(1, 6)]
+    assert obtido == esperado
+    assert all(e == "low" for _, e in obtido), "nenhum degrau Codex fora do padrão `low`"
+    tiers = [cfg.modelo_para_tentativa(n)["tier"] for n in range(1, 6)]
+    assert tiers == sorted(tiers), "a escada é crescente"
+    assert len(set(tiers)) == 5, "a cada tentativa sobe um degrau"
+    # do 5º em diante satura no topo, sem inventar degrau novo
+    assert cfg.modelo_para_tentativa(9)["slug"] == "gpt-6-astra"
+
+
+def test_escalonou_so_conta_subida_de_degrau(cfg):
+    """P-12: escalonamento é SUBIDA — rearme (volta ao degrau barato) não conta."""
+    assert cfg.escalonou("gpt-5.6-luna", "low", "gpt-5.6-terra", "low") is True
+    assert cfg.escalonou("gpt-5.6-sol", "low", "gpt-6-astra", "low") is True
+    assert cfg.escalonou("gpt-5.6-luna", "low", "gpt-5.6-luna", "low") is False   # repetiu
+    assert cfg.escalonou("gpt-5.6-sol", "low", "gpt-5.6-luna", "low") is False    # rearme
+    assert cfg.escalonou(None, None, "gpt-5.6-luna", "low") is False              # 1ª chamada
+    # par fora da escada (o `medium` de 27/09, antes de a matriz ser padronizada)
+    assert cfg.tier_do_modelo("gpt-5.6-sol", "medium") is None
+    assert cfg.escalonou("gpt-5.6-sol", "medium", "gpt-6-astra", "low") is False
+    # o topo repete na escada: vale o degrau de ENTRADA do par
+    assert cfg.tier_do_modelo("gpt-6-astra", "low") == 3
+
+
+def test_resumo_conta_escalonamento_de_verdade(store):
+    """P-12: o contador do resumo lia `json_extract(test_result,'$.tier')` — chave que
+    ninguém escreve, então todo sprint reportava 0 e o zero era lido como fato.
+
+    Agora conta o evento `escalonamento`, que o motor grava no momento em que sobe.
+    """
+    for de, para in (("gpt-5.6-luna/low", "gpt-5.6-terra/low"),
+                     ("gpt-5.6-terra/low", "gpt-5.6-sol/low")):
+        store.evento(SPRINT, "T1", "escalonamento", {"de": de, "para": para})
+    store.evento(SPRINT, "T4", "tentativa_iniciada", {})     # outro tipo não conta
+    m = store.metricas(SPRINT)
+    assert m["escalonamentos"] == 2, m
+    assert store.metricas("DEVFACTORY-INEXISTENTE")["escalonamentos"] == 0
 
 
 def test_modelos_da_escada_existem_de_fato(cfg, tmp_path):

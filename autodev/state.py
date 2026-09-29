@@ -943,9 +943,13 @@ class StateStore:
                 "SELECT COUNT(*) FROM attempts WHERE sprint_id=?"
                 " AND COALESCE(origem,'orquestrador') NOT IN ('retroativo')",
                 sprint_id),
+            # Escalonamento de modelo: o motor grava um evento `escalonamento` no
+            # momento em que SOBE de degrau (orquestrador). Antes esta consulta lia
+            # `json_extract(test_result,'$.tier')` — chave que ninguém escrevia, então
+            # todo sprint reportava 0, e o zero era lido como fato (P-12).
             "escalonamentos": q(
-                "SELECT COUNT(*) FROM attempts WHERE sprint_id=? AND CAST(json_extract("
-                "test_result,'$.tier') AS INTEGER) > 0", sprint_id),
+                "SELECT COUNT(*) FROM events WHERE sprint_id=? AND tipo='escalonamento'",
+                sprint_id),
             "esperas_cota": q(
                 "SELECT COUNT(*) FROM resource_waits WHERE sprint_id=?", sprint_id),
             "haq": q("SELECT COUNT(*) FROM haq WHERE sprint_id=?", sprint_id),

@@ -392,6 +392,22 @@ class Orquestrador:
             # ---- invoca ---------------------------------------------------------
             modelo = modelo_info["slug"] if agente == "codex" else None
             effort = modelo_info["effort"] if agente == "codex" else None
+
+            # ---- P-12: o escalonamento é REGISTRADO aqui, onde o motor sabe ------
+            # O resumo contava `json_extract(test_result,'$.tier')` e ninguém nunca
+            # escreveu `tier` ali: todo sprint reportava "0 escalonamentos", lido como
+            # fato. Aqui compara-se com a chamada ANTERIOR da mesma task — subir de
+            # degrau gera evento; voltar ao barato (rearme) não.
+            _ant = self.store.ultima_tentativa(self.sprint, task_id)
+            _ant_m, _ant_e = (_ant["model"], _ant["effort"]) if _ant else (None, None)
+            if self.cfg.escalonou(_ant_m, _ant_e, modelo, effort):
+                self.store.evento(self.sprint, task_id, "escalonamento", {
+                    "de": f"{_ant_m}/{_ant_e}", "para": f"{modelo}/{effort}",
+                    "tier_de": self.cfg.tier_do_modelo(_ant_m, _ant_e),
+                    "tier_para": self.cfg.tier_do_modelo(modelo, effort)})
+                self.log(f"{task_id}: escalonamento de degrau {_ant_m}/{_ant_e} "
+                         f"-> {modelo}/{effort}")
+
             log_path = self.dir_sprint / "logs" / f"{task_id}-t{n_tent + 1}-{agente}.log"
             att = self.store.iniciar_tentativa(
                 self.sprint, task_id, agent=agente, model=modelo or "", effort=effort or "",

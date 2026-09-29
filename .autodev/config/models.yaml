@@ -6,7 +6,11 @@
 codex:
   # Ordem crescente de custo/capacidade, validada contra os modelos que a conta expõe.
   # NÃO inventar nomes: só os slugs abaixo existem.
-  # Matriz aprovada (2026-09-27): luna/low -> terra/low -> sol/low -> sol/medium -> astra/low
+  #  Matriz aprovada (2026-09-27); degraus 4 e 5 revistos pelo autor em 2026-09-29 (P-13):
+  #  a escada escala SÓ por modelo e todo degrau do Codex fica no esforço padrão (`low`).
+  #  São 4 modelos para 5 degraus, então o topo (astra) ocupa o 4º e o 5º — antes o 4º
+  #  era `sol/medium`, escalonamento por ESFORÇO, que o padrão não permite.
+  #  luna/low -> terra/low -> sol/low -> astra/low -> astra/low
   ladder:
     - slug: gpt-5.6-luna
       effort: low
@@ -17,8 +21,8 @@ codex:
     - slug: gpt-5.6-sol
       effort: low
       tier: 2
-    - slug: gpt-5.6-sol
-      effort: medium
+    - slug: gpt-6-astra
+      effort: low
       tier: 3
     - slug: gpt-6-astra
       effort: low
@@ -59,7 +63,7 @@ papeis:
 #   1ª  codex luna/low    & agy Gemini 3.6 Flash (Low)
 #   2ª  codex terra/low   & agy Gemini 3.7 Flash (Low)
 #   3ª  codex sol/low     & agy Gemini 3.8 Flash (Low)
-#   4ª  codex sol/medium  & Hermes deepseek-flash/high
+#   4ª  codex astra/low   & Hermes deepseek-flash/high
 #   5ª  codex astra/low   & Hermes deepseek-flash/high   (última sem intervenção humana)
 # MUDANÇA DO AUTOR em 28/09/2026 (~23h55): o 5º degrau era `deepseek-v4-pro` (matriz
 # de 27/09) e passou a `deepseek-flash` com esforço `high`. O revisor é sempre o

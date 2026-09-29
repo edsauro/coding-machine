@@ -24,12 +24,16 @@ SPRINT = "TESTE-900"
 
 # ------------------------------------------------------- escada de implementação
 def test_escada_de_implementacao_e_a_matriz_do_autor(cfg):
+    """Matriz do autor, revisão de 29/09/2026 (P-13): escala SÓ por modelo, e todo
+    degrau do Codex no esforço padrão. São 4 modelos para 5 degraus, então o topo
+    (astra) ocupa o 4º e o 5º."""
     esperado = [("gpt-5.6-luna", "low"), ("gpt-5.6-terra", "low"),
-                ("gpt-5.6-sol", "low"), ("gpt-5.6-sol", "medium"),
+                ("gpt-5.6-sol", "low"), ("gpt-6-astra", "low"),
                 ("gpt-6-astra", "low")]
     obtido = [(cfg.modelo_para_tentativa(n)["slug"],
                cfg.modelo_para_tentativa(n)["effort"]) for n in range(1, 6)]
     assert obtido == esperado
+    assert all(e == "low" for _, e in obtido), "nenhum degrau fora do esforço padrão"
 
 
 def test_escada_de_implementacao_nao_estoura_o_teto_de_tentativas(cfg):
@@ -445,12 +449,14 @@ def test_orquestrador_respeita_o_degrau_da_decisao(cfg):
     from autodev.orchestrator import Orquestrador
     orq = Orquestrador.__new__(Orquestrador)      # só o mapa decisão -> degrau
     orq.cfg = cfg
-    # 4 tentativas feitas: o degrau ATUAL é o 4º (sol/medium), não o 5º (astra/low)
-    d = retry.decidir(failure_class="NETWORK_ERROR", tentativas_implementacao=4,
+    # 2 tentativas feitas: o degrau ATUAL é o 2º (terra/low), não o topo — na escada
+    # de 29/09 (P-13) o `astra/low` ocupa o 4º e o 5º, então "4 tentativas feitas" já
+    # estaria NO degrau caro e o teste não provaria nada
+    d = retry.decidir(failure_class="NETWORK_ERROR", tentativas_implementacao=2,
                       esperas_cota=0, agente_atual="codex", cfg=cfg,
                       fp_nova="mesma-falha", fps_anteriores=["mesma-falha"])
-    m = orq._modelo_da_tentativa(d, n_tent=4)
-    assert (m["slug"], m["effort"]) == ("gpt-5.6-sol", "medium"), (
+    m = orq._modelo_da_tentativa(d, n_tent=2)
+    assert (m["slug"], m["effort"]) == ("gpt-5.6-terra", "low"), (
         "falha de rede não pode subir para o degrau caro (astra/low)")
     # e, sem decisão (1ª tentativa), o contador continua mandando
     m1 = orq._modelo_da_tentativa(None, n_tent=0)

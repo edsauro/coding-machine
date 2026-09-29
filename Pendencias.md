@@ -65,30 +65,7 @@ Quando uma pendência é resolvida, ela sai de "Abertas" e vira uma linha em
 - **Cuidado de cota:** a franquia **semanal** do Codex está em **85%** (reset 04/10
   00:22) — o A/B com N≥3 consome muitas chamadas; começar depois do reset.
 
-### P-12 · Contador `escalonamentos` do resumo está morto (sempre 0) — **agente**
-- **O que é:** o resumo do sprint conta escalonamentos por
-  `json_extract(test_result,'$.tier') > 0` (`autodev/state.py:946`), mas **ninguém escreve
-  `tier` dentro de `test_result`** — o motor grava o degrau em `tasks.tier_atual`.
-- **Medido em 28/09:** `SELECT COUNT(*) FROM attempts WHERE test_result LIKE '%tier%'` → **0**;
-  `... WHERE CAST(json_extract(test_result,'$.tier') AS INTEGER) > 0` → **0**. Ou seja: todos
-  os sprints reportam "**0 escalonamentos**", o que se lê como fato e não é.
-- **Verificação:** `sqlite3 .autodev/state.db "SELECT COUNT(*) FROM attempts WHERE test_result LIKE '%tier%';"`
-- **Pronto quando:** o contador contar escalonamento de verdade (comparar o degrau da
-  tentativa com o da anterior, via `tasks.tier_atual`/modelo) **ou** a chave sair do resumo.
-
-### P-13 · Padrão de esforço vale para a ESCADA do motor? — **autor**
-- **O que é:** a decisão de hoje (**Codex sempre no `low`**, DeepSeek sempre no `high`)
-  vale para o A/B, mas a escada do motor escala também **por esforço**: o 4º degrau é
-  `codex sol/medium` e o 5º `codex astra/low`. Se o padrão valer para o motor, o 4º degrau
-  perde o `medium` e a escada fica só na troca de modelo.
-- **Caminhos:** `autodev/config.py` (matriz e `degrau_por_tier`), `README.md` (seção da
-  escada), `.autodev/config/policies.yaml`.
-- **Verificação:** `grep -n "medium\|high" autodev/config.py | head`
-- **Pronto quando:** você decidir entre (a) **manter** o `medium` no degrau 4 como
-  escalonamento por esforço, aplicando o padrão só aos testes A/B; ou (b) **aplicar** o
-  padrão no motor (todo degrau Codex em `low`, escalonando só por modelo).
-- **Hoje:** nada foi mexido no motor por causa disto — a pergunta está aberta e não
-  bloqueia a 003 (a rodada em curso usa `luna/low` no 1º degrau, como sempre).
+_P-12 e P-13 encerradas em 29/09 — estão no histórico de resolvidas acima._
 
 ---
 
@@ -156,6 +133,25 @@ Caminhos relativos à raiz do projeto (`~/Code/Coding_Machine`), salvo indicado.
 ---
 
 ## Resolvidas (histórico curto)
+
+- **29/09** — **P-13 resolvida: a escada do motor escala só por MODELO.** Decisão do autor:
+  o padrão de esforço vale também para o motor — todo degrau do Codex em **`low`**. O 4º
+  degrau era `sol/medium` (escalonamento por **esforço**, que o padrão não permite) e passou
+  a `astra/low`; como são 4 modelos para 5 degraus, o topo ocupa o 4º e o 5º
+  (`luna → terra → sol → astra → astra`, tudo em `low`). **Efeito de custo, para o autor
+  saber:** a 4ª tentativa fica ~50% mais cara que o antigo `sol/medium` (US$ 0,0201 contra
+  US$ 0,0133 por chamada, na régua medida) — em troca, ela chega com o modelo do topo em vez
+  de repetir o `sol` com mais esforço. Revisor segue `deepseek-flash/high` (P-13 é só a
+  escada de implementação). Testes da matriz atualizados em dois arquivos.
+- **29/09** — **P-12 resolvida: o contador `escalonamentos` conta de verdade.** O resumo lia
+  `json_extract(test_result,'$.tier')` e **ninguém escrevia `tier` ali**: todo sprint
+  reportava "0 escalonamentos" — número que se lê como fato. A fiação ficou do lado de quem
+  sabe: o orquestrador compara o modelo/esforço escolhido com o da chamada **anterior da
+  mesma task** e grava um evento `escalonamento` (com `de`, `para`, `tier_de`, `tier_para`);
+  o resumo conta esses eventos. Subir conta; **voltar ao degrau barato** (rearme por
+  dependência integrada, reabertura por defeito de contrato) **não conta** — senão o número
+  mediria movimento, não subida. Quem decide é `Config.escalonou()`, com teste próprio.
+  **327 verdes.**
 
 - **29/09** — **Relatório restrito às sprints 003 e 004, com a razão declarada.** Os três
   gráficos e todas as tabelas passaram a considerar só as duas sprints do protocolo atual

@@ -79,3 +79,5 @@
 [00:34:07] sprint DEVFACTORY-003: 7 tasks (0 novas) — ondas [['P01'], ['P02', 'P03'], ['P04'], ['P05'], ['P06'], ['P07']]
 [00:34:07] rodada dona: pid 3451713 — rodada única garantida pelo motor
 [00:34:07] P04 tentativa 1: codex gpt-5.6-luna/low
+[00:36:04] P04 t1: 42,961 tokens (codex-cli:rodape)
+[00:36:05] P04: testes exit=0 passed=3 failed=0 (configurado)
