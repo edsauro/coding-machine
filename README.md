@@ -186,12 +186,18 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 
 ## Estado atual
 
-- Para medir a suíte do orquestrador no terminal, rode
-  `.venv/bin/python -m pytest .autodev/tests/ -q`. Dentro do runner, que resolve
-  `python3` para o ambiente virtual, o comando equivalente é
-  `python3 -m pytest .autodev/tests/ -q`.
-- **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
-  ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
+- Para medir a contagem atual da suíte do orquestrador, rode
+  `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
+  use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
+  interpretador do projeto. O resumo do comando informa a contagem vigente.
+- Retrato do `state.db` informado pela revisão em 29/09/2026:
+  **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: ENCERRADO**
+  desde 28/09/2026 às 11:21:21 (10/10 tasks integradas);
+  **`DEVFACTORY-003`: EM EXECUÇÃO** desde 29/09/2026 às 08:14:02.
+  O estado factual vem do `state.db`; o `status:` do `sprint.yaml` é apenas
+  declaração de intenção. Esse banco operacional não é versionado no worktree.
+- A Sprint `DEVFACTORY-001` percorreu `EM_EXECUCAO → EM_VERIFICACAO →
+  ENCERRADO`. As 15 tarefas (T01–T15) estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
 - **Como as tarefas foram concluídas — leia antes de confiar no número:** as 14
   primeiras (T01–T14) foram concluídas por **evidência retroativa**. O código que
@@ -211,6 +217,48 @@ O projeto-fixture é gerado e não é versionado:
 ```bash
 .venv/bin/python .autodev/fixtures/criar_fixture.py
 ```
+
+---
+
+## Portão do plano
+
+Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar
+um sprint em estado `PLANEJADO`. Sprints iniciados antes do portão continuam
+retomáveis sem esse registro. Alterar o DAG depois da aprovação invalida o
+portão e exige nova aprovação.
+
+O checklist de plano derivado do D-16 é obrigatório como procedimento humano
+antes de aprovar:
+
+- cada task tem um **arquivo de teste próprio**, sem compartilhá-lo com outra task;
+- sem colisão de arquivo na mesma onda: nenhuma task pode compartilhar arquivo
+  com outra task da mesma onda;
+- ao editar módulo entregue por outra task, há um **critério de preservação**
+  do que já existe (por exemplo, “estender sem remover”);
+- todo critério cita um **arquivo ou comando** concreto e verificável;
+- uma task que estende módulo de outra depende dela, direta ou transitivamente.
+
+E4 cobre apenas caminhos de arquivo reconhecidos nos critérios ou no campo
+`teste` de cada task; um comando sozinho não satisfaz essa checagem.
+A exigência de concretude de cada critério também precisa de revisão humana.
+
+O verificador é somente leitura. Ele trata como erro: E1 (IDs duplicados,
+dependência inexistente ou ciclo), E2 (colisão na mesma onda), E3 (arquivo de
+teste compartilhado), E4 (task sem arquivo nomeado) e E5 (comando pytest fora
+da forma `python3 -m pytest ...`). A1/A2 são avisos; preservação e dependência
+exigem julgamento na aprovação humana.
+A execução do verificador é um passo manual do aprovador antes da aprovação:
+`aprovar` não executa esse script. Corrija os erros e avalie os avisos antes de
+registrar a aprovação humana.
+
+```bash
+python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
+```
+
+Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+direto para `dag.json` ou `--todos` para verificar todos os planos.
 
 ---
 

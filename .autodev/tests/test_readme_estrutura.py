@@ -16,6 +16,7 @@ TITULOS_ESPERADOS = [
     (2, "Planejador"),
     (2, "Os agentes"),
     (2, "Estado atual"),
+    (2, "Portão do plano"),
     (2, "Segurança"),
 ]
 
