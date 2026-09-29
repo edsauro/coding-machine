@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.10.2" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>RELATORIO-DE-PARADA</title>
+  <style>
+
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">
+@page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+body {
+font-family: "Source Sans 3", "DejaVu Sans", system-ui, sans-serif;
+font-size: 10.5pt; line-height: 1.55; color: #1c1c1c;
+max-width: 100%; margin: 0;
+}
+h1 { font-size: 19pt; color: #14395e; margin: 0 0 .2em; line-height: 1.25; }
+h2 {
+font-size: 13pt; color: #14395e; margin: 1.5em 0 .5em;
+border-bottom: 2px solid #d8e2ee; padding-bottom: .2em;
+page-break-after: avoid;
+}
+h3 { font-size: 11.5pt; color: #2c5382; margin: 1.2em 0 .4em; page-break-after: avoid; }
+p, li { orphans: 3; widows: 3; }
+ul, ol { padding-left: 1.3em; }
+li { margin-bottom: .25em; }
+
+h2 + ol {
+background: #fdf3f2; border-left: 4px solid #c0392b;
+padding: .8em 1em .8em 2.2em; border-radius: 0 4px 4px 0;
+page-break-inside: auto;
+}
+h2 + ol > li { margin-bottom: .5em; }
+table {
+border-collapse: collapse; width: 100%; margin: .9em 0;
+
+font-size: 8.2pt; page-break-inside: avoid;
+}
+th { background: #eef3f9; color: #14395e; text-align: left; }
+th, td { border: 1px solid #c9d6e4; padding: .3em .42em; }
+
+td { word-break: break-word; }
+tbody tr:nth-child(even) { background: #f8fafc; }
+
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+code {
+background: #f1f3f6; padding: .1em .35em; border-radius: 3px;
+font-family: "DejaVu Sans Mono", monospace; font-size: 9.4pt;
+}
+pre {
+background: #f6f8fa; border: 1px solid #dde3ea; border-radius: 4px;
+padding: .7em .9em; overflow-x: auto; font-size: 9pt;
+page-break-inside: avoid;
+}
+pre code { background: none; padding: 0; }
+img { max-width: 100%; height: auto; display: block; margin: 1em auto; }
+hr { border: none; border-top: 1px solid #dde3ea; margin: 1.6em 0; }
+strong { color: #0f2a45; }
+a { color: #1f5fa8; text-decoration: none; }
+
+.tabela-objetivos table { table-layout: fixed; width: 100%;
+
+page-break-inside: auto; break-inside: auto; }
+.tabela-objetivos th:nth-child(1), .tabela-objetivos td:nth-child(1) { width: 3.2em; }
+.tabela-objetivos th:nth-child(2), .tabela-objetivos td:nth-child(2) { width: 3.8em; }
+.tabela-objetivos td { vertical-align: top; }
+</style>
+</head>
+<body>
+<h1 id="relatório-de-parada-coding_machine-devfactory">Relatório de
+parada — Coding_Machine / DEVFACTORY</h1>
+<p><strong>Data da parada:</strong> 29/09/2026, ~13:30 (America/São
+Paulo) <strong>Autor do pedido:</strong> Ed (edsauro)
+<strong>Motivo:</strong> parar toda a execução e congelar o estado, com
+o histórico, as fases, os artefatos e os arquivos (usados e gerados) em
+um documento que sirva de <strong>base para um novo
+planejamento</strong>. <strong>Projeto:</strong>
+<code>~/Code/Coding_Machine</code> · branch <code>main</code> · HEAD
+<code>c49edb4</code> (sincronizado com <code>origin/main</code>).
+<strong>Estado final verificado:</strong> 4 sprints executadas,
+<strong>36/36 tarefas integradas</strong>, <strong>450 testes
+verdes</strong>, nenhum processo do motor rodando. <strong>Como
+ler:</strong> todo número aqui foi medido no <code>state.db</code>, no
+git ou no disco — não vem de resumo de memória. Onde há divergência com
+outro documento do repositório, o relatório aponta (ver §11).</p>
+<hr />
+<h2 id="a-parada-em-concreto-o-que-está-desligado-e-como-religar">0. A
+parada, em concreto (o que está desligado e como religar)</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>o que</th>
+<th>estado agora</th>
+<th>como religar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Execução de cron do Hermes</td>
+<td><strong>pausada</strong> (<code>hermes pause</code> → sentinel
+<code>~/.hermes/ESTOP</code>)</td>
+<td><code>hermes resume</code></td>
+</tr>
+<tr>
+<td>Cron <code>c9ff58c7925d</code> — vigia DEVFACTORY-003 (30 min)</td>
+<td><strong>pausado</strong></td>
+<td><code>hermes cron resume c9ff58c7925d</code></td>
+</tr>
+<tr>
+<td>Cron <code>5eb37e814ff2</code> — lembrete do A/B (segunda 9h)</td>
+<td><strong>pausado</strong></td>
+<td><code>hermes cron resume 5eb37e814ff2</code></td>
+</tr>
+<tr>
+<td>Cron <code>08885dbb91d1</code> — auditoria de recursos (ter/sáb
+4h)</td>
+<td><strong>pausado</strong></td>
+<td><code>hermes cron resume 08885dbb91d1</code></td>
+</tr>
+<tr>
+<td>Crons <code>329c5e1d03b4</code>, <code>aefcbe58a06c</code>,
+<code>de834c952bcd</code></td>
+<td>já concluídos/pausados antes</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Processo do motor (<code>autodev run</code>)</td>
+<td><strong>nenhum rodando</strong></td>
+<td><code>cd ~/Code/Coding_Machine &amp;&amp; .venv/bin/python -m autodev --sprint &lt;S&gt; run --rodadas 5</code></td>
+</tr>
+<tr>
+<td>Killswitch do motor (<code>state.db</code>)</td>
+<td>inativo (<code>STOP_SPRINT \| 0</code>)</td>
+<td><code>autodev start</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>O vigia era o único agente que podia <strong>religar o motor
+sozinho</strong> (o prompt dele mandava retomar o sprint quando não
+houvesse rodada viva). Sem ele e sem a entrega de cron, a parada é
+estável: nada acorda sozinho.</p>
+</blockquote>
+<p><strong>Última ação automatizada antes da parada:</strong> o vigia
+rodou às 13:06 e fez o commit <code>c49edb4</code> — “Revisao de
+processo: licoes aprendidas + verificador de dono de arquivo” — que
+criou <code>LICOES-APRENDIDAS.md</code> e
+<code>.autodev/scripts/checar_dono_arquivo.py</code>. Foi essa revisão
+que motivou a decisão de parar.</p>
+<hr />
+<h2 id="o-que-é-a-máquina-para-quem-for-replanejar-sem-contexto">1. O
+que é a máquina (para quem for replanejar sem contexto)</h2>
+<p>Uma fábrica de desenvolvimento autônomo: recebe uma especificação de
+sprint, quebra em tarefas (ou recebe o DAG pronto), executa cada tarefa
+com um agente de código dentro de um <strong>worktree isolado</strong>,
+roda testes determinísticos, submete a revisão por um <strong>agente
+diferente</strong> do que escreveu, corrige, re-testa e integra num
+branch de sprint — <strong>nunca em <code>main</code></strong>.</p>
+<pre><code>SPEC → PLAN → DAG DE TAREFAS → WORKTREE → AGENTE DE CÓDIGO → TESTE
+     → REVISÃO INDEPENDENTE → CORREÇÃO → RETESTE → INTEGRAÇÃO
+     → VALIDAÇÃO FINAL → RELATÓRIO</code></pre>
+<p>Três princípios que sustentam o desenho:</p>
+<ol type="1">
+<li><strong>Quem escreve não revisa</strong> (Codex escreve / Hermes
+revisa, por exemplo) — auto-revisão não encontra o erro de quem
+escreveu.</li>
+<li><strong>Cota de API não é falha.</strong> Esgotar cota vira espera
+de recurso, com checkpoint e retomada por <strong>continuação</strong>,
+não reinício.</li>
+<li><strong>Portão determinístico é piso, nunca aprovação.</strong> O
+que aprova é o revisor; o portão só barra o que é objetivamente
+quebrado.</li>
+</ol>
+<hr />
+<h2 id="histórico-por-fases">2. Histórico por fases</h2>
+<p>Datas e janelas vindas dos commits e do <code>state.db</code> (tabela
+<code>attempts</code>).</p>
+<h3 id="f0-252609-o-motor-nasce">F0 — 25–26/09 · o motor nasce</h3>
+<ul>
+<li>Sandbox <code>bubblewrap</code>, ciclo de vida do sprint, portões de
+integração, hook de commit, HAQ-001 (nenhuma credencial dentro do
+projeto: <code>~/.codex/auth.json</code> é montado <strong>somente
+leitura</strong>, nunca copiado).</li>
+<li><strong>DEVFACTORY-001</strong> executada (27/09, 02:03→02:07, 15
+chamadas). 15/15 tarefas — mas 14 delas foram marcadas depois como
+<code>origem=&#39;retroativo&#39;</code>: a evidência foi reconstruída, não
+observada. <strong>É um dos motivos de a 001 não estar no relatório de
+tentativas.</strong></li>
+</ul>
+<h3 id="f1-2709-os-primeiros-defeitos-de-motor">F1 — 27/09 · os
+primeiros defeitos de motor</h3>
+<ul>
+<li>D-07 (o modelo de dependências estava errado), D-08/D-09 (cota do
+AGY e colisão de “disk quota” no classificador), correção de privacidade
+(contexto de saúde fora do repo, com hook que barra).</li>
+<li><strong>Matriz do autor</strong> (<code>3b94dc2</code>): escadas de
+implementação e revisão, revisor Hermes, <code>desbloquear</code>,
+HAQ-001 registrado.</li>
+</ul>
+<h3 id="f2-2709-0309-2809-0952-o-planejador-devfactory-002">F2 — 27/09
+03:09 → 28/09 09:52 · o planejador (DEVFACTORY-002)</h3>
+<ul>
+<li>10 tarefas, <strong>73 chamadas</strong>, ~109k tokens. Objetivo: o
+motor passar a receber um pedido em texto livre e produzir spec + DAG
+executável, validado pelas mesmas regras da carga.</li>
+<li>D-16 (causa-raiz: o DAG mandava 8 de 10 tarefas escreverem
+<strong>no mesmo arquivo de teste</strong>), D-17, D-18, D-19
+(preservação com evolução), D-20 (a espera de cota usa o reset informado
+pelo agente), D-21/D-22 (registro de decisões e revisão retroativa por
+LLM).</li>
+<li>Entregas de apoio: tela permanente de eventos
+(<code>9155289</code>), guarda de sobreposição confiável (writer lock em
+vez de <code>pgrep</code>), <code>autodev plan</code> na CLI,
+planejamento do verificador de planos.</li>
+</ul>
+<h3 id="f3-2809-correções-e-a-segunda-frente-devfactory-004">F3 — 28/09
+· correções e a segunda frente (DEVFACTORY-004)</h3>
+<ul>
+<li>Revisão retroativa da sprint 2 → plano da 004 (4 tarefas). D-23:
+<strong>o comando dos critérios é o que o runner resolve</strong> — 12
+tentativas queimadas por erro de plano, não de modelo. D-24/D-25: rodada
+única garantida pelo motor e portão de segurança com escopo no
+diff.</li>
+<li>Fusão das branches na <code>main</code> por soma de lados (292
+verdes na época).</li>
+</ul>
+<h3 id="f4-2809-14191943-devfactory-004-executada">F4 — 28/09
+14:19→19:43 · DEVFACTORY-004 executada</h3>
+<ul>
+<li>4 tarefas, <strong>24 chamadas</strong>, ~138k tokens. Correções de
+README/hierarquia, teste de documentação isolando a seção do Planejador,
+comando de teste que roda nesta máquina.</li>
+<li>Relatório de tentativas nasce (<code>c661837</code>): chamadas de
+API por pacote e por tentativa.</li>
+</ul>
+<h3 id="f5-2809-2258-2909-0851-devfactory-003-a-maior">F5 — 28/09 22:58
+→ 29/09 08:51 · DEVFACTORY-003 (a maior)</h3>
+<ul>
+<li>7 tarefas, <strong>27 chamadas</strong>, ~1.541k tokens (a sprint
+que mais gastou, por causa das tentativas de contrato ruim e de uma
+espera de cota).</li>
+<li>Entregas: detecção de colisão de arquivo entre tarefas,
+<code>autodev prever</code> (impacto do plano antes de rodar,
+<code>plan_impacto.py</code>), <strong>portão de aprovação humana do
+plano</strong> e sua aceitação ponta a ponta.</li>
+<li>Em paralelo, no motor: P-09 (classe sem escalonamento não gasta
+degrau), P-10 (tokens por tentativa, lendo o rodapé do agente), P-12
+(contador de escalonamento direcional), P-13 (a escada escala <strong>só
+por modelo</strong>), P-14 (<code>cota.py</code> lê o
+<code>resetsAt</code> da janela certa) e P-15 (estratégias de alocação
+gravadas por task, com o portão humano <code>WAITING_HUMAN</code>).</li>
+<li>Relatório de tentativas reorganizado em <strong>4 painéis alinhados
+no eixo x</strong>, abertos por modelo de tentativa, mais a seção de
+estratégias, auditoria de data-hora por pacote e a marcação de qual
+estratégia cada pacote está.</li>
+</ul>
+<h3 id="f6-2909-pós-0900-revisão-e-parada">F6 — 29/09 (pós-09:00) ·
+revisão e parada</h3>
+<ul>
+<li>O vigia produz <code>LICOES-APRENDIDAS.md</code>: <strong>75% dos
+findings de rejeição são defeito de contrato ou de plano; 3% são da
+implementação.</strong> Conclusão que motivou a parada: escalar modelo
+num contrato quebrado paga caro para receber a mesma falha.</li>
+<li>Autor decide parar tudo → este documento.</li>
+</ul>
+<hr />
+<h2 id="arquitetura-do-motor-código">3. Arquitetura do motor
+(código)</h2>
+<p><code>autodev/</code> — <strong>21 módulos, 6.281 linhas</strong>
+(sem os testes):</p>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 40%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr>
+<th>módulo</th>
+<th style="text-align: right;">linhas</th>
+<th>papel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>orchestrator.py</code></td>
+<td style="text-align: right;">951</td>
+<td>laço principal: ondas, tentativas, escalonamento, trabalho por
+task</td>
+</tr>
+<tr>
+<td><code>state.py</code></td>
+<td style="text-align: right;">1005</td>
+<td>SQLite: tasks, attempts, eventos, métricas, killswitch,
+estratégia</td>
+</tr>
+<tr>
+<td><code>cli.py</code></td>
+<td style="text-align: right;">629</td>
+<td>comandos: <code>plan</code>, <code>run</code>, <code>status</code>,
+<code>desbloquear</code>, <code>prever</code>, <code>stop</code>,
+<code>start</code></td>
+</tr>
+<tr>
+<td><code>config.py</code></td>
+<td style="text-align: right;">424</td>
+<td>carrega YAML: agentes, modelos (escadas), políticas,
+estratégias</td>
+</tr>
+<tr>
+<td><code>planner.py</code></td>
+<td style="text-align: right;">391</td>
+<td>tipos do plano, validação de schema, colisão na mesma onda</td>
+</tr>
+<tr>
+<td><code>agents.py</code></td>
+<td style="text-align: right;">385</td>
+<td>invocação dos agentes (Codex CLI, AGY, Hermes) com sandbox</td>
+</tr>
+<tr>
+<td><code>report.py</code></td>
+<td style="text-align: right;">347</td>
+<td>relatório por sprint (snapshot do estado)</td>
+</tr>
+<tr>
+<td><code>review.py</code></td>
+<td style="text-align: right;">330</td>
+<td>revisor independente (modelo e esforço vindos da config)</td>
+</tr>
+<tr>
+<td><code>integration.py</code></td>
+<td style="text-align: right;">267</td>
+<td>merge de onda, portões build/testes/lint/segurança</td>
+</tr>
+<tr>
+<td><code>retry.py</code></td>
+<td style="text-align: right;">267</td>
+<td>classificação de falha e decisão de escalonamento</td>
+</tr>
+<tr>
+<td><code>testrunner.py</code></td>
+<td style="text-align: right;">237</td>
+<td>comando de teste declarado no critério + parsing</td>
+</tr>
+<tr>
+<td><code>sandbox.py</code></td>
+<td style="text-align: right;">234</td>
+<td><code>bubblewrap</code>, HOME isolado, montagem somente leitura</td>
+</tr>
+<tr>
+<td><code>errors.py</code></td>
+<td style="text-align: right;">201</td>
+<td>taxonomia de falhas (<code>REVIEW_FAILURE</code>,
+<code>CODEX_QUOTA</code>, …)</td>
+</tr>
+<tr>
+<td><code>worktree.py</code></td>
+<td style="text-align: right;">193</td>
+<td>worktree por task, a partir das dependências</td>
+</tr>
+<tr>
+<td><code>cota.py</code></td>
+<td style="text-align: right;">141</td>
+<td>lê <code>resetsAt</code> das janelas (5h e semanal) e calcula a
+espera</td>
+</tr>
+<tr>
+<td><code>haq.py</code></td>
+<td style="text-align: right;">126</td>
+<td>perguntas de bloqueio humano (HAQ) e seu ciclo</td>
+</tr>
+<tr>
+<td><code>killswitch.py</code></td>
+<td style="text-align: right;">83</td>
+<td>parada de projeto/sprint/task</td>
+</tr>
+<tr>
+<td><code>plan_prompt.py</code></td>
+<td style="text-align: right;">36</td>
+<td>prompt do planejador</td>
+</tr>
+<tr>
+<td><code>plan_impacto.py</code></td>
+<td style="text-align: right;">28</td>
+<td>impacto do plano antes de rodar</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Testes:</strong> 34 arquivos, <strong>5.792 linhas</strong>,
+<strong>450 verdes</strong> (comando na §13).</p>
+<p><strong>Fluxo de uma tentativa:</strong> task → worktree (base nas
+dependências) → agente no sandbox → testes do critério → revisor
+independente → APPROVE/REQUEST_CHANGES com findings → escalonamento de
+degrau se reprovar → commit → integração por onda → portões →
+<code>main</code> só por merge manual (o motor nunca faz).</p>
+<hr />
+<h2 id="artefatos-de-desenvolvimento-o-que-foi-construído-e-onde-vive">4.
+Artefatos de desenvolvimento (o que foi construído e onde vive)</h2>
+<h3 id="código-e-testes">4.1 Código e testes</h3>
+<ul>
+<li><code>autodev/*.py</code> (21 módulos) — o motor.</li>
+<li><code>.autodev/tests/*.py</code> (34 arquivos) — a suíte.</li>
+<li><code>.autodev/fixtures/</code> — fixtures (ex.: estrutura de README
+para o teste documental).</li>
+<li><code>.autodev/scripts/</code> — ferramentas operacionais, não
+portões: <code>tela.py</code> (tela permanente de eventos),
+<code>estado_003.sh</code> (status + linha de Telegram),
+<code>rodada_em_andamento.py</code> (guarda de sobreposição),
+<code>verificar_plano.py</code> (colisão e critério vago),
+<code>checar_dono_arquivo.py</code> (<strong>criado na revisão de
+29/09</strong>), <code>aceitacao_real.py</code>,
+<code>backfill_tokens.py</code>.</li>
+<li><code>.autodev/config/</code> — <code>agents.yaml</code>,
+<code>models.yaml</code> (escadas e matriz), <code>policies.yaml</code>
+(retry, <code>classes_sem_escalonamento</code>,
+<code>retry.estrategias</code> com a “3 degraus”).</li>
+</ul>
+<h3 id="planejamento-e-decisão-por-sprint">4.2 Planejamento e decisão
+(por sprint)</h3>
+<p>Cada sprint tem <code>spec.md</code>,
+<code>plan.md</code>/<code>dag.json</code>, <code>sprint.yaml</code>,
+<code>decisions.md</code>, <code>SPRINT-REPORT.md</code>,
+<code>HAQ.md</code>, <code>evidence/</code> e <code>logs/</code>:</p>
+<table>
+<colgroup>
+<col style="width: 13%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 13%" />
+</colgroup>
+<thead>
+<tr>
+<th>sprint</th>
+<th style="text-align: right;">decisions.md</th>
+<th style="text-align: right;">tasks</th>
+<th style="text-align: right;">chamadas</th>
+<th style="text-align: right;">tokens</th>
+<th>resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DEVFACTORY-001</td>
+<td style="text-align: right;">308 linhas</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">não medido</td>
+<td>15/15 (14 retroativas)</td>
+</tr>
+<tr>
+<td>DEVFACTORY-002</td>
+<td style="text-align: right;">667 linhas</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">73</td>
+<td style="text-align: right;">~109k</td>
+<td>10/10</td>
+</tr>
+<tr>
+<td>DEVFACTORY-003</td>
+<td style="text-align: right;">44 linhas</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">27</td>
+<td style="text-align: right;">~1.541k</td>
+<td>7/7</td>
+</tr>
+<tr>
+<td>DEVFACTORY-004</td>
+<td style="text-align: right;">210 linhas</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">~138k</td>
+<td>4/4</td>
+</tr>
+</tbody>
+</table>
+<h3 id="documentos-de-topo">4.3 Documentos de topo</h3>
+<ul>
+<li><code>README.md</code> — visão, fluxo, por que não é “Codex num
+loop”.</li>
+<li><code>Pendencias.md</code> (289 linhas) — o que está pendente, quem
+decide, caminhos.</li>
+<li><code>LICOES-APRENDIDAS.md</code> — revisão de processo de 29/09
+(ver §11: a tabela de sprints dele estava errada e foi corrigida com
+nota).</li>
+<li><code>TesteAB-eficiencia-LLM.md</code> — plano do estudo A/B
+(PLANEJADO, não executado).</li>
+<li><code>REPORT-TENTATIVAS-CODEX.md</code> + <code>report/</code> — o
+relatório visual e seus insumos.</li>
+</ul>
+<h3 id="relatório-de-tentativas-o-produto-analítico">4.4 Relatório de
+tentativas (o produto analítico)</h3>
+<ul>
+<li><code>report/gerar_relatorio_tentativas.py</code> — gerador
+(gráficos + Markdown da <strong>mesma</strong> agregação; o texto e o
+gráfico não podem divergir).</li>
+<li><code>report/paineis-comparacao.png</code> — os 4 painéis no mesmo
+eixo x: chamadas, custo, tokens e complexidade (linhas/arquivos do
+commit + findings do revisor), abertos por modelo.</li>
+<li><code>report/histograma-tentativas.png</code>,
+<code>distribuicao-tentativas.png</code>,
+<code>custo-por-pacote.png</code> — os gráficos detalhados.</li>
+<li><code>report/dados.json</code> — a agregação crua, auditável.</li>
+<li><code>report/relatorio-tentativas.pdf</code> (14 páginas, ~1 MB) +
+<code>.html</code> (autocontido) +
+<code>report/estilo-relatorio.css</code>.</li>
+<li>Escopo declarado: <strong>sprints 003 e 004</strong> (as únicas com
+registro de modelo por tentativa); 001 e 002 aparecem fora do recorte,
+com a razão no próprio PDF.</li>
+</ul>
+<h3 id="skills-do-hermes-usadasgeradas-para-este-trabalho">4.5 Skills do
+Hermes usadas/geradas para este trabalho</h3>
+<p><code>llm-coding-efficiency</code>, <code>capability-ab-test</code>,
+<code>agent-cost-audit</code>, <code>autonomous-coding-loop</code>,
+<code>agent-bridge</code>, <code>coding-agent-sessions</code>,
+<code>relatorio-para-pdf</code>, <code>resource-auditor</code>,
+<code>spec-solucoes-dev</code>, <code>claude-handoff</code>,
+<code>subagent-fan-out</code>, <code>computer-use</code>,
+<code>hermes-agent</code>.</p>
+<hr />
+<h2 id="arquivos-usados-entradas">5. Arquivos USADOS (entradas)</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>arquivo / recurso</th>
+<th>papel</th>
+<th>observação de segurança</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.autodev/state.db</code></td>
+<td><strong>fonte da verdade</strong> do motor (tasks, attempts,
+eventos, killswitch, estratégia)</td>
+<td>1,4 MB; lido em modo somente leitura pelo relatório</td>
+</tr>
+<tr>
+<td><code>.autodev/sprints/&lt;S&gt;/sprint.yaml</code>,
+<code>dag.json</code>, <code>spec.md</code>, <code>plan.md</code></td>
+<td>definição do backlog e do grafo</td>
+<td>entrada do orquestrador</td>
+</tr>
+<tr>
+<td><code>.autodev/config/*.yaml</code></td>
+<td>agentes, modelos/escadas, políticas e estratégias</td>
+<td>mudanças aqui só valem na próxima largada do processo</td>
+</tr>
+<tr>
+<td><code>~/.codex/auth.json</code></td>
+<td>credencial do Codex CLI</td>
+<td><strong>[nunca copiada]</strong>; montada somente leitura no sandbox
+(<code>--ro-bind-try</code>)</td>
+</tr>
+<tr>
+<td>CLI <code>agy</code> / <code>ask-agy</code></td>
+<td>agente de revisão da escada (Antigravity)</td>
+<td>cota própria; indisponibilidade cai para a reserva</td>
+</tr>
+<tr>
+<td><code>~/.hermes/.env</code></td>
+<td>chave do provider DeepSeek (revisor)</td>
+<td>fora do repositório</td>
+</tr>
+<tr>
+<td>gateway do Hermes (Telegram)</td>
+<td>aviso de status e portão humano</td>
+<td><code>hermes send --to telegram</code></td>
+</tr>
+<tr>
+<td><code>uv</code> + venv descartável</td>
+<td>matplotlib/pandoc/Chromium para os gráficos</td>
+<td>não se instala pacote de gráfico no venv do projeto</td>
+</tr>
+<tr>
+<td>repositório do projeto</td>
+<td>o alvo do trabalho de cada tarefa</td>
+<td>o motor integra em branch de sprint; <code>main</code> só por merge
+manual</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="arquivos-gerados-saídas">6. Arquivos GERADOS (saídas)</h2>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 40%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr>
+<th>caminho</th>
+<th style="text-align: right;">volume</th>
+<th>o que é</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.autodev/worktrees/</code></td>
+<td style="text-align: right;"><strong>91 MB</strong> (28
+worktrees)</td>
+<td>um worktree por tarefa, com branch própria</td>
+</tr>
+<tr>
+<td><code>.autodev/sprints/</code></td>
+<td style="text-align: right;">6,1 MB</td>
+<td>specs, planos, decisions, relatórios, <strong>137 arquivos de
+evidência</strong>, <strong>177 logs</strong></td>
+</tr>
+<tr>
+<td><code>.autodev/state.db</code></td>
+<td style="text-align: right;">1,4 MB</td>
+<td>banco de estado (cresce a cada tentativa)</td>
+</tr>
+<tr>
+<td><code>.autodev/tests/</code></td>
+<td style="text-align: right;">1,5 MB</td>
+<td>suíte (34 arquivos, 450 testes)</td>
+</tr>
+<tr>
+<td><code>.autodev/scripts/</code></td>
+<td style="text-align: right;">116 KB</td>
+<td>ferramentas operacionais</td>
+</tr>
+<tr>
+<td><code>.autodev/fixtures/</code></td>
+<td style="text-align: right;">208 KB</td>
+<td>fixtures de teste</td>
+</tr>
+<tr>
+<td><code>.autodev/config/</code></td>
+<td style="text-align: right;">20 KB</td>
+<td>configuração do motor</td>
+</tr>
+<tr>
+<td><code>.autodev/</code> total</td>
+<td style="text-align: right;"><strong>101 MB</strong></td>
+<td>inclui os worktrees</td>
+</tr>
+<tr>
+<td><code>report/</code></td>
+<td style="text-align: right;">4,1 MB</td>
+<td>PDF (1,0 MB), HTML (1,0 MB), 8 PNGs, <code>dados.json</code>, CSS,
+gerador</td>
+</tr>
+<tr>
+<td><code>.git/</code></td>
+<td style="text-align: right;">17 MB</td>
+<td>130 commits, 818 arquivos alterados acumulados, +141.724/−6.857
+linhas</td>
+</tr>
+<tr>
+<td>branches</td>
+<td style="text-align: right;"><strong>44</strong></td>
+<td>branches de task + de integração por sprint</td>
+</tr>
+<tr>
+<td>webhooks/crons</td>
+<td style="text-align: right;">7 jobs</td>
+<td>ver §0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="números-que-sustentam-decisões">7. Números que sustentam
+decisões</h2>
+<p><strong>Produtividade (fonte: <code>state.db</code> +
+LICOES-APRENDIDAS §3)</strong></p>
+<table>
+<thead>
+<tr>
+<th>sprint</th>
+<th style="text-align: right;">chamadas</th>
+<th style="text-align: right;">aprovadas</th>
+<th style="text-align: right;">REVIEW_FAILURE</th>
+<th style="text-align: right;">esperas de cota</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>001</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>002</td>
+<td style="text-align: right;">73</td>
+<td style="text-align: right;">43</td>
+<td style="text-align: right;">17</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td>003</td>
+<td style="text-align: right;">27</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>004</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td><strong>total</strong></td>
+<td style="text-align: right;"><strong>139</strong></td>
+<td style="text-align: right;"><strong>69 (50%)</strong></td>
+<td style="text-align: right;"><strong>42 (30%)</strong></td>
+<td style="text-align: right;"><strong>8</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Causa-raiz dos findings de rejeição (003/004, 147
+findings)</strong></p>
+<table>
+<thead>
+<tr>
+<th>causa raiz</th>
+<th style="text-align: right;">findings</th>
+<th style="text-align: right;">%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PLANO — dono de arquivo</td>
+<td style="text-align: right;">41</td>
+<td style="text-align: right;">28%</td>
+</tr>
+<tr>
+<td>CONTRATO — fato volátil</td>
+<td style="text-align: right;">33</td>
+<td style="text-align: right;">22%</td>
+</tr>
+<tr>
+<td>CONTRATO — critério ambíguo</td>
+<td style="text-align: right;">29</td>
+<td style="text-align: right;">20%</td>
+</tr>
+<tr>
+<td>CONTRATO — comando/runner</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">5%</td>
+</tr>
+<tr>
+<td>não classificado (precisa leitura manual)</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">22%</td>
+</tr>
+<tr>
+<td><strong>IMPLEMENTAÇÃO</strong></td>
+<td style="text-align: right;"><strong>5</strong></td>
+<td style="text-align: right;"><strong>3%</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Economia de cota (Codex)</strong> — modelo de custo:
+<strong>US$ 20/mês = 400% de cota semanal</strong>; 1% da janela de 5h ≈
+16.871 tokens; 1% da semanal ≈ 118.096 tokens; <strong>1% da semanal ≈
+US$ 0,05</strong> (≈ US$ 0,42/Mtok).</p>
+<p><strong>Teste A/B (prévia medida, ainda não executado como
+estudo)</strong> — custo por chamada:</p>
+<table>
+<thead>
+<tr>
+<th>braço</th>
+<th style="text-align: right;">US$ por chamada</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>deepseek-flash/high</code></td>
+<td style="text-align: right;">0,0027</td>
+</tr>
+<tr>
+<td><code>sol/low</code></td>
+<td style="text-align: right;">0,0066</td>
+</tr>
+<tr>
+<td><code>luna/low</code></td>
+<td style="text-align: right;">0,0105</td>
+</tr>
+<tr>
+<td><code>terra/low</code></td>
+<td style="text-align: right;">0,0106</td>
+</tr>
+<tr>
+<td><code>deepseek-v4-pro/high</code></td>
+<td style="text-align: right;">0,0133</td>
+</tr>
+<tr>
+<td><code>astra/low</code></td>
+<td style="text-align: right;">0,0201</td>
+</tr>
+</tbody>
+</table>
+<p>Padrão fixado pelo autor a partir disso: <strong>DeepSeek sempre no
+<code>high</code>, Codex sempre no <code>low</code></strong> — e
+<code>sol/high</code> reprovou (o <code>high</code> no Codex não comprou
+acerto).</p>
+<p><strong>Modelos efetivamente usados nas tentativas
+registradas:</strong></p>
+<table>
+<thead>
+<tr>
+<th>modelo/esforço</th>
+<th style="text-align: right;">chamadas</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gpt-5.6-luna/low</code></td>
+<td style="text-align: right;">47</td>
+</tr>
+<tr>
+<td><code>gpt-5.6-sol/low</code></td>
+<td style="text-align: right;">28</td>
+</tr>
+<tr>
+<td><code>gpt-5.6-sol/medium</code> (matriz antiga)</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr>
+<td><code>gpt-6-astra/low</code></td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr>
+<td><code>gpt-5.6-terra/low</code></td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr>
+<td><code>gpt-5.6-luna/medium</code> (matriz antiga)</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td><code>gpt-5.6-terra/medium</code> (matriz antiga)</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td>sem registro (sprint 001)</td>
+<td style="text-align: right;">15</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="decisões-registradas-o-que-não-se-rediscute-sem-motivo">8.
+Decisões registradas (o que não se rediscute sem motivo)</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>id</th>
+<th>decisão</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HAQ-001</td>
+<td>nenhuma credencial dentro do projeto;
+<code>~/.codex/auth.json</code> montado somente leitura</td>
+</tr>
+<tr>
+<td>D-07</td>
+<td>o modelo de dependências do motor estava errado; worktree nasce das
+dependências, integração a cada onda</td>
+</tr>
+<tr>
+<td>D-08/D-09</td>
+<td>cota do AGY não estaciona a task; “disk quota” entra no
+classificador</td>
+</tr>
+<tr>
+<td>D-15</td>
+<td>cota do agente secundário não para a task (regra “não parar”)</td>
+</tr>
+<tr>
+<td>D-16</td>
+<td>causa-raiz: o DAG mandava 8 de 10 tarefas escreverem no mesmo
+arquivo de teste</td>
+</tr>
+<tr>
+<td>D-17</td>
+<td>entrega vazia (pergunta de design em headless) e ruído de
+bytecode</td>
+</tr>
+<tr>
+<td>D-18</td>
+<td>worktree sempre na base atual; rodada em passadas que não param no
+tropeço</td>
+</tr>
+<tr>
+<td>D-19</td>
+<td>preservação com evolução (a regra absoluta do D-16 tornava uma
+tarefa impossível)</td>
+</tr>
+<tr>
+<td>D-20</td>
+<td>a espera de cota usa o reset informado pelo agente (a política vira
+teto)</td>
+</tr>
+<tr>
+<td>D-21/D-22</td>
+<td>registro das decisões; fechamento e revisão retroativa por LLM</td>
+</tr>
+<tr>
+<td>D-23</td>
+<td>o comando dos critérios é o que o <strong>runner</strong> resolve
+(12 tentativas queimadas por erro de plano)</td>
+</tr>
+<tr>
+<td>D-24</td>
+<td>rodada única garantida pelo motor (writer lock, não
+<code>pgrep</code>)</td>
+</tr>
+<tr>
+<td>D-25</td>
+<td>portão de segurança com escopo no diff</td>
+</tr>
+<tr>
+<td>P-12/P-13</td>
+<td>contador de escalonamento é direcional; a escada escala <strong>só
+por modelo</strong> (4º degrau <code>astra/low</code>)</td>
+</tr>
+<tr>
+<td>P-14</td>
+<td>a espera de cota mira a janela <strong>certa</strong>
+(<code>resetsAt</code>), não um prazo fixo de 5h10m</td>
+</tr>
+<tr>
+<td>P-15</td>
+<td>estratégia de alocação gravada por task e <strong>imutável</strong>
+na largada; “3 degraus” com parada para decisão do autor</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="pendências-abertas-no-momento-da-parada">9. Pendências abertas
+no momento da parada</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>id</th>
+<th>pendência</th>
+<th>estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P-11</td>
+<td>estudo A/B de eficiência de LLM com <strong>N≥3</strong></td>
+<td>plano escrito (<code>TesteAB-eficiencia-LLM.md</code>), prévia
+medida, <strong>nunca executado</strong></td>
+</tr>
+<tr>
+<td>P-14</td>
+<td>espera de cota pela janela certa</td>
+<td><strong>implementada</strong> (<code>cota.py</code> + testes)</td>
+</tr>
+<tr>
+<td>P-15</td>
+<td>estratégias de alocação + portão humano</td>
+<td><strong>implementada</strong>; a “3 degraus” <strong>nunca rodou em
+produção</strong></td>
+</tr>
+<tr>
+<td>—</td>
+<td>próxima sprint (005)</td>
+<td><strong>não planejada</strong>; fila vazia</td>
+</tr>
+</tbody>
+</table>
+<p>Também aberto, do <code>LICOES-APRENDIDAS.md</code> (§9, decisões do
+autor): refazer, revisar ou refazer do zero; e a avaliação sobre comprar
+API do Claude/Anthropic.</p>
+<hr />
+<h2 id="o-que-importa-para-o-próximo-planejamento">10. O que importa
+para o próximo planejamento</h2>
+<ol type="1">
+<li><strong>O gargalo é o contrato, não o modelo.</strong> 75% dos
+findings são de contrato/plano; 3% da implementação. Qualquer plano que
+comece por “modelo melhor” ataca 3% do problema.</li>
+<li><strong>Os verificadores existem e não são portões.</strong>
+<code>verificar_plano.py</code> e <code>checar_dono_arquivo.py</code>
+são scripts manuais. Hoje há 4 portões <strong>por task</strong> (build,
+testes, lint, segurança) na integração — e <strong>nenhum portão antes
+de gastar cota</strong>.</li>
+<li><strong>O planejador construído na sprint 002 nunca rodou de
+verdade.</strong> O laço ainda consome DAG escrito à mão.</li>
+<li><strong>Ativos levantados nunca usados</strong> (28 repositórios
+analisados, BMAD instalado, <code>superpowers</code> instalado como
+skill do Codex): zero menção em specs, decisions ou DAGs.</li>
+<li><strong>Custo por chamada é conhecido; a decisão de escalonamento
+pode ser econômica.</strong> Com a régua medida (§7), a pergunta “a
+4ª/5ª posição da escada se paga?” passa a ter resposta por pacote, não
+por impressão.</li>
+<li><strong>O que estreia na próxima sprint já tem mecanismo pronto e
+não exercitado:</strong> estratégia por task, portão humano
+(<code>WAITING_HUMAN</code>), espera de cota pela janela certa, linha de
+status no Telegram por pacote.</li>
+<li><strong>O que eu faria primeiro, se o replanejamento for
+meu:</strong> transformar <code>checar_dono_arquivo.py</code> e
+<code>verificar_plano.py</code> em <strong>portão de plano</strong>
+(antes da primeira chamada de agente), porque é o único item que mexe no
+gargalo dos 75%.</li>
+</ol>
+<hr />
+<h2 id="divergências-e-armadilhas-conhecidas-para-não-repetir-erro-de-leitura">11.
+Divergências e armadilhas conhecidas (para não repetir erro de
+leitura)</h2>
+<ol type="1">
+<li><strong><code>LICOES-APRENDIDAS.md</code> §2 estava errado</strong>
+(“002 = 1/10”, “004 em andamento”). O <code>state.db</code> mostra 002 =
+10/10 e 004 = 4/4. A nota de correção foi adicionada no topo do arquivo
+em 29/09; as causas-raiz (§3/§4) seguem válidas.</li>
+<li><strong>O relatório de tentativas cobre só as sprints 003 e
+004.</strong> A 001 não tem registro de modelo por tentativa (evidência
+retroativa) e a 002 rodou parte antes do registro. Não é omissão: está
+declarado no próprio PDF.</li>
+<li><strong>A “3 degraus” não tem execução real.</strong> O 003/P07 foi
+<strong>gravado</strong> nela, mas executou a escada antiga (a troca de
+código não valeu para a rodada em curso). Está marcado com
+<code>*</code> nos gráficos e na tabela.</li>
+<li><strong>Mudança de config não vale no processo em curso:</strong> a
+matriz de modelos é lida na largada.</li>
+<li><strong>Duas numerações de “tentativa”:</strong>
+<code>attempt</code> (sequência do banco, sempre <code>max+1</code>) e o
+<strong>degrau</strong> (contador da task, que reinicia em
+rearme/reabertura). Ler uma como a outra produz conclusão errada.</li>
+<li><strong><code>main</code> nunca é tocada pelo motor.</strong> 44
+branches vivas; a integração de sprint é um merge manual, feito depois
+com a suíte verde.</li>
+</ol>
+<hr />
+<h2 id="como-reproduzir-comandos">12. Como reproduzir (comandos)</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># suíte do motor (esperado: 450 verdes)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> ~/Code/Coding_Machine <span class="kw">&amp;&amp;</span> <span class="ex">.venv/bin/python</span> <span class="at">-m</span> pytest .autodev/tests <span class="at">-q</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># status de um sprint</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv/bin/python</span> <span class="at">-m</span> autodev <span class="at">--sprint</span> DEVFACTORY-003 status</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># rodar/retomar um sprint</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv/bin/python</span> <span class="at">-m</span> autodev <span class="at">--sprint</span> <span class="op">&lt;</span>SPRINT<span class="op">&gt;</span> run <span class="at">--rodadas</span> 5</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># relatório de tentativas (venv descartável com matplotlib)</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ex">~/.hermes/cache/scratch/venv_report/bin/python</span> report/gerar_relatorio_tentativas.py</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="ex">pandoc</span> REPORT-TENTATIVAS-CODEX.md <span class="at">-o</span> report/relatorio-tentativas.html <span class="at">--standalone</span> <span class="dt">\</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--embed-resources</span> <span class="at">--resource-path</span><span class="op">=</span>.:report <span class="at">--css</span><span class="op">=</span>report/estilo-relatorio.css <span class="dt">\</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">--metadata</span> lang=pt-BR</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="ex">chromium</span> <span class="at">--headless</span><span class="op">=</span>new <span class="at">--disable-gpu</span> <span class="at">--no-sandbox</span> <span class="at">--user-data-dir</span><span class="op">=</span>/tmp/chrome-pdf <span class="dt">\</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">--virtual-time-budget</span><span class="op">=</span>30000 <span class="at">--no-pdf-header-footer</span> <span class="dt">\</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">--print-to-pdf</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$PWD</span><span class="st">/report/relatorio-tentativas.pdf&quot;</span> <span class="dt">\</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;file://</span><span class="va">$PWD</span><span class="st">/report/relatorio-tentativas.html&quot;</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co"># parada e retomada de tudo</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="ex">hermes</span> pause      <span class="co"># liga o ESTOP (cron/kanban/gateway)</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="ex">hermes</span> resume     <span class="co"># religa</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="ex">hermes</span> cron list  <span class="co"># estado dos 7 jobs</span></span></code></pre></div>
+<p><strong>Ambiente no momento da parada:</strong> Arch Linux + Omarchy
+(<code>7.2.3-arch1-3</code>), Python 3.14.7, <code>.venv</code> do
+projeto com as dependências do motor, <code>uv</code> para o venv
+descartável dos gráficos, Chromium e pandoc para o PDF.</p>
+<hr />
+<h2 id="índice-de-arquivos-chave-para-o-replanejamento">13. Índice de
+arquivos-chave (para o replanejamento)</h2>
+<pre><code>~/Code/Coding_Machine/
+├── README.md                      visão e fluxo
+├── Pendencias.md                  o que está pendente + mapa dos produtos
+├── LICOES-APRENDIDAS.md           revisão de processo de 29/09 (com nota de correção)
+├── TesteAB-eficiencia-LLM.md      plano do estudo A/B (não executado)
+├── RELATORIO-DE-PARADA.md         este documento
+├── REPORT-TENTATIVAS-CODEX.md     relatório de tentativas (fonte do PDF)
+├── autodev/                       21 módulos, 6.281 linhas (o motor)
+├── .autodev/
+│   ├── config/                    agents.yaml, models.yaml, policies.yaml
+│   ├── tests/                     34 arquivos, 450 testes
+│   ├── scripts/                   tela, verificar_plano, checar_dono_arquivo, estado_003…
+│   ├── fixtures/                  fixtures de teste
+│   ├── sprints/DEVFACTORY-00X/    spec, plan/dag, sprint.yaml, decisions, report, HAQ, evidence, logs
+│   └── state.db                   fonte da verdade
+└── report/                        gerador + PNGs + PDF + HTML + CSS + dados.json
+
+~/workspace/s_llm-coding-efficiency/previa-custo/   medições do A/B (custos.py, medir.py, resultados.jsonl)
+~/spec_solucoes_dev/001-vigia-execucao-noturna.md   spec do vigia de execução noturna</code></pre>
+</body>
+</html>

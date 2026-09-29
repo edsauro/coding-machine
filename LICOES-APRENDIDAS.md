@@ -6,6 +6,12 @@ Nada aqui é impressão — o que não tem evidência está marcado como *hipót
 **Por que existe:** o autor parou o desenvolvimento em 29/09 ao concluir que
 "tem erro demais, problema demais". Este documento é a revisão que ele pediu.
 
+> **Correção (29/09, no fechamento/parada):** a tabela de sprints do §2 saiu de uma leitura
+> parcial e está **errada**. No `state.db` (fonte da verdade) o estado final é:
+> **001 = 15/15 · 002 = 10/10 · 003 = 7/7 · 004 = 4/4 integradas** (450 testes verdes na
+> `main`). As causas-raiz dos findings (§3, §4, §7) não dependem dessa tabela e seguem
+> válidas — e é o achado que importa: **o gargalo é o contrato, não o modelo.**
+
 ---
 
 ## 1. Sumário executivo
