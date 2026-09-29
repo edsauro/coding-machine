@@ -364,10 +364,10 @@ def cmd_prever(args) -> int:
     from . import plan_impacto
     from .planner import Plano, TaskPlano
 
-    sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint
+    sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
     dag_path = sprint_dir / "dag.json"
     if not dag_path.is_file():
-        mensagem = f"sprint não encontrado: {args.sprint}"
+        mensagem = f"sprint não encontrado: {args.sprint_id}"
         if args.json:
             print(json.dumps({"erro": mensagem}, ensure_ascii=False))
         else:
@@ -375,8 +375,12 @@ def cmd_prever(args) -> int:
         return 1
     try:
         dag = json.loads(dag_path.read_text(encoding="utf-8"))
+        if not isinstance(dag, dict) or "tasks" not in dag:
+            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
+        if not isinstance(dag["tasks"], list):
+            raise ValueError("dag.json: tasks deve ser uma lista")
         plano = Plano(
-            titulo=dag.get("titulo", args.sprint),
+            titulo=dag.get("titulo", args.sprint_id),
             objetivo=dag.get("objetivo", ""),
             repositorio=dag.get("repositorio", ""),
             prompt_original=dag.get("prompt_original", ""),
@@ -387,8 +391,8 @@ def cmd_prever(args) -> int:
             ) for t in dag["tasks"]],
         )
         relatorio = plan_impacto.impacto(plano)
-    except (OSError, ValueError, KeyError, TypeError) as erro:
-        mensagem = f"não foi possível prever o sprint {args.sprint}: {erro}"
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as erro:
+        mensagem = f"não foi possível prever o sprint {args.sprint_id}: {erro}"
         if args.json:
             print(json.dumps({"erro": mensagem}, ensure_ascii=False))
         else:
@@ -433,7 +437,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("sprint_id")
     s.add_argument("--json", action="store_true", dest="json",
                    help="imprime o relatório em JSON")
-    s.set_defaults(fn=cmd_prever, sprint="")
+    s.set_defaults(fn=cmd_prever)
 
     s = sub.add_parser("status")
     s.add_argument("-v", "--verbose", action="store_true")
@@ -495,8 +499,6 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("start").set_defaults(fn=cmd_start)
 
     args = p.parse_args(argv)
-    if args.cmd == "prever":
-        args.sprint = args.sprint_id
     return args.fn(args)
 
 
