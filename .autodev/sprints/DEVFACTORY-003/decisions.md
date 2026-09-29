@@ -5,7 +5,8 @@
 **Contexto:** o planejador gera `dag.json` automaticamente, mas a Sprint 2
 demonstrou que a validação estrutural não basta para garantir um plano seguro.
 
-**Evidência:** o D-16 da Sprint 2 registrou colisões de arquivos entre tasks,
+**Evidência:** o [D-16 da Sprint 2](../DEVFACTORY-002/decisions.md) registrou
+colisões de arquivos entre tasks,
 inclusive várias tasks escrevendo o mesmo arquivo de teste, causando regressões,
 reprovações e tasks bloqueadas.
 

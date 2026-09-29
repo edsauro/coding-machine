@@ -190,9 +190,12 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
   `.venv/bin/python -m pytest .autodev/tests/ -q` no terminal. Dentro do runner,
   use `python3 -m pytest .autodev/tests/ -q`, pois ele resolve `python3` para o
   interpretador do projeto. O resumo do comando informa a contagem vigente.
-- **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
-  **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
-  `status:` do `sprint.yaml` é apenas declaração de intenção.
+- Retrato do `state.db` informado pela revisão em 29/09/2026:
+  **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: ENCERRADO**
+  desde 28/09/2026 às 11:21:21 (10/10 tasks integradas);
+  **`DEVFACTORY-003`: EM EXECUÇÃO** desde 29/09/2026 às 08:14:02.
+  O estado factual vem do `state.db`; o `status:` do `sprint.yaml` é apenas
+  declaração de intenção. Esse banco operacional não é versionado no worktree.
 - A Sprint `DEVFACTORY-001` percorreu `EM_EXECUCAO → EM_VERIFICACAO →
   ENCERRADO`; suas tarefas estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.

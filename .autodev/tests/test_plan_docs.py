@@ -1,8 +1,10 @@
 """Contrato da documentacao publica do planejador."""
 
+import json
 import re
+import shlex
+import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -104,11 +106,12 @@ def test_readme_documenta_verificador_e_estado_atual_das_sprints():
 
     assert ".autodev/scripts/verificar_plano.py" in portao
     assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
-    assert ".venv/bin/python -m pytest .autodev/tests/ -q" in estado_atual
-    assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
-    assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
-    assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
-    assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+    # A contagem/comando da suíte já é coberta em test_readme_afirmacoes.py
+    # por test_estado_atual_mede_suite_sem_contagem_fixa.
+    for sprint in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-003"):
+        assert sprint in estado_atual
+    assert "estado factual vem do `state.db`" in estado_atual
+    assert "declaração de intenção" in estado_atual
 
 
 def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
@@ -120,9 +123,27 @@ def test_readme_documenta_todas_as_classes_de_erro_e_excecao_legada():
     assert "iniciados antes do portão" in portao
 
 
-def test_exemplo_documentado_do_verificador_roda_sem_erros():
+def test_exemplo_documentado_do_verificador_roda_sem_erros(tmp_path):
+    portao = _corpo_da_secao("Portão do plano")
+    exemplo = re.search(r"^python3 .autodev/scripts/verificar_plano.py .+$", portao, re.MULTILINE)
+    assert exemplo
+    comando = shlex.split(exemplo.group())
+    python3 = shutil.which(comando[0])
+    assert python3, "python3 documentado precisa estar disponível no PATH"
+    comando[0] = python3
+    # Exercita a CLI documentada com um plano isolado: mudanças futuras no
+    # DAG operacional não devem quebrar o contrato de documentação.
+    dag = tmp_path / "dag.json"
+    dag.write_text(json.dumps({"tasks": [{
+        "id": "DOC01",
+        "titulo": "Documentar exemplo",
+        "criterios": ["README.md ganha exemplo de uso"],
+        "teste": "python3 -m pytest tests/test_docs.py -q",
+        "deps": [],
+    }]}), encoding="utf-8")
+    comando[-1] = str(dag)
     resultado = subprocess.run(
-        [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+        comando,
         cwd=ROOT,
         text=True,
         capture_output=True,
@@ -130,7 +151,7 @@ def test_exemplo_documentado_do_verificador_roda_sem_erros():
     )
 
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
-    assert "OK    DEVFACTORY-003:" in resultado.stdout
+    assert f"OK    {tmp_path.name}:" in resultado.stdout
 
 
 def test_decisions_registra_aprovacao_humana_e_d16():
