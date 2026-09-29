@@ -73,3 +73,34 @@ Mais texto.
     assert "Texto próprio do planejador." in secao
     assert "Ciclo de vida do sprint" not in secao
     assert "Texto de outro assunto." not in secao
+
+
+def test_readme_documenta_portao_e_checklist_derivado_do_d16():
+    texto = README.read_text(encoding="utf-8").lower()
+
+    assert "portão do plano" in texto
+    assert "planejar" in texto and "prever" in texto
+    assert "aprovar" in texto and "rodar" in texto
+    assert "arquivo de teste próprio" in texto
+    assert "sem colisão de arquivo na mesma onda" in texto
+    assert "critério de preservação" in texto
+    assert "arquivo ou comando" in texto
+
+
+def test_readme_documenta_verificador_e_estado_atual_das_sprints():
+    texto = README.read_text(encoding="utf-8")
+
+    assert ".autodev/scripts/verificar_plano.py" in texto
+    assert "verificar_plano.py DEVFACTORY-003" in texto
+    assert "325" in texto or "testes" in texto.lower()
+    for sprint in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-003"):
+        assert sprint in texto
+
+
+def test_decisions_registra_aprovacao_humana_e_d16():
+    decisoes = README.parent / ".autodev/sprints/DEVFACTORY-003/decisions.md"
+    texto = decisoes.read_text(encoding="utf-8").lower()
+
+    assert "aprovação humana" in texto
+    assert "d-16" in texto
+    assert "sprint 2" in texto

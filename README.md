@@ -187,9 +187,12 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 ## Estado atual
 
 - Para medir a suíte do orquestrador no terminal, rode
-  `.venv/bin/python -m pytest .autodev/tests/ -q`. Dentro do runner, que resolve
+  `.venv/bin/python -m pytest .autodev/tests/ -q` (contagem atual: **325**). Dentro do runner, que resolve
   `python3` para o ambiente virtual, o comando equivalente é
   `python3 -m pytest .autodev/tests/ -q`.
+- **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM_EXECUÇÃO**;
+  **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
+  `status:` do `sprint.yaml` é apenas declaração de intenção.
 - **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
   ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
@@ -213,6 +216,32 @@ O projeto-fixture é gerado e não é versionado:
 ```
 
 ---
+
+<h2>Portão do plano</h2>
+
+Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
+plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
+com quem aprovou, quando e o hash do `dag.json`, e só então `run` pode executar o
+sprint. Alterar o DAG depois da aprovação invalida o portão e exige nova aprovação.
+
+O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
+
+- cada task tem um **arquivo de teste próprio**, sem compartilhá-lo com outra task;
+- sem colisão de arquivo na mesma onda: nenhuma task pode compartilhar arquivo
+  com outra task da mesma onda;
+- ao editar módulo entregue por outra task, há um **critério de preservação**
+  do que já existe (por exemplo, “estender sem remover”);
+- todo critério cita um **arquivo ou comando** concreto e verificável;
+- uma task que estende módulo de outra depende dela, direta ou transitivamente.
+
+O verificador somente leitura automatiza essas conferências antes da execução:
+
+```bash
+python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003
+```
+
+Ele retorna código diferente de zero quando encontra erro. Também aceita o caminho
+direto para `dag.json` ou `--todos` para verificar todos os planos.
 
 ## Segurança
 
