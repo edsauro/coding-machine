@@ -233,7 +233,7 @@ def _arquivos_da_task(task: TaskPlano) -> set[str]:
 
 def _normalizar_caminho(caminho: str) -> str:
     """Normaliza separadores e prefixos relativos sem acessar o filesystem."""
-    return config._normalizar_caminho(caminho)
+    return config.normalizar_caminho(caminho)
 
 
 def arquivo_de_teste(caminho: str) -> bool:
@@ -283,6 +283,8 @@ def colisoes_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
             for arquivo in sorted(
                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
             ):
+                if config.registro_compartilhado(arquivo):
+                    continue
                 if arquivo_de_teste(arquivo) or onda_a == onda_b:
                     colisoes.append({
                         "task_a": task_a.id,
@@ -304,12 +306,12 @@ def avisos_de_colisao_de_arquivo(plano: Plano) -> list[dict[str, str | int]]:
         for indice_b, task_b in enumerate(plano.tasks[indice + 1:], indice + 1):
             onda_a = onda_por_task[task_a.id]
             onda_b = onda_por_task[task_b.id]
-            if onda_a == onda_b:
-                continue
             for arquivo in sorted(
                 arquivos_mencionados[indice] & arquivos_mencionados[indice_b]
             ):
-                if not arquivo_de_teste(arquivo):
+                if config.registro_compartilhado(arquivo) or (
+                    onda_a != onda_b and not arquivo_de_teste(arquivo)
+                ):
                     avisos.append({
                         "task_a": task_a.id,
                         "task_b": task_b.id,

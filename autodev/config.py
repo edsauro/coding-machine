@@ -19,9 +19,14 @@ CONFIG = AUTODEV / "config"
 
 # Referências textuais a arquivos.  O planejador e o validador do motor usam a
 # mesma regra para que um plano aprovado não mude de significado no `init`.
+_EXTENSOES_ARQUIVO = (
+    "bash|c|cc|cfg|conf|cpp|css|csv|go|h|hpp|html|ini|java|js|json|jsx|kt|log|"
+    "md|php|py|rb|rs|sh|sql|svelte|toml|ts|tsx|txt|vue|xml|yaml|yml"
+)
 _ARQUIVO = re.compile(
-    r"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]*\b"
-    r"|\b(?:Makefile|Dockerfile)\b"
+    rf"(?<![\w.])(?:[\w.-]+/)*[\w-]+(?:\.[\w-]+)*\.({_EXTENSOES_ARQUIVO})\b"
+    r"|\b(?:Makefile|Dockerfile)\b",
+    re.IGNORECASE,
 )
 
 ESTADOS = ["NEW", "PLANNED", "QUEUED", "RUNNING", "VERIFYING", "BLOCKED",
@@ -196,7 +201,7 @@ class Task:
             raise ValueError(f"task {d['id']}: criterios precisa ser lista não vazia")
 
 
-def _normalizar_caminho(caminho: str) -> str:
+def normalizar_caminho(caminho: str) -> str:
     """Normaliza um caminho textual, sem acessar o filesystem."""
     caminho = caminho.replace("\\", "/")
     while caminho.startswith("./"):
@@ -204,10 +209,24 @@ def _normalizar_caminho(caminho: str) -> str:
     return PurePosixPath(caminho).as_posix().lstrip("/")
 
 
+# Compatibilidade para consumidores antigos; código novo usa a API pública.
+_normalizar_caminho = normalizar_caminho
+
+
+def registro_compartilhado(caminho: str) -> bool:
+    """Indica arquivos append-only que tasks paralelas podem compartilhar."""
+    partes = PurePosixPath(normalizar_caminho(caminho)).parts
+    return bool(
+        partes
+        and (partes[-1].casefold() == "decisions.md"
+             or {parte.casefold() for parte in partes} & {"logs", "evidence"})
+    )
+
+
 def arquivos_citados(textos: list[str]) -> set[str]:
     """Extrai caminhos citados em textos usando a regra comum do plano."""
     return {
-        _normalizar_caminho(encontrado.group(0))
+        normalizar_caminho(encontrado.group(0))
         for texto in textos
         if isinstance(texto, str)
         for encontrado in _ARQUIVO.finditer(texto.replace("\\", "/"))
@@ -271,9 +290,11 @@ def valida_dag(dag: dict) -> list[str]:
         for indice, id_a in enumerate(onda):
             for id_b in onda[indice + 1:]:
                 for arquivo in sorted(arquivos.get(id_a, set()) & arquivos.get(id_b, set())):
+                    if registro_compartilhado(arquivo):
+                        continue
                     erros.append(
                         f"colisão de arquivo entre {id_a} e {id_b}: "
-                        f"{arquivo} (onda {numero})"
+                        f"{arquivo} (onda {numero + 1})"
                     )
     return erros
 
