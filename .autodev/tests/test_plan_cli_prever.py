@@ -29,7 +29,7 @@ def test_prever_imprime_impacto_por_onda(tmp_path, monkeypatch, capsys):
     saida = capsys.readouterr().out
     assert "onda 1" in saida and "P01" in saida
     assert "src/a.py" in saida and "tests/test_a.py" in saida
-    assert "colis" in saida.lower()
+    assert "P01 x P02: tests/test_a.py" in saida
 
 
 def test_prever_json_e_valido(tmp_path, monkeypatch, capsys):
@@ -75,6 +75,33 @@ def test_prever_json_malformado_falha_sem_traceback(tmp_path, monkeypatch, capsy
     assert cli.main(["prever", "S-QUEBRADO"]) == 1
     captura = capsys.readouterr()
     assert "não foi possível prever" in captura.out
+    assert "Traceback" not in captura.out + captura.err
+
+
+def test_prever_dag_invalido_falha_sem_traceback(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "RAIZ", tmp_path)
+    _dag(tmp_path)
+    dag_path = tmp_path / ".autodev/sprints/S-001/dag.json"
+    dag = json.loads(dag_path.read_text(encoding="utf-8"))
+    dag["tasks"][1]["id"] = "P01"
+    dag_path.write_text(json.dumps(dag), encoding="utf-8")
+
+    assert cli.main(["prever", "S-001"]) == 1
+    captura = capsys.readouterr()
+    assert "DAG inválido" in captura.out
+    assert "ids duplicados" in captura.out
+    assert "Traceback" not in captura.out + captura.err
+
+
+def test_prever_rejeita_sprint_id_com_traversal(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "RAIZ", tmp_path)
+    fora = tmp_path / ".autodev/FORA"
+    fora.mkdir(parents=True)
+    (fora / "dag.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
+
+    assert cli.main(["prever", "../FORA"]) == 1
+    captura = capsys.readouterr()
+    assert "sprint inválido" in captura.out
     assert "Traceback" not in captura.out + captura.err
 
 

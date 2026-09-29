@@ -3,6 +3,7 @@
 Uso:
   python3 -m autodev detect                 # T01
   python3 -m autodev plan "pedido"          # cria um sprint planejado
+  python3 -m autodev prever <sprint_id> [--json]  # impacto antes de rodar
   python3 -m autodev init                   # valida DAG e cria as tasks
   python3 -m autodev status                 # estado atual do Sprint
   python3 -m autodev run [--parar-em T07]   # executa o Sprint
@@ -361,8 +362,18 @@ def cmd_plan(args) -> int:
 
 def cmd_prever(args) -> int:
     """Exibe o impacto de um DAG sem executar ou alterar o sprint."""
+    from .config import carrega_dag
     from . import plan_impacto
     from .planner import Plano, TaskPlano
+
+    if (not args.sprint_id or args.sprint_id in (".", "..")
+            or "/" in args.sprint_id or "\\" in args.sprint_id):
+        mensagem = f"sprint inválido: {args.sprint_id}"
+        if args.json:
+            print(json.dumps({"erro": mensagem}, ensure_ascii=False))
+        else:
+            print(mensagem)
+        return 1
 
     sprint_dir = RAIZ / ".autodev" / "sprints" / args.sprint_id
     dag_path = sprint_dir / "dag.json"
@@ -374,11 +385,7 @@ def cmd_prever(args) -> int:
             print(mensagem)
         return 1
     try:
-        dag = json.loads(dag_path.read_text(encoding="utf-8"))
-        if not isinstance(dag, dict) or "tasks" not in dag:
-            raise ValueError("dag.json deve ser um objeto com a chave 'tasks'")
-        if not isinstance(dag["tasks"], list):
-            raise ValueError("dag.json: tasks deve ser uma lista")
+        dag = carrega_dag(dag_path)
         plano = Plano(
             titulo=dag.get("titulo", args.sprint_id),
             objetivo=dag.get("objetivo", ""),
