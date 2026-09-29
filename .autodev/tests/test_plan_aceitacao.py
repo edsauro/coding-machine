@@ -111,6 +111,7 @@ def test_aceitacao_do_planejador(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "RAIZ", raiz)
     assert cli.main(["--sprint", sprint_id, "init"]) == 0
     assert "DAG valido: 3 tasks em 2 ondas" in capsys.readouterr().out
+    assert cli.main(["aprovar", sprint_id, "--por", "Teste de aceitacao"]) == 0
 
     dag = json.loads((destino / "dag.json").read_text(encoding="utf-8"))
     ondas = ordem_topologica(dag)

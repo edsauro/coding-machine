@@ -85,6 +85,10 @@ class ResultadoSprint:
         return sum(1 for t in self.tasks if t.estado_final in ("DONE", "INTEGRATED"))
 
 
+class PlanoInvalido(ValueError):
+    """Arquivos do plano não puderam ser carregados ou validados."""
+
+
 class Orquestrador:
     def __init__(self, raiz: str | Path, sprint: str, *,
                  modo_teste: bool = False, deadline_s: float | None = None):
@@ -222,7 +226,7 @@ class Orquestrador:
 
     def _validar_aprovacao(self) -> str | None:
         """Impede executar plano ainda não aprovado ou cujo DAG mudou."""
-        if (self.sprint_yaml.get("status") or "PLANEJADO") != "PLANEJADO":
+        if self.store.estado_sprint(self.sprint) not in (None, "PLANEJADO"):
             return None
         aprovacao = self.sprint_yaml.get("aprovacao")
         comando = f"autodev aprovar {self.sprint} --por <nome>"
@@ -237,15 +241,20 @@ class Orquestrador:
 
     def checar_aprovacao(self) -> str | None:
         """Checa o portão sem criar tasks ou alterar o estado persistido."""
-        self._ler_plano()
+        try:
+            self._ler_plano()
+        except ValueError as exc:
+            raise PlanoInvalido(str(exc)) from exc
         return self._validar_aprovacao()
 
     def _registrar_aprovacao(self) -> None:
         aprovacao = self.sprint_yaml["aprovacao"]
         hash_dag = aprovacao["hash_dag"]
-        for evento in self.store.eventos(self.sprint):
-            if evento["tipo"] != "aprovacao_plano":
-                continue
+        eventos = self.store.conn.execute(
+            "SELECT payload FROM events WHERE sprint_id=? AND tipo='aprovacao_plano'",
+            (self.sprint,),
+        ).fetchall()
+        for evento in eventos:
             try:
                 if json.loads(evento["payload"]).get("hash_dag") == hash_dag:
                     return
@@ -709,7 +718,7 @@ class Orquestrador:
             res.parado_por = motivo_lock
             res.duracao_s = 0.0
             return res
-        if (self.sprint_yaml.get("status") or "PLANEJADO") == "PLANEJADO":
+        if self.store.estado_sprint(self.sprint) in (None, "PLANEJADO"):
             self._registrar_aprovacao()
         self.log(f"rodada dona: pid {os.getpid()} — rodada única garantida pelo motor")
         parar_batimento = threading.Event()

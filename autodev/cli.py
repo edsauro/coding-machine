@@ -26,8 +26,6 @@ import sys
 import time
 from pathlib import Path
 
-import yaml
-
 RAIZ = Path(__file__).resolve().parent.parent
 SPRINT_PADRAO = "DEVFACTORY-001"
 
@@ -134,14 +132,14 @@ def _rodar_com_rodadas(o, args):
 
 
 def cmd_run(args) -> int:
-    from .orchestrator import Orquestrador
+    from .orchestrator import Orquestrador, PlanoInvalido
     import os
     os.environ.setdefault("AUTODEV_AGENT_TIMEOUT", "900")
     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste,
                      deadline_s=args.deadline)
     try:
         r = _rodar_com_rodadas(o, args)
-    except ValueError as exc:
+    except PlanoInvalido as exc:
         print(f"sprint invalido: {exc}")
         return 2
     assert r is not None  # rodadas >= 1 sempre executa ao menos uma passada
@@ -152,6 +150,10 @@ def cmd_run(args) -> int:
 
 
 def cmd_aprovar(args) -> int:
+    if (not args.sprint_id or args.sprint_id in (".", "..")
+            or "/" in args.sprint_id or "\\" in args.sprint_id):
+        print(f"sprint inválido: {args.sprint_id}")
+        return 1
     if args.sprint is not None and args.sprint != args.sprint_id:
         print(f"--sprint {args.sprint} diverge de sprint_id {args.sprint_id}")
         return 2
@@ -179,18 +181,23 @@ def cmd_aprovar(args) -> int:
         f"  {chave}: {json.dumps(valor, ensure_ascii=False)}\n"
         for chave, valor in aprovacao.items())
     texto = yaml_path.read_text(encoding="utf-8")
-    texto = re.sub(r"(?m)^aprovacao:\n(?:^[ \t].*(?:\n|$))*", "", texto)
+    texto = re.sub(
+        r"(?m)^aprovacao:(?:[ \t]*(?:null|~)[ \t]*\n?"
+        r"|[ \t]*\n(?:^[ \t]+.*(?:\n|$))*)",
+        "",
+        texto,
+    )
     yaml_path.write_text(texto.rstrip() + "\n" + bloco, encoding="utf-8")
     print(f"sprint {args.sprint_id} aprovado por {args.por}")
     return 0
 
 
 def cmd_resume(args) -> int:
-    from .orchestrator import Orquestrador
+    from .orchestrator import Orquestrador, PlanoInvalido
     o = Orquestrador(RAIZ, args.sprint, modo_teste=args.modo_teste)
     try:
         bloqueio = o.checar_aprovacao()
-    except ValueError as exc:
+    except PlanoInvalido as exc:
         print(f"sprint invalido: {exc}")
         return 2
     if bloqueio:
