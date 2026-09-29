@@ -55,8 +55,19 @@ def test_portao_do_plano(tmp_path, monkeypatch, projeto_pytest):
     # de validar o DAG/portão. O driver abaixo é o falso determinístico.
     fake_spec = escreve_fake_spec(
         tmp_path / "driver-falso.json",
-        {"acao": "editar", "arquivo": "src/calc.py",
-         "conteudo": "# entregue pelo driver falso\n\ndef soma(a, b):\n    return a + b\n"},
+        {
+            "sequencia": [
+                {
+                    "acao": "editar",
+                    "arquivo": "src/calc.py",
+                    "conteudo": (
+                        "# entregue pelo driver falso\n\n"
+                        "def soma(a, b):\n"
+                        "    return a + b\n"
+                    ),
+                }
+            ]
+        },
     )
     monkeypatch.setenv("AUTODEV_FAKE_AGENT", "1")
     monkeypatch.setenv("AUTODEV_FAKE_SPEC", str(fake_spec))
