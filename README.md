@@ -186,15 +186,14 @@ responder sem terminal interativo. Eles não fazem parte deste repositório.
 
 ## Estado atual
 
-- Para medir a suíte do orquestrador no terminal, rode
-  `.venv/bin/python -m pytest .autodev/tests/ -q` (contagem atual: **325**). Dentro do runner, que resolve
-  `python3` para o ambiente virtual, o comando equivalente é
-  `python3 -m pytest .autodev/tests/ -q`.
-- **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM_EXECUÇÃO**;
+- Para medir a contagem atual da suíte do orquestrador, rode
+  `python3 -m pytest .autodev/tests/ -q`. O runner resolve `python3` para o
+  interpretador do projeto, portanto o resultado é a medida vigente da suíte.
+- **Sprint `DEVFACTORY-001`: ENCERRADO**; **`DEVFACTORY-002`: EM EXECUÇÃO**;
   **`DEVFACTORY-003`: PLANEJADO**. O estado factual vem do `state.db`; o
   `status:` do `sprint.yaml` é apenas declaração de intenção.
-- **Sprint `DEVFACTORY-001`: ENCERRADO** (`EM_EXECUCAO → EM_VERIFICACAO →
-  ENCERRADO`). As 15 tarefas estão concluídas e o relatório está em
+- A Sprint `DEVFACTORY-001` percorreu `EM_EXECUCAO → EM_VERIFICACAO →
+  ENCERRADO`; suas tarefas estão concluídas e o relatório está em
   `.autodev/sprints/DEVFACTORY-001/SPRINT-REPORT.md`.
 - **Como as tarefas foram concluídas — leia antes de confiar no número:** as 14
   primeiras (T01–T14) foram concluídas por **evidência retroativa**. O código que
@@ -217,7 +216,7 @@ O projeto-fixture é gerado e não é versionado:
 
 ---
 
-<h2>Portão do plano</h2>
+## Portão do plano
 
 Todo sprint segue o fluxo **planejar → prever → aprovar → rodar**. `plan` gera o
 plano, `prever` mostra o impacto por onda, `aprovar` registra a aprovação humana
@@ -234,7 +233,9 @@ O checklist de plano derivado do D-16 é obrigatório antes de aprovar:
 - todo critério cita um **arquivo ou comando** concreto e verificável;
 - uma task que estende módulo de outra depende dela, direta ou transitivamente.
 
-O verificador somente leitura automatiza essas conferências antes da execução:
+O verificador é somente leitura: trata E2/E3/E4 como erro e sinaliza A1/A2 como
+aviso; preservação e dependência exigem julgamento na aprovação humana.
+Execute-o antes da aprovação:
 
 ```bash
 python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003

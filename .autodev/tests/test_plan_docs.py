@@ -1,10 +1,22 @@
 """Contrato da documentacao publica do planejador."""
 
-from pathlib import Path
 import re
+import subprocess
+import sys
+from pathlib import Path
 
 
-README = Path(__file__).parents[2] / "README.md"
+ROOT = Path(__file__).parents[2]
+README = ROOT / "README.md"
+
+
+def _corpo_da_secao(titulo: str) -> str:
+    texto = README.read_text(encoding="utf-8")
+    inicio = re.search(rf"^## {re.escape(titulo)}$", texto, re.MULTILINE)
+    assert inicio, f"README não contém a seção {titulo!r} como título Markdown"
+    proximo = re.search(r"^## ", texto[inicio.end():], re.MULTILINE)
+    fim = len(texto) if proximo is None else inicio.end() + proximo.start()
+    return texto[inicio.start():fim]
 
 
 def _secao_planejador() -> str:
@@ -76,7 +88,7 @@ Mais texto.
 
 
 def test_readme_documenta_portao_e_checklist_derivado_do_d16():
-    texto = README.read_text(encoding="utf-8").lower()
+    texto = _corpo_da_secao("Portão do plano").lower()
 
     assert "portão do plano" in texto
     assert "planejar" in texto and "prever" in texto
@@ -88,17 +100,33 @@ def test_readme_documenta_portao_e_checklist_derivado_do_d16():
 
 
 def test_readme_documenta_verificador_e_estado_atual_das_sprints():
-    texto = README.read_text(encoding="utf-8")
+    portao = _corpo_da_secao("Portão do plano")
+    estado_atual = _corpo_da_secao("Estado atual")
 
-    assert ".autodev/scripts/verificar_plano.py" in texto
-    assert "verificar_plano.py DEVFACTORY-003" in texto
-    assert "325" in texto or "testes" in texto.lower()
-    for sprint in ("DEVFACTORY-001", "DEVFACTORY-002", "DEVFACTORY-003"):
-        assert sprint in texto
+    assert ".autodev/scripts/verificar_plano.py" in portao
+    assert "python3 .autodev/scripts/verificar_plano.py DEVFACTORY-003" in portao
+    assert "python3 -m pytest .autodev/tests/ -q" in estado_atual
+    assert not re.search(r"\b\d+\s*(?:testes?|tests?|passed|verdes)\b", estado_atual, re.I)
+    assert re.search(r"DEVFACTORY-001`: ENCERRADO", estado_atual)
+    assert re.search(r"DEVFACTORY-002`: EM EXECUÇÃO", estado_atual)
+    assert re.search(r"DEVFACTORY-003`: PLANEJADO", estado_atual)
+
+
+def test_exemplo_documentado_do_verificador_roda_sem_erros():
+    resultado = subprocess.run(
+        [sys.executable, ".autodev/scripts/verificar_plano.py", "DEVFACTORY-003"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert resultado.returncode == 0, resultado.stdout + resultado.stderr
+    assert "OK    DEVFACTORY-003:" in resultado.stdout
 
 
 def test_decisions_registra_aprovacao_humana_e_d16():
-    decisoes = README.parent / ".autodev/sprints/DEVFACTORY-003/decisions.md"
+    decisoes = ROOT / ".autodev/sprints/DEVFACTORY-003/decisions.md"
     texto = decisoes.read_text(encoding="utf-8").lower()
 
     assert "aprovação humana" in texto
